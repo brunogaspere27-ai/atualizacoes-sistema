@@ -1,0 +1,64 @@
+Suggested commit for these changes
+
+Commit message:
+chore: security, dev tooling, CI, UI theme and dashboard polish
+
+Files changed (high level):
+- .env (removed from repo) -> use .env.example
+- .env.example (added)
+- requirements-dev.txt (added)
+- .pre-commit-config.yaml (added)
+- .github/workflows/ci.yml (added)
+- requirements.txt (appended with Gemma3 optional deps)
+- scripts/setup_gemma3.ps1 (added)
+- scripts/install_dev_tools.ps1 (added)
+- models/gemma3_runner.py (added)
+- config/gemma3.json (added)
+- README_GEMMA3.md (added)
+- telas/theme.py (added)
+- main.py (updated to use theme)
+- telas/dashboard.py (refactored to use theme)
+- telas/relatorios.py (refactored to use theme)
+- migrations/ (added runner and initial migration)
+
+Recommended Git steps (run locally):
+
+1) Install dev tools and hooks (PowerShell):
+
+```powershell
+.\scripts\install_dev_tools.ps1
+```
+
+2) Stage and commit changes:
+
+```bash
+git add -A
+git commit -m "chore: security, dev tooling, CI, UI theme and dashboard polish"
+```
+
+3) Run pre-commit auto-fixes and re-commit if needed:
+
+```bash
+pre-commit run --all-files
+git add -A
+git commit -m "style: apply pre-commit fixes" || echo "No staged changes"
+```
+
+4) Push to remote:
+
+```bash
+git push origin main
+```
+
+Important next steps (manual):
+- Rotate Supabase credentials immediately (you removed `.env` from repo but credentials may be leaked elsewhere). Do not re-add secrets to Git.
+- Run migrations locally after ensuring the DB exists:
+
+```powershell
+python migrations/apply_migrations.py
+```
+
+- Review the UI changes (`telas/theme.py`, `telas/dashboard.py`, `telas/relatorios.py`) and tweak colors in `telas/theme.py` if desired.
+- If you want to remove the `.env` from Git history, coordinate with your team and follow a safe history-rewrite process (e.g., `git filter-repo`) — this is destructive.
+
+If you want I can prepare a single squash commit message and suggested PR description. Reply "prepare PR" and I'll generate a suggested PR body.

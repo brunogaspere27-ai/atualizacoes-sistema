@@ -1,0 +1,7 @@
+{
+  "model_name": "gemma3-12b",
+  "repo_id": "<your-hf-repo-id-here>",
+  "local_path": "models/gemma3_local",
+  "dtype": "auto",
+  "notes": "Set `repo_id` to the Hugging Face repo if you want direct download. For local GGML quantized weights, set `local_path`."
+}

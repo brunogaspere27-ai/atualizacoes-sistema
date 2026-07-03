@@ -1,0 +1,15 @@
+{
+    "empresa": "CW TRANSPORTADORA",
+    "cnpj": "",
+    "telefone": "",
+    "email": "",
+    "cidade": "Cascavel",
+    "uf": "PR",
+    "meta_lucro": "10000",
+    "imposto_percentual": "3",
+    "pasta_relatorios": "relatorios_gerados",
+    "alerta_revisao": "8000",
+    "revisao_obrigatoria": "10000",
+    "tema": "Premium Escuro",
+    "cor_tema": "Vermelho"
+}
