@@ -1,5 +1,11 @@
 # CW Transportadora - .gitignore
 
+# NUNCA commitar estes arquivos — contêm senhas e dados sensíveis!
+.env_para_pc_empresa
+.env_local
+.env.local
+sync_config.json
+
 # Variáveis de ambiente (credenciais)
 .env
 

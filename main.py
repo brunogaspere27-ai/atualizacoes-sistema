@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 
 from telas.theme import setup_theme
 from utils.splash_screen import SplashScreen
+from utils.env_check import verificar_configuracao_env
 
 
 def mostrar_erro_profissional(master, titulo: str, mensagem: str, detalhe: str | None = None):
@@ -68,6 +69,13 @@ class App(ctk.CTk):
         self.splash.update_status("Preparando ambiente...")
         criar_banco()
         criar_caminhoes_padrao()
+
+        # Verificar configuração de nuvem e avisar usuário se necessário
+        _cloud_ok, _cloud_msg = verificar_configuracao_env()
+        if not _cloud_ok:
+            self.after(900, lambda m=_cloud_msg: messagebox.showwarning(
+                "⚠️ Sincronização Desativada", m
+            ))
 
         self.splash.update_status("Carregando interface...")
         self.backup_automatico()
