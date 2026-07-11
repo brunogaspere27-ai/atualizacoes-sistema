@@ -158,6 +158,12 @@ class Settings:
             "enable_auto_update": True,
             "update_url": "",  # URL alternativa (GitHub, etc.)
             "update_timeout": 10,
+            # Configurações do GitHub para Auto-Update
+            "github_repo_owner": "",  # Ex: "usuario"
+            "github_repo_name": "",  # Ex: "cw-transportadora"
+            "github_token": "",  # Personal Access Token para repositório privado
+            "github_use_cdn": True,  # Usar GitHub como CDN para distribuição
+            "github_release_branch": "main",  # Branch para releases
         }
 
     def _carregar_config_json(self) -> Dict[str, Any]:
@@ -421,6 +427,38 @@ class Settings:
         path = self.dados_dir / "updates"
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @property
+    def github_repo_owner(self) -> str:
+        """Proprietário do repositório GitHub."""
+        return self._config_json.get("github_repo_owner", "")
+
+    @property
+    def github_repo_name(self) -> str:
+        """Nome do repositório GitHub."""
+        return self._config_json.get("github_repo_name", "")
+
+    @property
+    def github_token(self) -> str:
+        """Token de acesso pessoal do GitHub."""
+        return self._config_json.get("github_token", "")
+
+    @property
+    def github_use_cdn(self) -> bool:
+        """Usar GitHub como CDN para distribuição."""
+        return self._config_json.get("github_use_cdn", True)
+
+    @property
+    def github_release_branch(self) -> str:
+        """Branch para releases no GitHub."""
+        return self._config_json.get("github_release_branch", "main")
+
+    @property
+    def github_repo_full_name(self) -> str:
+        """Nome completo do repositório (owner/repo)."""
+        if self.github_repo_owner and self.github_repo_name:
+            return f"{self.github_repo_owner}/{self.github_repo_name}"
+        return ""
 
 
 settings = Settings()

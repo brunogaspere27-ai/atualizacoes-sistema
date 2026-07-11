@@ -5,6 +5,7 @@
 .env_local
 .env.local
 sync_config.json
+configuracoes.json
 
 # Variáveis de ambiente (credenciais)
 .env

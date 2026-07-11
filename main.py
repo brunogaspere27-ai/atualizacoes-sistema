@@ -11,6 +11,7 @@ from PIL import Image
 from config.settings import settings
 from services.sync_service import sync_service
 from services.update_service import update_service
+from services.github_update_service import github_update_service
 from services.financeiro_service import financeiro_service
 from services.auth_service import auth_service
 from services.auditoria_service import auditoria_service, ACAO_LOGOUT
@@ -659,7 +660,11 @@ class App(ctk.CTk):
         """Verifica atualizações em background ao iniciar o aplicativo."""
         def tarefa():
             try:
-                resultado = update_service.check_for_updates()
+                # Usar GitHub se configurado, caso contrário usa update_service original
+                if settings.github_use_cdn and settings.github_repo_owner and settings.github_repo_name:
+                    resultado = github_update_service.check_for_updates()
+                else:
+                    resultado = update_service.check_for_updates()
                 
                 if resultado.get("has_update") and resultado.get("download_url"):
                     self.after(0, lambda: self.mostrar_dialogo_atualizacao(resultado))
