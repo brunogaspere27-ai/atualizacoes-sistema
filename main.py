@@ -11,10 +11,17 @@ from PIL import Image
 from config.settings import settings
 from services.sync_service import sync_service
 from services.update_service import update_service
+from services.financeiro_service import financeiro_service
+from services.auth_service import auth_service
+from services.auditoria_service import auditoria_service, ACAO_LOGOUT
 from utils.database import criar_banco, criar_caminhoes_padrao
 from utils.sync import contar_pendencias_sync
 from utils.logger import get_logger
 
+from telas.login import TelaLogin
+from telas.alterar_senha import ModalAlterarSenha
+from telas.gerenciar_usuarios import TelaGerenciarUsuarios
+from telas.auditoria import TelaAuditoria
 from telas.dashboard import Dashboard
 from telas.operacoes import TelaOperacoes
 from telas.contas import TelaContas
@@ -25,8 +32,12 @@ from telas.combustivel import TelaCombustivel
 from telas.manutencao import TelaManutencao
 from telas.relatorios import TelaRelatorios
 from telas.configuracoes import TelaConfiguracoes
+from telas.atualizacao import TelaAtualizacao
+from telas.historico_versoes import TelaHistoricoVersoes
 from telas.notas import TelaNotas
 from telas.criar_viagem import TelaCriarViagem
+from telas.publicar_versao import abrir_publicar_versao
+from telas.admin_atualizacoes import abrir_admin_atualizacoes
 
 logger = get_logger(__name__)
 
@@ -70,6 +81,9 @@ class App(ctk.CTk):
         criar_banco()
         criar_caminhoes_padrao()
 
+        # Garantir usuario mestre existe
+        auth_service.garantir_usuario_mestre()
+
         # Verificar configuração de nuvem e avisar usuário se necessário
         _cloud_ok, _cloud_msg = verificar_configuracao_env()
         if not _cloud_ok:
@@ -84,6 +98,12 @@ class App(ctk.CTk):
         self.botoes_menu = []
         self.tela_atual = "dashboard"
         self.mapa_botoes = {}
+        self.sidebar = None
+        self.area_direita = None
+        self.container = None
+        self.header = None
+        self._login_view = None
+
         self.titulos_telas = {
             "dashboard": ("PAINEL PRINCIPAL", "Controle operacional, financeiro e logístico da frota"),
             "operacoes": ("NOVA OPERAÇÃO", "Registro de transferências SP → Cascavel"),
@@ -97,26 +117,125 @@ class App(ctk.CTk):
             "manutencao": ("MANUTENÇÃO", "Registro e controle de manutenção da frota"),
             "funcionarios": ("FUNCIONÁRIOS", "Cadastro de equipe e folha de pagamento"),
             "configuracoes": ("CONFIGURAÇÕES", "Empresa, backup, tema e preferências do sistema"),
+            "historico_versoes": ("HISTORICO DE VERSOES", "Informacoes de atualizacoes e releases do sistema"),
+            "usuarios": ("GERENCIAR USUÁRIOS", "Administração de usuários e permissões"),
+            "auditoria": ("AUDITORIA", "Registro de ações do sistema"),
+            "publicar_versao": ("PUBLICAR VERSÃO", "Distribuir nova versão para todos os computadores"),
+            "admin_atualizacoes": ("ADMINISTRAÇÃO DE ATUALIZAÇÕES", "Gerencie publicações e visualize histórico de versões"),
         }
 
+        # Verificar sessao salva (Lembrar de mim)
+        usuario_salvo = auth_service.verificar_sessao_salva()
+
+        if usuario_salvo:
+            self.splash.update_status(f"Bem-vindo, {usuario_salvo['nome_completo']}!")
+            self._iniciar_app_principal()
+        else:
+            self._mostrar_tela_login()
+
+    def _mostrar_tela_login(self):
+        """Exibe a tela de login no container principal."""
+        # Limpar qualquer view existente
+        for child in self.winfo_children():
+            if child not in (getattr(self, 'splash', None),):
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        self._login_view = TelaLogin(self, on_login_sucesso=self._on_login_sucesso)
+        self._login_view.pack(fill="both", expand=True)
+
+        # Fechar splash se ainda estiver aberto
+        try:
+            if hasattr(self, 'splash') and self.splash:
+                self.after(300, self.splash.close)
+        except Exception:
+            pass
+
+    def _on_login_sucesso(self, usuario_dados):
+        """Chamado quando o login é bem-sucedido."""
+        # Destruir tela de login
+        if self._login_view:
+            self._login_view.destruir_binds()
+            self._login_view.destroy()
+            self._login_view = None
+
+        # Verificar se precisa alterar senha (primeiro login)
+        if usuario_dados.get("deve_alterar_senha"):
+            ModalAlterarSenha(
+                self,
+                obrigatorio=True,
+                on_sucesso=lambda: self._iniciar_app_principal(),
+            )
+        else:
+            self._iniciar_app_principal()
+
+    def _iniciar_app_principal(self):
+        """Constroi a interface principal apos autenticacao."""
         self.splash.update_status("Montando interface...")
+        self.botoes_menu = []
+        self.mapa_botoes = {}
         self.criar_sidebar()
         self.criar_area_principal()
         self.mostrar_dashboard()
         self.atualizar_ultima_sync(sync_service.ultimo_resultado)
 
         self.splash.update_status("Sincronizando dados...")
-        self.sincronizar_nuvem(mostrar_mensagem=False)
+        self.sincronizar_nuvem(mostrar_mensagem=False, reparar_fila=True)
         self.iniciar_sync_automatico()
 
-        # Verificar atualizações ao iniciar (em background)
         self.verificar_atualizacao_inicio()
-
-        # Configurar atalhos de teclado
         self.configurar_atalhos()
-        
+
         self.splash.update_status("Pronto!")
         self.after(500, self.splash.close)
+
+    def fazer_logout(self):
+        """Faz logout: limpa sessao e volta para tela de login."""
+        usuario = auth_service.usuario_atual
+        if usuario:
+            auditoria_service.registrar(
+                ACAO_LOGOUT, "auth", usuario["usuario"],
+                usuario_id=usuario["id"],
+                usuario_nome=usuario["nome_completo"],
+            )
+        auth_service.logout()
+
+        # Destruir UI principal
+        if self.sidebar:
+            self.sidebar.destroy()
+            self.sidebar = None
+        if self.area_direita:
+            self.area_direita.destroy()
+            self.area_direita = None
+
+        self._mostrar_tela_login()
+
+    def mostrar_alterar_senha(self):
+        """Abre modal para alterar a propria senha."""
+        ModalAlterarSenha(self, obrigatorio=False)
+
+    def mostrar_usuarios(self):
+        """Tela de gerenciamento de usuarios (apenas mestre)."""
+        if not auth_service.tem_permissao("usuarios", "visualizar"):
+            messagebox.showwarning("Acesso Negado", "Voce nao tem permissao para acessar este modulo.")
+            return
+        self.limpar_tela()
+        self.atualizar_header("usuarios")
+        self.tela_usuarios = TelaGerenciarUsuarios(self.container)
+        self.tela_usuarios.pack(fill="both", expand=True)
+
+    def mostrar_auditoria(self):
+        """Tela de auditoria (apenas mestre)."""
+        if not auth_service.tem_permissao("auditoria", "visualizar"):
+            messagebox.showwarning("Acesso Negado", "Voce nao tem permissao para acessar este modulo.")
+            return
+        self.limpar_tela()
+        self.atualizar_header("auditoria")
+        self.tela_auditoria = TelaAuditoria(self.container)
+        self.tela_auditoria.pack(fill="both", expand=True)
+
 
     def backup_automatico(self):
         try:
@@ -126,21 +245,17 @@ class App(ctk.CTk):
             if not origem_db.exists():
                 return
 
+            # Garante que a pasta existe antes de tentar copiar
+            if not pasta_backup.exists():
+                pasta_backup.mkdir(parents=True, exist_ok=True)
+
             nome_backup = f"backup_auto_{datetime.now().strftime('%d%m%Y_%H%M%S')}.db"
             destino_db = pasta_backup / nome_backup
 
             shutil.copy2(origem_db, destino_db)
 
-            if not pasta_backup.exists():
-                pasta_backup.mkdir(parents=True, exist_ok=True)
-
-            backups = [
-                pasta_backup / arquivo
-                for arquivo in pasta_backup.iterdir()
-                if arquivo.name.endswith(".db")
-            ]
-
-            backups.sort(
+            backups = sorted(
+                pasta_backup.glob("*.db"),
                 key=lambda item: item.stat().st_mtime,
                 reverse=True
             )
@@ -161,6 +276,7 @@ class App(ctk.CTk):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
+        # Logo (fixo no topo)
         logo_frame = ctk.CTkFrame(
             self.sidebar,
             fg_color=self.cores["sidebar"],
@@ -180,16 +296,25 @@ class App(ctk.CTk):
             ctk.CTkLabel(
                 logo_frame,
                 text="CW",
-                font=("Arial", 48, "bold"),
+                font=(self.cores["font_family"], 48, "bold"),
                 text_color="#DC2626"
             ).pack(pady=(0, 5))
 
         ctk.CTkLabel(
             logo_frame,
             text="CW TRANSPORTADORA",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             text_color="#FFFFFF"
         ).pack(pady=(0, 10))
+
+        # Area scrollavel para botoes de menu
+        self.sidebar_scroll = ctk.CTkScrollableFrame(
+            self.sidebar,
+            fg_color=self.cores["sidebar"],
+            scrollbar_button_color=self.cores.get("sidebar_card", "#1F2937"),
+            scrollbar_button_hover_color=self.cores.get("hover", "#374151"),
+        )
+        self.sidebar_scroll.pack(fill="both", expand=True, padx=0, pady=0)
 
         self.criar_botao_menu("🏠  Página Inicial", self.mostrar_dashboard, "dashboard")
         self.criar_botao_menu("🧾  Nova Operação", self.mostrar_operacoes, "operacoes")
@@ -204,6 +329,22 @@ class App(ctk.CTk):
         self.criar_botao_menu("👥  Funcionários", self.mostrar_funcionarios, "funcionarios")
         self.criar_botao_menu("⚙️  Configurações", self.mostrar_configuracoes, "configuracoes")
 
+        # Botoes administrativos (visiveis apenas para mestre)
+        if auth_service.eh_mestre:
+            ctk.CTkFrame(self.sidebar_scroll, fg_color="#1E293B", height=1).pack(fill="x", padx=20, pady=(8, 4))
+            self.criar_botao_menu("👑  Usuários", self.mostrar_usuarios, "usuarios")
+            self.criar_botao_menu("📋  Auditoria", self.mostrar_auditoria, "auditoria")
+            self.criar_botao_menu("🔄  Historico Versoes", self.mostrar_historico_versoes, "historico_versoes")
+            ctk.CTkFrame(self.sidebar_scroll, fg_color="#1E293B", height=1).pack(fill="x", padx=20, pady=(8, 4))
+            self.criar_botao_menu("📤  Publicar Versão", self.mostrar_publicar_versao, "publicar_versao")
+            self.criar_botao_menu("⚙️  Admin Atualizações", self.mostrar_admin_atualizacoes, "admin_atualizacoes")
+
+        # Minha Conta (visivel para todos)
+        self.criar_botao_menu("🔑  Minha Conta", self.mostrar_alterar_senha, "minha_conta")
+
+        # Agenda atualização do badge de contas vencidas 2s após a janela aparecer
+        self.after(2000, self._atualizar_badge_contas)
+
         self.botao_sync = ctk.CTkButton(
             self.sidebar,
             text="☁️  Sincronizar Nuvem",
@@ -213,7 +354,7 @@ class App(ctk.CTk):
             text_color="white",
             corner_radius=10,
             anchor="w",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             command=lambda: self.sincronizar_nuvem(mostrar_mensagem=True)
         )
         self.botao_sync.pack(fill="x", padx=15, pady=(12, 5))
@@ -227,7 +368,7 @@ class App(ctk.CTk):
             text_color="white",
             corner_radius=10,
             anchor="w",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=self.preparar_distribuicao
         ).pack(fill="x", padx=15, pady=(6, 8))
 
@@ -241,14 +382,14 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             self.card_sync,
             text="☁️ STATUS DA NUVEM",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#FFFFFF"
         ).pack(anchor="w", padx=14, pady=(12, 4))
 
         self.label_sync_status = ctk.CTkLabel(
             self.card_sync,
             text="🟡 Verificando",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#FACC15"
         )
         self.label_sync_status.pack(anchor="w", padx=14, pady=(2, 2))
@@ -256,7 +397,7 @@ class App(ctk.CTk):
         self.label_status_ultima = ctk.CTkLabel(
             self.card_sync,
             text="🕒 Última sync: ainda não sincronizado",
-            font=("Arial", 10),
+            font=(self.cores["font_family"], 10),
             text_color="#CBD5E1",
             wraplength=230,
             justify="left"
@@ -266,7 +407,7 @@ class App(ctk.CTk):
         self.label_status_pendencias = ctk.CTkLabel(
             self.card_sync,
             text="📦 Pendências: 0",
-            font=("Arial", 10, "bold"),
+            font=(self.cores["font_family"], 10, "bold"),
             text_color="#CBD5E1"
         )
         self.label_status_pendencias.pack(anchor="w", padx=14, pady=(2, 2))
@@ -274,71 +415,52 @@ class App(ctk.CTk):
         self.label_status_resumo = ctk.CTkLabel(
             self.card_sync,
             text=f"🔄 Automático: a cada {settings.intervalo_sync_segundos}s",
-            font=("Arial", 10),
+            font=(self.cores["font_family"], 10),
             text_color="#94A3B8",
             wraplength=230,
             justify="left"
         )
         self.label_status_resumo.pack(anchor="w", padx=14, pady=(2, 12))
 
-
-        footer = ctk.CTkFrame(
-            self.sidebar,
-            fg_color=self.cores["sidebar_card"],
-            corner_radius=10
-        )
-        footer.pack(fill="x", padx=15, pady=(10, 12), side="bottom")
-
-        ctk.CTkLabel(
-            footer,
-            text="⏱ Atualizado em",
-            font=("Arial", 11),
-            text_color="#CBD5E1"
-        ).pack(anchor="w", padx=15, pady=(12, 2))
-
-        ctk.CTkLabel(
-            footer,
-            text=datetime.now().strftime("%d/%m/%Y %H:%M"),
-            font=("Arial", 13, "bold"),
-            text_color="#FFFFFF"
-        ).pack(anchor="w", padx=15, pady=(0, 12))
-
-        self.label_ultima_sync = ctk.CTkLabel(
-            footer,
-            text=self.ultima_sync_texto,
-            font=("Arial", 11),
-            text_color="#CBD5E1",
-            wraplength=230,
-            justify="left"
-        )
-        self.label_ultima_sync.pack(anchor="w", padx=15, pady=(0, 12))
-
         ctk.CTkButton(
             self.sidebar,
-            text="↪  Sair",
-            height=46,
+            text="↩  Sair da Conta",
+            height=42,
+            fg_color="#374151",
+            hover_color="#1F2937",
+            text_color="white",
+            corner_radius=10,
+            anchor="w",
+            font=(self.cores["font_family"], 13, "bold"),
+            command=self.fazer_logout
+        ).pack(fill="x", padx=15, pady=(0, 4), side="bottom")
+        
+        ctk.CTkButton(
+            self.sidebar,
+            text="✕  Fechar Sistema",
+            height=42,
             fg_color=self.cores["sidebar_card"],
             hover_color=self.cores["hover"],
             text_color="white",
             corner_radius=10,
             anchor="w",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=self.fechar_sistema
-        ).pack(fill="x", padx=15, pady=(0, 18), side="bottom")
+        ).pack(fill="x", padx=15, pady=(0, 14), side="bottom")
 
     def atualizar_status_sync(self, status, cor="#CBD5E1"):
         try:
             self.label_sync_status.configure(text=status, text_color=cor)
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.debug(f"Label sync não disponível: {erro}")
 
         try:
             pendencias = contar_pendencias_sync()
             self.label_status_pendencias.configure(
                 text=f"📦 Pendências: {pendencias}"
             )
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.debug(f"Label pendências não disponível: {erro}")
 
     def atualizar_ultima_sync(self, resultado=None):
         resultado = resultado or {}
@@ -367,9 +489,8 @@ class App(ctk.CTk):
             self.label_status_ultima.configure(text=ultima_texto)
             self.label_status_pendencias.configure(text=f"📦 Pendências: {pendencias}")
             self.label_status_resumo.configure(text=resumo)
-            self.label_ultima_sync.configure(text=self.ultima_sync_texto)
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.debug(f"Labels de sync não disponíveis: {erro}")
 
     def preparar_distribuicao(self):
         if sync_service.sincronizando:
@@ -427,7 +548,7 @@ class App(ctk.CTk):
                 str(erro),
             )
 
-    def sincronizar_nuvem(self, mostrar_mensagem=False):
+    def sincronizar_nuvem(self, mostrar_mensagem=False, reparar_fila=True):
         if sync_service.sincronizando:
             self.atualizar_status_sync("🟡 Sincronização em andamento...", "#FACC15")
             return
@@ -436,13 +557,13 @@ class App(ctk.CTk):
         self.atualizar_status_sync("🟡 Sincronizando...", "#FACC15")
         try:
             self.label_status_resumo.configure(text="🔄 Enviando e baixando alterações...")
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.debug(f"Label resumo não disponível: {erro}")
         self.botao_sync.configure(text="☁️  Sincronizando...")
 
         def tarefa():
             try:
-                resultado = sync_service.executar()
+                resultado = sync_service.executar(reparar_fila=reparar_fila)
 
                 cor = "#22C55E"
                 status = "🟢 Nuvem sincronizada"
@@ -520,7 +641,7 @@ class App(ctk.CTk):
 
     def executar_sync_automatico(self):
         if not sync_service.sincronizando:
-            self.sincronizar_nuvem(mostrar_mensagem=False)
+            self.sincronizar_nuvem(mostrar_mensagem=False, reparar_fila=False)
 
         self.after(settings.intervalo_sync_ms, self.executar_sync_automatico)
 
@@ -539,95 +660,8 @@ class App(ctk.CTk):
         threading.Thread(target=tarefa, daemon=True).start()
 
     def mostrar_dialogo_atualizacao(self, resultado):
-        """Mostra diálogo informando sobre nova atualização disponível."""
-        from tkinter import simpledialog
-        
-        mensagem = (
-            f"Nova versão disponível: {resultado['latest_version']}\n"
-            f"Versão atual: {resultado['current_version']}\n\n"
-            f"Deseja baixar e instalar a atualização agora?"
-        )
-        
-        if messagebox.askyesno(
-            "Atualização Disponível",
-            mensagem
-        ):
-            self.baixar_e_instalar_atualizacao(resultado)
-
-    def baixar_e_instalar_atualizacao(self, resultado):
-        """Baixa e instala a atualização com barra de progresso."""
-        download_url = resultado.get("download_url")
-        
-        if not download_url:
-            messagebox.showerror(
-                "Erro",
-                "URL de download não disponível."
-            )
-            return
-        
-        # Criar janela de progresso
-        progresso_janela = ctk.CTkToplevel(self)
-        progresso_janela.title("Baixando Atualização")
-        progresso_janela.geometry("400x150")
-        progresso_janela.resizable(False, False)
-        progresso_janela.grab_set()
-        
-        ctk.CTkLabel(
-            progresso_janela,
-            text="Baixando atualização...",
-            font=("Arial", 14, "bold")
-        ).pack(pady=20)
-        
-        progress_bar = ctk.CTkProgressBar(progresso_janela, width=300)
-        progress_bar.pack(pady=10)
-        progress_bar.set(0)
-        
-        label_status = ctk.CTkLabel(
-            progresso_janela,
-            text="Iniciando...",
-            font=("Arial", 11)
-        )
-        label_status.pack(pady=5)
-        
-        def progresso_callback(downloaded, total):
-            if total > 0:
-                porcentagem = (downloaded / total) * 100
-                self.after(0, lambda: progress_bar.set(porcentagem / 100))
-                self.after(0, lambda: label_status.configure(
-                    text=f"{downloaded / (1024*1024):.1f} MB / {total / (1024*1024):.1f} MB"
-                ))
-        
-        def tarefa_download():
-            success, result = update_service.download_update(
-                download_url,
-                progresso_callback
-            )
-            
-            self.after(0, lambda: progresso_janela.destroy())
-            
-            if success:
-                # Perguntar se deseja instalar
-                if messagebox.askyesno(
-                    "Download Concluído",
-                    "A atualização foi baixada. Deseja instalar agora?\n\n"
-                    "O aplicativo será fechado durante a instalação."
-                ):
-                    success_install, msg = update_service.install_update(result)
-                    
-                    if success_install:
-                        messagebox.showinfo("Instalação", msg)
-                        self.fechar_sistema()
-                    else:
-                        messagebox.showerror("Erro", msg)
-            else:
-                mostrar_erro_profissional(
-                    self,
-                    "Erro na atualização",
-                    "Não foi possível concluir o download da atualização.",
-                    result,
-                )
-        
-        threading.Thread(target=tarefa_download, daemon=True).start()
+        """Abre o dialog profissional de atualizacao."""
+        TelaAtualizacao(self, resultado)
 
     def configurar_atalhos(self):
         """Configura atalhos de teclado globais."""
@@ -658,14 +692,14 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             self.header,
             text=f"Atualizado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color=self.cores["texto_suave"]
         ).place(relx=0.97, y=30, anchor="e")
 
         self.label_header_titulo = ctk.CTkLabel(
             self.header,
             text="PAINEL PRINCIPAL",
-            font=("Arial", 25, "bold"),
+            font=(self.cores["font_family"], 25, "bold"),
             text_color=self.cores["texto"]
         )
         self.label_header_titulo.place(x=30, y=16)
@@ -673,7 +707,7 @@ class App(ctk.CTk):
         self.label_header_subtitulo = ctk.CTkLabel(
             self.header,
             text="Controle operacional, financeiro e logístico da frota",
-            font=("Arial", 12),
+            font=(self.cores["font_family"], 12),
             text_color=self.cores["texto_suave"]
         )
         self.label_header_subtitulo.place(x=32, y=50)
@@ -686,7 +720,7 @@ class App(ctk.CTk):
 
     def criar_botao_menu(self, texto, comando, chave_tela):
         botao = ctk.CTkButton(
-            self.sidebar,
+            self.sidebar_scroll,
             text=texto,
             height=48,
             fg_color="transparent",
@@ -694,7 +728,7 @@ class App(ctk.CTk):
             text_color="white",
             corner_radius=12,
             anchor="w",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
         )
 
         botao.configure(command=lambda b=botao, c=comando: self.executar_menu(b, c))
@@ -717,8 +751,8 @@ class App(ctk.CTk):
         try:
             self.label_header_titulo.configure(text=titulo)
             self.label_header_subtitulo.configure(text=subtitulo)
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.debug(f"Label header não disponível: {erro}")
 
     def executar_menu(self, botao, comando):
         for b in self.botoes_menu:
@@ -735,7 +769,19 @@ class App(ctk.CTk):
         for child in self.container.winfo_children():
             child.destroy()
 
+    def _verificar_permissao(self, modulo: str) -> bool:
+        """Verifica permissao e mostra aviso se negado. Retorna True se OK."""
+        if not auth_service.tem_permissao(modulo, "visualizar"):
+            messagebox.showwarning(
+                "Acesso Negado",
+                "Voce nao tem permissao para acessar este modulo.",
+            )
+            return False
+        return True
+
     def mostrar_dashboard(self):
+        if not self._verificar_permissao("dashboard"):
+            return
         self.limpar_tela()
         self.atualizar_header("dashboard")
         self.ativar_primeiro_botao()
@@ -743,54 +789,74 @@ class App(ctk.CTk):
         self.dashboard.pack(fill="both", expand=True)
 
     def mostrar_notas(self):
+        if not self._verificar_permissao("notas"):
+            return
         self.limpar_tela()
         self.atualizar_header("notas")
         self.tela_notas = TelaNotas(self.container)
         self.tela_notas.pack(fill="both", expand=True)
 
     def mostrar_criar_viagem(self):
+        if not self._verificar_permissao("criar_viagem"):
+            return
         self.limpar_tela()
         self.atualizar_header("criar_viagem")
         self.tela_criar_viagem = TelaCriarViagem(self.container)
         self.tela_criar_viagem.pack(fill="both", expand=True)
 
     def mostrar_operacoes(self):
+        if not self._verificar_permissao("operacoes"):
+            return
         self.limpar_tela()
         self.atualizar_header("operacoes")
         self.tela_operacoes = TelaOperacoes(self.container)
         self.tela_operacoes.pack(fill="both", expand=True)
 
     def mostrar_historico(self):
+        if not self._verificar_permissao("historico"):
+            return
         self.limpar_tela()
         self.atualizar_header("historico")
         self.tela_historico = TelaHistorico(self.container)
         self.tela_historico.pack(fill="both", expand=True)
 
     def mostrar_ranking_clientes(self):
+        if not self._verificar_permissao("ranking_clientes"):
+            return
         self.limpar_tela()
         self.atualizar_header("ranking_clientes")
         self.tela_ranking_clientes = TelaRankingClientes(self.container)
         self.tela_ranking_clientes.pack(fill="both", expand=True)
 
     def mostrar_combustivel(self):
+        if not self._verificar_permissao("combustivel"):
+            return
         self.limpar_tela()
         self.atualizar_header("combustivel")
         self.tela_combustivel = TelaCombustivel(self.container)
         self.tela_combustivel.pack(fill="both", expand=True)
 
     def mostrar_contas(self):
+        if not self._verificar_permissao("contas"):
+            return
         self.limpar_tela()
         self.atualizar_header("contas")
         self.tela_contas = TelaContas(self.container)
         self.tela_contas.pack(fill="both", expand=True)
+        # Quando o usuário abre Contas, atualiza o badge após sair
+        self.after(500, self._atualizar_badge_contas)
 
     def mostrar_manutencao(self):
+        if not self._verificar_permissao("manutencao"):
+            return
         self.limpar_tela()
         self.atualizar_header("manutencao")
         self.tela_manutencao = TelaManutencao(self.container)
         self.tela_manutencao.pack(fill="both", expand=True)
 
     def mostrar_relatorios(self):
+        if not self._verificar_permissao("relatorios"):
+            return
         self.limpar_tela()
         self.atualizar_header("relatorios")
         self.tela_relatorios = TelaRelatorios(self.container)
@@ -798,24 +864,99 @@ class App(ctk.CTk):
 
 
     def fechar_sistema(self):
-        try:
-            self.backup_automatico()
-        except Exception as erro:
-            logger.error(f"Erro ao fechar sistema: {erro}")
+        def _finalizar():
+            try:
+                if settings.supabase_enabled and not sync_service.sincronizando:
+                    sync_service.executar(reparar_fila=True)
+            except Exception as erro:
+                logger.error(f"Erro ao sincronizar ao fechar: {erro}")
 
-        self.destroy()
+            try:
+                self.backup_automatico()
+            except Exception as erro:
+                logger.error(f"Erro ao criar backup no fechamento: {erro}")
+
+            self.after(0, self.destroy)
+
+        # Executa em thread para não travar a UI, com timeout de 10s
+        t = threading.Thread(target=_finalizar, daemon=True)
+        t.start()
+        # Se a thread não terminar em 10s, força o fechamento
+        self.after(10000, self.destroy)
 
     def mostrar_funcionarios(self):
+        if not self._verificar_permissao("funcionarios"):
+            return
         self.limpar_tela()
         self.atualizar_header("funcionarios")
         self.tela_funcionarios = TelaFuncionarios(self.container)
         self.tela_funcionarios.pack(fill="both", expand=True)
 
     def mostrar_configuracoes(self):
+        if not self._verificar_permissao("configuracoes"):
+            return
         self.limpar_tela()
         self.atualizar_header("configuracoes")
         self.tela_configuracoes = TelaConfiguracoes(self.container)
         self.tela_configuracoes.pack(fill="both", expand=True)
+
+    def mostrar_historico_versoes(self):
+        """Tela de historico de versoes (acessivel via configuracoes ou sidebar)."""
+        self.limpar_tela()
+        self.atualizar_header("historico_versoes")
+        self.tela_hist_versoes = TelaHistoricoVersoes(self.container)
+        self.tela_hist_versoes.pack(fill="both", expand=True)
+
+    def mostrar_publicar_versao(self):
+        """Abre o dialogo para publicar nova versao (apenas mestre)."""
+        abrir_publicar_versao(self, on_concluida=self._on_publicacao_concluida)
+
+    def _on_publicacao_concluida(self):
+        """Callback quando a publicacao e concluida."""
+        # Atualizar a tela de historico de versoes se estiver visivel
+        if self.tela_atual == "historico_versoes":
+            self.mostrar_historico_versoes()
+
+    def mostrar_admin_atualizacoes(self):
+        """Tela de administracao de atualizacoes (apenas mestre)."""
+        self.limpar_tela()
+        self.atualizar_header("admin_atualizacoes")
+        abrir_admin_atualizacoes(self.container, self.mostrar_dashboard)
+
+    # ------------------------------------------------------------------
+    # Badge de contas vencidas no menu lateral
+    # ------------------------------------------------------------------
+
+    def _atualizar_badge_contas(self) -> None:
+        """
+        Consulta contas vencidas em background e atualiza o texto
+        do botão 'Contas' no sidebar com um badge visual.
+        Reagenda a si mesmo a cada 5 minutos para manter o dado fresco.
+        """
+        def _consultar():
+            try:
+                vencidas = financeiro_service.contar_contas_vencidas()
+            except Exception as erro:
+                logger.warning(f"Erro ao consultar contas vencidas: {erro}")
+                vencidas = 0
+            self.after(0, lambda: self._aplicar_badge_contas(vencidas))
+
+        threading.Thread(target=_consultar, daemon=True).start()
+        # Reagenda para daqui a 5 minutos
+        self.after(300_000, self._atualizar_badge_contas)
+
+    def _aplicar_badge_contas(self, vencidas: int) -> None:
+        """Aplica o badge vermelho no botão Contas ou remove se não houver."""
+        botao = self.mapa_botoes.get("contas")
+        if not botao:
+            return
+        try:
+            if vencidas > 0:
+                botao.configure(text=f"💳  Contas  🔴 {vencidas}")
+            else:
+                botao.configure(text="💳  Contas")
+        except Exception as erro:
+            logger.debug(f"Widget de contas não disponível: {erro}")
 
 
 if __name__ == "__main__":

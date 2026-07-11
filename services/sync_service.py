@@ -28,7 +28,7 @@ class SyncService:
         resultado["pendencias"] = contar_pendencias_sync()
         return resultado
 
-    def executar(self) -> Dict[str, Any]:
+    def executar(self, reparar_fila: bool = True) -> Dict[str, Any]:
         with self._lock:
             if self._sincronizando:
                 return {
@@ -40,7 +40,7 @@ class SyncService:
             self._sincronizando = True
 
         try:
-            self._ultimo_resultado = sincronizar()
+            self._ultimo_resultado = sincronizar(reparar_fila=reparar_fila)
             self._ultimo_resultado["pendencias"] = contar_pendencias_sync()
             return dict(self._ultimo_resultado)
         finally:

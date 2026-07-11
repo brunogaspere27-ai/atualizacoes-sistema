@@ -10,7 +10,13 @@ except ImportError:  # pragma: no cover
     execute_values = None
 
 from config.settings import settings
-from utils.database import DB_NAME, TABELAS_SYNC, criar_banco
+from utils.database import (
+    DB_NAME,
+    TABELAS_SYNC,
+    criar_banco,
+    get_connection_rows,
+    tabela_existe_sqlite,
+)
 from utils.logger import get_logger
 from utils.supabase_db import (
     conectar_supabase,
@@ -34,6 +40,7 @@ def conectar_local() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -73,13 +80,6 @@ def salvar_config_sync(data_sync: str) -> None:
     except Exception as erro:
         logger.error(f"Erro ao salvar configuração de sync: {erro}")
 
-
-def tabela_existe_sqlite(cursor: sqlite3.Cursor, tabela: str) -> bool:
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        (tabela,)
-    )
-    return cursor.fetchone() is not None
 
 
 def tabela_existe_supabase(cursor_cloud, tabela: str) -> bool:
@@ -180,8 +180,8 @@ def preparar_sqlite_sync() -> None:
         ]:
             try:
                 cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
-            except Exception:
-                pass
+            except sqlite3.OperationalError:
+                pass  # Coluna já existe
 
         try:
             cursor.execute(f"""
@@ -236,6 +236,160 @@ def filtrar_colunas_sync(colunas: List[str]) -> List[str]:
     return [coluna for coluna in colunas if coluna not in COLUNAS_IGNORADAS_SYNC]
 
 
+def _referencias_numericas(referencias: List[str]) -> List[str]:
+    numericas = []
+    for referencia in referencias:
+        try:
+            int(referencia)
+            numericas.append(str(referencia))
+        except (TypeError, ValueError):
+            continue
+    return numericas
+
+
+def _referencias_sync_id(referencias: List[str]) -> List[str]:
+    sync_ids = []
+    for referencia in referencias:
+        try:
+            int(referencia)
+        except (TypeError, ValueError):
+            if referencia:
+                sync_ids.append(str(referencia))
+    return sync_ids
+
+
+def buscar_registros_locais(cursor_local, tabela: str, referencias: List[str]) -> List[sqlite3.Row]:
+    """Busca registros pelo id numérico ou pelo sync_id."""
+    if not referencias:
+        return []
+
+    registros: Dict[str, sqlite3.Row] = {}
+    ids = _referencias_numericas(referencias)
+    sync_ids = _referencias_sync_id(referencias)
+
+    if ids:
+        placeholders = ",".join(["?"] * len(ids))
+        cursor_local.execute(
+            f"SELECT * FROM {tabela} WHERE id IN ({placeholders})",
+            ids,
+        )
+        for row in cursor_local.fetchall():
+            registros[str(row["id"])] = row
+
+    if sync_ids:
+        placeholders = ",".join(["?"] * len(sync_ids))
+        cursor_local.execute(
+            f"SELECT * FROM {tabela} WHERE sync_id IN ({placeholders})",
+            sync_ids,
+        )
+        for row in cursor_local.fetchall():
+            chave = str(row["sync_id"]) if row["sync_id"] else str(row["id"])
+            registros[chave] = row
+
+    return list(registros.values())
+
+
+def _timestamp_mais_recente(valor_local: Any, valor_remoto: Any) -> bool:
+    if not valor_remoto:
+        return False
+    if not valor_local:
+        return True
+    return str(valor_remoto) > str(valor_local)
+
+
+def marcar_registros_sincronizados(cursor_local, tabela: str, registros: List[sqlite3.Row]) -> None:
+    agora_atual = agora()
+    for registro in registros:
+        try:
+            cursor_local.execute(
+                f"""
+                UPDATE {tabela}
+                SET sincronizado = 1,
+                    atualizado_em = COALESCE(NULLIF(atualizado_em, ''), ?)
+                WHERE id = ?
+                """,
+                (agora_atual, registro["id"]),
+            )
+        except Exception as erro:
+            logger.warning(f"Não foi possível marcar {tabela}:{registro['id']} como sincronizado: {erro}")
+
+
+def reparar_e_enfileirar_fila() -> int:
+    """
+    Garante que registros locais pendentes estejam na fila de envio.
+    Corrige entradas marcadas como OK sem envio real e registros nunca enfileirados.
+    """
+    from utils.database import registrar_sync
+
+    preparar_sync_log()
+    conn = conectar_local()
+    cursor = conn.cursor()
+    total = 0
+
+    try:
+        for tabela in TABELAS_SYNC:
+            if not tabela_existe_sqlite(cursor, tabela):
+                continue
+
+            cursor.execute(
+                f"""
+                SELECT id, sync_id, atualizado_em
+                FROM {tabela}
+                WHERE COALESCE(deletado, 0) = 0
+                """
+            )
+            registros = cursor.fetchall()
+
+            for registro in registros:
+                registro_id = registro["id"]
+                sync_id = registro["sync_id"]
+                atualizado_em = registro["atualizado_em"]
+                referencias = [str(registro_id)]
+                if sync_id:
+                    referencias.append(str(sync_id))
+
+                placeholders = ",".join(["?"] * len(referencias))
+                cursor.execute(
+                    f"""
+                    SELECT status, sincronizado_em
+                    FROM sync_log
+                    WHERE tabela = ?
+                      AND registro_id IN ({placeholders})
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    [tabela, *referencias],
+                )
+                ultimo_log = cursor.fetchone()
+
+                precisa_enfileirar = False
+                if ultimo_log is None:
+                    precisa_enfileirar = True
+                elif ultimo_log["status"] == "ERRO":
+                    precisa_enfileirar = True
+                elif ultimo_log["status"] == "OK":
+                    cursor.execute(
+                        f"SELECT sincronizado FROM {tabela} WHERE id = ?",
+                        (registro_id,),
+                    )
+                    estado_local = cursor.fetchone()
+                    if estado_local and not estado_local["sincronizado"]:
+                        precisa_enfileirar = True
+                    elif atualizado_em and ultimo_log["sincronizado_em"]:
+                        if str(atualizado_em) > str(ultimo_log["sincronizado_em"]):
+                            precisa_enfileirar = True
+
+                if precisa_enfileirar:
+                    registrar_sync(cursor, tabela, registro_id)
+                    total += 1
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    return total
+
+
 def enviar_lote_tabela(cursor_local, cursor_cloud, tabela: str, itens: List[sqlite3.Row]):
     if not itens:
         return [], []
@@ -284,14 +438,15 @@ def enviar_lote_tabela(cursor_local, cursor_cloud, tabela: str, itens: List[sqli
                 erros.extend([(item["id"], str(erro)) for item in itens_delete])
 
     if itens_upsert:
-        ids = [str(item["registro_id"]) for item in itens_upsert]
-        placeholders = ",".join(["?"] * len(ids))
-        cursor_local.execute(f"SELECT * FROM {tabela} WHERE id IN ({placeholders})", ids)
-        rows = cursor_local.fetchall()
+        referencias = [str(item["registro_id"]) for item in itens_upsert]
+        rows = buscar_registros_locais(cursor_local, tabela, referencias)
         dados = [dict(row) for row in rows]
 
         if not dados:
-            sucessos.extend([item["id"] for item in itens_upsert])
+            erros.extend([
+                (item["id"], f"Registro não encontrado em {tabela}: {item['registro_id']}")
+                for item in itens_upsert
+            ])
             return sucessos, erros
 
         colunas_insert = filtrar_colunas_sync(list(dados[0].keys()))
@@ -308,6 +463,7 @@ def enviar_lote_tabela(cursor_local, cursor_cloud, tabela: str, itens: List[sqli
 
         try:
             execute_values(cursor_cloud, sql, valores, page_size=500)
+            marcar_registros_sincronizados(cursor_local, tabela, rows)
             sucessos.extend([item["id"] for item in itens_upsert])
         except Exception as erro:
             erros.extend([(item["id"], str(erro)) for item in itens_upsert])
@@ -402,15 +558,15 @@ def garantir_colunas_sqlite(cursor_local, tabela: str, colunas: List[Tuple]):
         if nome not in existentes:
             try:
                 cursor_local.execute(f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo_sqlite(tipo)}")
-            except Exception:
-                pass
+            except sqlite3.OperationalError:
+                pass  # Coluna já existe
     if "sync_id" in [coluna[0] for coluna in colunas]:
         try:
             cursor_local.execute(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{tabela}_sync_id ON {tabela}(sync_id)"
             )
-        except Exception:
-            pass
+        except sqlite3.OperationalError:
+            pass  # Índice já existe
 
 
 def baixar_tabela(cursor_local, cursor_cloud, tabela: str) -> int:
@@ -435,12 +591,19 @@ def baixar_tabela(cursor_local, cursor_cloud, tabela: str) -> int:
         row_dict = dict(zip(nomes, row))
         
         try:
-            # Verificar se existe sync_id
             sync_id = row_dict.get("sync_id")
             registro_id = row_dict.get("id")
-            
+            atualizado_remoto = row_dict.get("atualizado_em")
+
             if sync_id and "sync_id" in nomes:
-                # Tentar atualizar pelo sync_id
+                cursor_local.execute(
+                    f"SELECT id, atualizado_em FROM {tabela} WHERE sync_id = ?",
+                    (sync_id,),
+                )
+                local = cursor_local.fetchone()
+                if local and not _timestamp_mais_recente(local["atualizado_em"], atualizado_remoto):
+                    continue
+
                 placeholders = ", ".join(["?"] * len(nomes))
                 updates = ", ".join([f"{col}=excluded.{col}" for col in nomes if col != "id"])
                 sql = f"""
@@ -451,19 +614,18 @@ def baixar_tabela(cursor_local, cursor_cloud, tabela: str) -> int:
                 cursor_local.execute(sql, list(row))
                 total += 1
             else:
-                # Sem sync_id, verificar se existe pelo ID
-                cursor_local.execute(f"SELECT id FROM {tabela} WHERE id = ?", (registro_id,))
+                cursor_local.execute(f"SELECT id, atualizado_em FROM {tabela} WHERE id = ?", (registro_id,))
                 existe = cursor_local.fetchone()
                 
                 if existe:
-                    # Atualizar registro existente
+                    if not _timestamp_mais_recente(existe["atualizado_em"], atualizado_remoto):
+                        continue
                     set_clause = ", ".join([f"{col} = ?" for col in nomes if col != "id"])
                     sql = f"UPDATE {tabela} SET {set_clause} WHERE id = ?"
                     valores = [row_dict[col] for col in nomes if col != "id"] + [registro_id]
                     cursor_local.execute(sql, valores)
                     total += 1
                 else:
-                    # Inserir novo registro
                     placeholders = ", ".join(["?"] * len(nomes))
                     sql = f"INSERT INTO {tabela} ({', '.join(nomes)}) VALUES ({placeholders})"
                     cursor_local.execute(sql, list(row))
@@ -501,9 +663,15 @@ def baixar_do_supabase() -> Tuple[int, int]:
     return total_baixados, erros
 
 
-def sincronizar() -> Dict[str, Any]:
-    criar_banco()
-    preparar_sqlite_sync()
+_sync_banco_preparado = False
+
+
+def sincronizar(reparar_fila: bool = True) -> Dict[str, Any]:
+    global _sync_banco_preparado
+    if not _sync_banco_preparado:
+        criar_banco()
+        preparar_sqlite_sync()
+        _sync_banco_preparado = True
 
     if not supabase_habilitado():
         pendencias = contar_pendencias_sync()
@@ -526,7 +694,18 @@ def sincronizar() -> Dict[str, Any]:
     try:
         config = carregar_config_sync()
         inicio_sync = agora()
-        enviados, erros_envio = processar_fila_envio()
+        if reparar_fila:
+            reparar_e_enfileirar_fila()
+
+        enviados = 0
+        erros_envio = 0
+        for _ in range(20):
+            lote_enviados, lote_erros = processar_fila_envio()
+            enviados += lote_enviados
+            erros_envio += lote_erros
+            if lote_enviados == 0 and lote_erros == 0:
+                break
+
         baixados, erros_baixar = baixar_do_supabase()
         total_erros = erros_envio + erros_baixar
         pendencias = contar_pendencias_sync()

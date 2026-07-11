@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any, List, Optional, Sequence, Tuple
 
 from utils.database import conectar, listar_caminhoes, registrar_sync
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class FrotaService:
@@ -295,7 +298,13 @@ class FrotaService:
         finally:
             conn.close()
 
+    # Tabelas permitidas para consulta de veículos — whitelist explícita para evitar SQL injection
+    _TABELAS_VEICULOS_PERMITIDAS = frozenset({"abastecimentos", "manutencoes"})
+
     def listar_veiculos_disponiveis(self, tabela_historico: str) -> List[str]:
+        if tabela_historico not in self._TABELAS_VEICULOS_PERMITIDAS:
+            raise ValueError(f"Tabela não permitida: {tabela_historico!r}")
+
         nomes: List[str] = []
 
         try:
@@ -305,12 +314,14 @@ class FrotaService:
                 nome = f"{modelo} - {placa}" if placa else modelo
                 if nome.strip() and nome not in nomes:
                     nomes.append(nome)
-        except Exception:
+        except Exception as erro:
+            logger.warning(f"Erro ao listar caminhões para veículos disponíveis: {erro}")
             pass
 
         conn = conectar()
         cursor = conn.cursor()
         try:
+            # tabela_historico validada pela whitelist acima — seguro usar f-string
             cursor.execute(f"""
                 SELECT DISTINCT veiculo
                 FROM {tabela_historico}
@@ -322,8 +333,8 @@ class FrotaService:
                 nome = item[0]
                 if nome and nome not in nomes:
                     nomes.append(nome)
-        except Exception:
-            pass
+        except Exception as erro:
+            logger.warning(f"Erro ao listar veículos históricos da tabela {tabela_historico}: {erro}")
         finally:
             conn.close()
 

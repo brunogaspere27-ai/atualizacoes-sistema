@@ -121,8 +121,17 @@ class Settings:
             "pasta_relatorios": "relatorios_gerados",
             "alerta_revisao": "8000",
             "revisao_obrigatoria": "10000",
-            "tema": "Vermelho CW",
+            "tema": "Premium Escuro",
             "cor_tema": "Vermelho",
+            # Configurações do servidor de atualizações
+            "update_server_type": "http",  # http, https, local, smb, ftp
+            "update_server_path": "",  # URL do servidor HTTP (ex: https://seuservidor.com/atualizacoes)
+            "update_server_username": "",  # Usuário para autenticação HTTP
+            "update_server_password": "",  # Senha para autenticação HTTP
+            "update_channel": "stable",  # stable, beta, dev
+            "enable_auto_update": True,
+            "update_url": "",  # URL alternativa (GitHub, etc.)
+            "update_timeout": 10,
         }
 
     def _carregar_config_json(self) -> Dict[str, Any]:
@@ -341,10 +350,34 @@ class Settings:
         return cores
 
     @property
+    def update_server_type(self) -> str:
+        """Tipo de servidor de atualizações (local, smb, http, ftp)."""
+        return self._config_json.get("update_server_type", "local")
+
+    @property
+    def update_server_path(self) -> str:
+        """Caminho do servidor de atualizações."""
+        return self._config_json.get("update_server_path", "")
+
+    @property
+    def update_server_username(self) -> str:
+        """Usuário para autenticação no servidor de atualizações."""
+        return self._config_json.get("update_server_username", "")
+
+    @property
+    def update_server_password(self) -> str:
+        """Senha para autenticação no servidor de atualizações."""
+        return self._config_json.get("update_server_password", "")
+
+    @property
+    def update_channel(self) -> str:
+        """Canal de atualização (stable, beta, dev)."""
+        return self._config_json.get("update_channel", "stable")
+
+    @property
     def update_url(self) -> str:
-        """URL para verificação de atualizações."""
-        return self._config_json.get("update_url",
-            "https://api.github.com/repos/brunogaspere27-ai/bruno/releases/latest")
+        """URL alternativa para verificação de atualizações (GitHub, etc.)."""
+        return self._config_json.get("update_url", "")
 
     @property
     def update_timeout(self) -> int:
@@ -355,6 +388,13 @@ class Settings:
     def enable_auto_update(self) -> bool:
         """Habilita verificação automática de atualizações."""
         return self._config_json.get("enable_auto_update", True)
+
+    @property
+    def updates_dir(self) -> Path:
+        """Diretório local para armazenar atualizações publicadas."""
+        path = self.dados_dir / "updates"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
 
 settings = Settings()

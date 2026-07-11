@@ -35,7 +35,9 @@ wheels/
 venv/
 env/
 ENV/
-.venv
+.venv/
+.venv-1/
+.venv-*/
 
 # IDEs
 .vscode/
@@ -55,9 +57,9 @@ logs/
 *.db-wal
 cw_transportadora.db
 
-# Backups
-backup_dados/*.db
-backup_dados/automatico/*.db
+# Backups (todos os níveis)
+backup_dados/
+backup_dados/**/*.db
 
 # Relatórios gerados
 relatorios_gerados/*.pdf

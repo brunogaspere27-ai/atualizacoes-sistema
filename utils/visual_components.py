@@ -4,50 +4,17 @@ Componentes visuais reutilizáveis para melhor apresentação.
 
 import customtkinter as ctk
 from typing import Callable, Optional
+from telas.theme import FONT_FAMILY
 
 
 class AnimatedButton(ctk.CTkButton):
-    """Botão com animação suave ao passar o mouse."""
+    """Botão estilizado reutilizável (animação removida — era no-op)."""
 
     def __init__(self, *args, **kwargs):
-        self.original_fg_color = kwargs.get("fg_color", "#DC2626")
-        self.hover_fg_color = kwargs.get("hover_color", "#991B1B")
-        self.animation_step = 0
-        self.is_animating = False
-
+        # Garante defaults consistentes
+        kwargs.setdefault("corner_radius", 10)
+        kwargs.setdefault("height", 42)
         super().__init__(*args, **kwargs)
-
-        self.bind("<Enter>", self._start_hover_animation)
-        self.bind("<Leave>", self._start_leave_animation)
-
-    def _start_hover_animation(self, event=None):
-        """Inicia animação de hover."""
-        if not self.is_animating:
-            self.is_animating = True
-            self._animate_hover()
-
-    def _start_leave_animation(self, event=None):
-        """Inicia animação de saída do hover."""
-        if not self.is_animating:
-            self.is_animating = True
-            self._animate_leave()
-
-    def _animate_hover(self):
-        """Anima transição para hover."""
-        if self.animation_step < 10:
-            self.animation_step += 1
-            # Aqui seria possível ajustar a cor gradualmente
-            if self.animation_step >= 10:
-                self.is_animating = False
-                self.animation_step = 0
-
-    def _animate_leave(self):
-        """Anima transição de saída do hover."""
-        if self.animation_step > 0:
-            self.animation_step -= 1
-            if self.animation_step <= 0:
-                self.is_animating = False
-                self.animation_step = 0
 
 
 class ShadowCard(ctk.CTkFrame):
@@ -117,9 +84,13 @@ class StatCard(ctk.CTkFrame):
         valor: str,
         unidade: str,
         cor: str = "#DC2626",
+        card_bg: str = "#FFFFFF",
+        font_family: str = FONT_FAMILY,
         **kwargs,
     ):
-        super().__init__(master, fg_color="#FFFFFF", corner_radius=14, **kwargs)
+        super().__init__(master, fg_color=card_bg, corner_radius=14, **kwargs)
+
+        ff = font_family
 
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=16)
@@ -130,7 +101,7 @@ class StatCard(ctk.CTkFrame):
         ctk.CTkLabel(
             header,
             text=titulo,
-            font=("Arial", 12, "bold"),
+            font=(ff, 12, "bold"),
             text_color="#64748B",
         ).pack(anchor="w")
 
@@ -140,40 +111,43 @@ class StatCard(ctk.CTkFrame):
         ctk.CTkLabel(
             valor_frame,
             text=valor,
-            font=("Arial", 28, "bold"),
+            font=(ff, 28, "bold"),
             text_color=cor,
         ).pack(anchor="w")
 
         ctk.CTkLabel(
             valor_frame,
             text=unidade,
-            font=("Arial", 11),
+            font=(ff, 11),
             text_color="#94A3B8",
         ).pack(anchor="w", pady=(2, 0))
 
 
 class ModernHeader(ctk.CTkFrame):
-    """Header moderno com design refinado."""
+    """Header moderno com design refinado — usa tokens do tema."""
 
     def __init__(self, master, titulo: str, subtitulo: str = "", **kwargs):
-        super().__init__(master, fg_color="#0F172A", corner_radius=0, **kwargs)
+        fg = kwargs.pop("fg_color", "#0F172A")
+        font_family = kwargs.pop("font_family", FONT_FAMILY)
+        super().__init__(master, fg_color=fg, corner_radius=0, **kwargs)
 
         self.pack_propagate(False)
 
+        ff = font_family
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=30, pady=20)
 
         ctk.CTkLabel(
             container,
             text="🔹 SEÇÃO",
-            font=("Arial", 11, "bold"),
+            font=(ff, 11, "bold"),
             text_color="#93C5FD",
         ).pack(anchor="w", pady=(0, 8))
 
         ctk.CTkLabel(
             container,
             text=titulo,
-            font=("Arial", 32, "bold"),
+            font=(ff, 32, "bold"),
             text_color="#FFFFFF",
         ).pack(anchor="w", pady=(0, 6))
 
@@ -181,7 +155,7 @@ class ModernHeader(ctk.CTkFrame):
             ctk.CTkLabel(
                 container,
                 text=subtitulo,
-                font=("Arial", 13),
+                font=(ff, 13),
                 text_color="#CBD5E1",
             ).pack(anchor="w")
 

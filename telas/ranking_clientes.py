@@ -1,7 +1,13 @@
+import csv
+import threading
 import customtkinter as ctk
 from datetime import datetime
+from tkinter import filedialog, messagebox
 
 from services.ranking_service import ranking_service
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TelaRankingClientes(ctk.CTkFrame):
@@ -28,6 +34,8 @@ class TelaRankingClientes(ctk.CTkFrame):
         self.criar_resumo()
         self.criar_tabela()
 
+        self._carregando = False
+        self._geracao = 0
         self.carregar_ranking()
 
     def criar_filtros(self):
@@ -40,7 +48,7 @@ class TelaRankingClientes(ctk.CTkFrame):
             border_color="#e5e7eb"
         )
         frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 12))
-        frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         self.combo_periodo = ctk.CTkOptionMenu(
             frame,
@@ -84,18 +92,54 @@ class TelaRankingClientes(ctk.CTkFrame):
             command=self.carregar_ranking
         ).grid(row=0, column=3, padx=14, pady=14, sticky="ew")
 
+        ctk.CTkButton(
+            frame,
+            text="📥 Exportar CSV",
+            height=40,
+            font=("Arial", 13, "bold"),
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            command=self.exportar_csv
+        ).grid(row=0, column=4, padx=14, pady=14)
+
     def carregar_ranking(self):
 
         self.tipo_periodo = self.combo_periodo.get()
         self.mes = self.combo_mes.get()
         self.ano = self.entry_ano.get().strip()
 
-        self.dados = ranking_service.carregar_ranking(
-            self.tipo_periodo,
-            self.mes,
-            self.ano
-        )
+        self._geracao += 1
+        geracao_atual = self._geracao
+        self._mostrar_carregando()
 
+        tipo, mes, ano = self.tipo_periodo, self.mes, self.ano
+
+        def _tarefa():
+            try:
+                dados = ranking_service.carregar_ranking(tipo, mes, ano)
+                self.after(0, lambda: self._aplicar_dados(dados, geracao_atual))
+            except Exception as erro:
+                logger.error(f"Erro ao carregar ranking: {erro}")
+                self.after(0, lambda: self._aplicar_dados([], geracao_atual))
+
+        threading.Thread(target=_tarefa, daemon=True).start()
+
+    def _mostrar_carregando(self):
+        for widget in self.tabela.winfo_children():
+            widget.destroy()
+        ctk.CTkLabel(
+            self.tabela,
+            text="Carregando...",
+            font=("Arial", 15, "bold"),
+            text_color="#6b7280"
+        ).grid(row=1, column=0, columnspan=7, pady=40)
+
+    def _aplicar_dados(self, dados, geracao):
+        if geracao != self._geracao:
+            return  # resultado obsoleto, descartar
+        if not self.winfo_exists():
+            return  # tela foi fechada
+        self.dados = dados
         self.atualizar_resumo()
         self.atualizar_tabela()
 
@@ -190,8 +234,71 @@ class TelaRankingClientes(ctk.CTkFrame):
         )
         self.tabela.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
 
-    def atualizar_tabela(self):
+    def exportar_csv(self):
+        """Exporta o ranking atual para um arquivo CSV."""
+        if not self.dados:
+            messagebox.showwarning("Atenção", "Nenhum dado para exportar. Carregue o ranking primeiro.")
+            return
 
+        periodo = {
+            "Mês": f"{self.mes}_{self.ano}",
+            "Ano": self.ano,
+        }.get(self.tipo_periodo, "geral")
+
+        nome_sugerido = f"ranking_clientes_{periodo}_{datetime.now().strftime('%d%m%Y_%H%M%S')}.csv"
+
+        caminho = filedialog.asksaveasfilename(
+            title="Salvar ranking como CSV",
+            defaultextension=".csv",
+            filetypes=[("Arquivo CSV", "*.csv"), ("Todos os arquivos", "*.*")],
+            initialfile=nome_sugerido,
+        )
+
+        if not caminho:
+            return
+
+        try:
+            with open(caminho, "w", newline="", encoding="utf-8-sig") as f:
+                # utf-8-sig garante que o Excel abre sem problema de acentuação
+                writer = csv.writer(f, delimiter=";")
+
+                writer.writerow([
+                    "Posição",
+                    "Cliente",
+                    "Total Notas",
+                    "Valor Mercadoria (R$)",
+                    "Frete Gerado (R$)",
+                    "Peso (kg)",
+                    "% Frete Médio",
+                ])
+
+                for i, item in enumerate(self.dados, start=1):
+                    writer.writerow([
+                        i,
+                        item.get("cliente", ""),
+                        item.get("total_notas", 0),
+                        f"{item.get('valor_notas', 0):.2f}".replace(".", ","),
+                        f"{item.get('frete', 0):.2f}".replace(".", ","),
+                        f"{item.get('peso', 0):.2f}".replace(".", ","),
+                        f"{item.get('percentual_medio', 0):.2f}".replace(".", ","),
+                    ])
+
+            messagebox.showinfo(
+                "Exportação concluída",
+                f"Ranking exportado com sucesso!\n\n{caminho}"
+            )
+
+            try:
+                import os
+                os.startfile(caminho)
+            except Exception:
+                pass
+
+        except Exception as erro:
+            messagebox.showerror("Erro ao exportar", str(erro))
+
+    def atualizar_tabela(self):
+        """Renderiza os dados do ranking na tabela visual."""
         for widget in self.tabela.winfo_children():
             widget.destroy()
 

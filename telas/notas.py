@@ -1,10 +1,14 @@
+import threading                                    # ← adicionar linha 1
 import customtkinter as ctk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 from datetime import datetime
 
 from services.notas_service import notas_service
 from services.viagem_service import viagem_service
+from utils.loading_overlay import LoadingOverlay   # ← adicionar esta linha
 from utils.logger import get_logger
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 logger = get_logger(__name__)
 
@@ -12,26 +16,28 @@ logger = get_logger(__name__)
 class TelaNotas(ctk.CTkFrame):
 
     def __init__(self, master):
-        super().__init__(master, fg_color="transparent")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
         self.notas_ids = {}
         self.caminhoes_map = {}
         self.notas_marcadas = set()
 
-        ctk.CTkLabel(
+        criar_header(
             self,
-            text="📋 NOTAS IMPORTADAS",
-            font=("Arial", 28, "bold"),
-            text_color="#111827"
-        ).pack(anchor="w", padx=10, pady=(0, 10))
+            tag="NOTAS FISCAIS",
+            titulo="Notas Importadas",
+            subtitulo="Gerenciamento de manifestos, notas fiscais e criação de viagens.",
+            cores=self.cores,
+        )
 
         self.resumo = ctk.CTkLabel(
             self,
             text="Selecione um manifesto para visualizar as notas.",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             text_color="#374151"
         )
-        self.resumo.pack(anchor="w", padx=10, pady=(0, 10))
+        self.resumo.pack(anchor="w", padx=25, pady=(0, 10))
 
         self.criar_tabela_manifestos()
         self.criar_barra_viagem()
@@ -136,7 +142,7 @@ class TelaNotas(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="📁 MANIFESTOS / ARQUIVOS TXT",
-            font=("Arial", 16, "bold"),
+            font=(self.cores["font_family"], 16, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=15, pady=(12, 6))
 
@@ -149,7 +155,7 @@ class TelaNotas(ctk.CTkFrame):
             height=38,
             fg_color="#15803d",
             hover_color="#166534",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=self.importar_manifesto
         ).pack(side="left", padx=(0, 8))
 
@@ -159,7 +165,7 @@ class TelaNotas(ctk.CTkFrame):
             height=38,
             fg_color="#b91c1c",
             hover_color="#7f1d1d",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=self.apagar_manifesto_selecionado
         ).pack(side="left")
 
@@ -244,7 +250,7 @@ class TelaNotas(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="🚚 CRIAR VIAGEM COM NOTAS SELECIONADAS",
-            font=("Arial", 15, "bold"),
+            font=(self.cores["font_family"], 15, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=15, pady=(12, 8))
 
@@ -295,7 +301,7 @@ class TelaNotas(ctk.CTkFrame):
         self.label_selecao = ctk.CTkLabel(
             linha,
             text="Notas selecionadas: 0",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         )
         self.label_selecao.pack(side="left", padx=18)
@@ -308,7 +314,7 @@ class TelaNotas(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="📄 NOTAS DO MANIFESTO SELECIONADO",
-            font=("Arial", 16, "bold"),
+            font=(self.cores["font_family"], 16, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=15, pady=(12, 6))
 
@@ -678,7 +684,7 @@ class TelaNotas(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text="🚚 Novo Veículo",
-            font=("Arial", 22, "bold")
+            font=(self.cores["font_family"], 22, "bold")
         ).pack(pady=(20, 10))
 
         entrada_placa = ctk.CTkEntry(janela, placeholder_text="Placa ou nome")

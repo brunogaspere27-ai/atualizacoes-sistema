@@ -1,42 +1,28 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from utils.database import criar_banco
 from services.financeiro_service import financeiro_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 
 class TelaContas(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="#F4F6F8")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
-        criar_banco()
         self.criar_layout()
         self.carregar_contas()
 
     def criar_layout(self):
-        topo = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=24)
-        topo.pack(fill="x", padx=25, pady=(20, 15))
-
-        ctk.CTkLabel(
-            topo,
-            text="FINANCEIRO",
-            font=("Arial", 13, "bold"),
-            text_color="#93c5fd"
-        ).pack(anchor="w", padx=24, pady=(18, 0))
-
-        ctk.CTkLabel(
-            topo,
-            text="Contas a Pagar e Receber",
-            font=("Arial", 34, "bold"),
-            text_color="white"
-        ).pack(anchor="w", padx=24)
-
-        ctk.CTkLabel(
-            topo,
-            text="Controle de vencimentos, pagamentos, recebimentos, atrasos e fluxo financeiro.",
-            font=("Arial", 14),
-            text_color="#cbd5e1"
-        ).pack(anchor="w", padx=24, pady=(0, 18))
+        ff = self.cores["font_family"]
+        criar_header(
+            self,
+            tag="FINANCEIRO",
+            titulo="Contas a Pagar e Receber",
+            subtitulo="Controle de vencimentos, pagamentos, recebimentos, atrasos e fluxo financeiro.",
+            cores=self.cores,
+        )
 
         filtros = ctk.CTkFrame(self, fg_color="white", corner_radius=18)
         filtros.pack(fill="x", padx=25, pady=10)
@@ -167,14 +153,14 @@ class TelaContas(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 12),
+            font=(self.cores["font_family"], 12),
             text_color="#6B7280"
         ).pack(pady=(10, 0))
 
         label = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         )
         label.pack(pady=(2, 10))
@@ -192,7 +178,7 @@ class TelaContas(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text="Cadastro de Conta",
-            font=("Arial", 24, "bold")
+            font=(self.cores["font_family"], 24, "bold")
         ).pack(pady=(20, 10))
 
         frame = ctk.CTkFrame(janela, fg_color="white", corner_radius=18)
@@ -295,7 +281,7 @@ class TelaContas(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text=texto,
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
 
@@ -423,25 +409,17 @@ class TelaContas(ctk.CTkFrame):
 
         self.carregar_contas()
 
+    def numero(self, valor: str) -> float:
+        """Converte string para float tratando separadores BR."""
+        from utils.helpers import parse_numero
+        return parse_numero(str(valor).replace("R$", "").strip())
+
+    def moeda(self, valor) -> str:
+        from utils.helpers import formatar_moeda
+        return formatar_moeda(valor)
+
     def converter_data(self, texto):
         try:
             return datetime.strptime(str(texto), "%d/%m/%Y").date()
-        except:
+        except Exception:
             return None
-
-    def numero(self, valor):
-        if not valor:
-            return 0.0
-
-        valor = str(valor).replace("R$", "").replace(" ", "").strip()
-
-        if "," in valor:
-            valor = valor.replace(".", "").replace(",", ".")
-
-        try:
-            return float(valor)
-        except:
-            return 0.0
-
-    def moeda(self, valor):
-        return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

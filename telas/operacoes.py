@@ -3,12 +3,15 @@ from tkinter import messagebox, ttk
 from datetime import datetime
 
 from services.operacoes_service import operacoes_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 
 class TelaOperacoes(ctk.CTkFrame):
 
     def __init__(self, master):
-        super().__init__(master, fg_color="transparent")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
         self.campos = {}
 
@@ -16,12 +19,15 @@ class TelaOperacoes(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(
+        criar_header(
             self,
-            text="🚛 TRANSFERÊNCIA SÃO PAULO → CASCAVEL",
-            font=("Arial", 28, "bold"),
-            text_color="#111827"
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 18))
+            tag="OPERAÇÕES",
+            titulo="Transferência SP → Cascavel",
+            subtitulo="Controle de transferências, fretes, pedágios e custos de carga.",
+            cores=self.cores,
+            row=0, column=0, columnspan=2, sticky="ew",
+            padx=10, pady=(0, 18),
+        )
 
         self.form = ctk.CTkFrame(
             self,
@@ -75,7 +81,7 @@ class TelaOperacoes(ctk.CTkFrame):
             height=46,
             fg_color="#16a34a",
             hover_color="#15803d",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             command=self.salvar
         ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
@@ -85,7 +91,7 @@ class TelaOperacoes(ctk.CTkFrame):
             height=46,
             fg_color="#6b7280",
             hover_color="#4b5563",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             command=self.limpar
         ).grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
@@ -94,7 +100,7 @@ class TelaOperacoes(ctk.CTkFrame):
         ctk.CTkLabel(
             self.resumo,
             text="📊 RESUMO",
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=20, pady=(22, 16))
 
@@ -111,7 +117,7 @@ class TelaOperacoes(ctk.CTkFrame):
             height=42,
             fg_color="#111827",
             hover_color="#374151",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=self.atualizar_resumo
         ).pack(fill="x", padx=20, pady=20)
 
@@ -129,7 +135,7 @@ class TelaOperacoes(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="📋 ÚLTIMAS TRANSFERÊNCIAS SP → CASCAVEL",
-            font=("Arial", 17, "bold"),
+            font=(self.cores["font_family"], 17, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=18, pady=(16, 8))
 
@@ -188,7 +194,7 @@ class TelaOperacoes(ctk.CTkFrame):
         ctk.CTkLabel(
             self.form,
             text=texto,
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             text_color="#b91c1c"
         ).grid(
             row=row,
@@ -207,7 +213,7 @@ class TelaOperacoes(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text=texto,
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#374151"
         ).pack(anchor="w")
 
@@ -237,14 +243,14 @@ class TelaOperacoes(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#6b7280"
         ).pack(anchor="w", padx=14, pady=(10, 2))
 
         label = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color=cor
         )
         label.pack(anchor="w", padx=14, pady=(0, 10))

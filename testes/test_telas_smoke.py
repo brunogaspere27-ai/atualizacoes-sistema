@@ -24,7 +24,10 @@ SCREENS = [
 
 @pytest.fixture
 def tk_root():
-    root = ctk.CTk()
+    try:
+        root = ctk.CTk()
+    except Exception:
+        pytest.skip("Tkinter/Tcl não disponível neste ambiente")
     root.withdraw()
     frame = ctk.CTkFrame(root)
     frame.pack(fill="both", expand=True)

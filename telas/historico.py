@@ -3,24 +3,30 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 
 from services.historico_service import historico_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 
 class TelaHistorico(ctk.CTkFrame):
 
     def __init__(self, master):
-        super().__init__(master, fg_color="transparent")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
         self.viagens_ids = {}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
 
-        ctk.CTkLabel(
+        criar_header(
             self,
-            text="🚚 VIAGENS",
-            font=("Arial", 28, "bold"),
-            text_color="#b91c1c"
-        ).grid(row=0, column=0, sticky="w", padx=10, pady=(0, 18))
+            tag="HISTÓRICO DE VIAGENS",
+            titulo="Viagens",
+            subtitulo="Acompanhamento de viagens, notas, fretes e peso transportado.",
+            cores=self.cores,
+            row=0, column=0, sticky="ew",
+            padx=10, pady=(0, 18),
+        )
 
         self.criar_resumo()
         self.criar_tabela()
@@ -51,14 +57,14 @@ class TelaHistorico(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 10, "bold"),
+            font=(self.cores["font_family"], 10, "bold"),
             text_color="#6b7280"
         ).pack(anchor="w", padx=12, pady=(12, 4))
 
         label_valor = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 17, "bold"),
+            font=(self.cores["font_family"], 17, "bold"),
             text_color=cor
         )
         label_valor.pack(anchor="w", padx=12, pady=(0, 12))
@@ -79,7 +85,7 @@ class TelaHistorico(ctk.CTkFrame):
         ctk.CTkLabel(
             topo,
             text="Lista de Viagens Criadas",
-            font=("Arial", 17, "bold"),
+            font=(self.cores["font_family"], 17, "bold"),
             text_color="#111827"
         ).pack(side="left")
 
@@ -292,7 +298,7 @@ class TelaHistorico(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text=f"📦 DETALHES DA VIAGEM #{viagem_id}",
-            font=("Arial", 24, "bold"),
+            font=(self.cores["font_family"], 24, "bold"),
             text_color="#b91c1c"
         ).pack(anchor="w", padx=20, pady=(20, 10))
 
@@ -334,14 +340,14 @@ class TelaHistorico(ctk.CTkFrame):
                 ctk.CTkLabel(
                     card,
                     text=titulo,
-                    font=("Arial", 10, "bold"),
+                    font=(self.cores["font_family"], 10, "bold"),
                     text_color="#6b7280"
                 ).pack(anchor="w", padx=12, pady=(10, 2))
 
                 ctk.CTkLabel(
                     card,
                     text=valor,
-                    font=("Arial", 14, "bold"),
+                    font=(self.cores["font_family"], 14, "bold"),
                     text_color=cor
                 ).pack(anchor="w", padx=12, pady=(0, 10))
 
@@ -442,21 +448,21 @@ class TelaHistorico(ctk.CTkFrame):
         ctk.CTkLabel(
             resumo,
             text=f"Notas: {len(notas)}",
-            font=("Arial", 15, "bold"),
+            font=(self.cores["font_family"], 15, "bold"),
             text_color="#111827"
         ).pack(side="left", padx=20, pady=15)
 
         ctk.CTkLabel(
             resumo,
             text=f"Peso Total: {total_peso:,.2f} kg",
-            font=("Arial", 15, "bold"),
+            font=(self.cores["font_family"], 15, "bold"),
             text_color="#b91c1c"
         ).pack(side="left", padx=20, pady=15)
 
         ctk.CTkLabel(
             resumo,
             text=f"Frete Total: R$ {total_frete:,.2f}",
-            font=("Arial", 15, "bold"),
+            font=(self.cores["font_family"], 15, "bold"),
             text_color="#15803d"
         ).pack(side="right", padx=20, pady=15)
 

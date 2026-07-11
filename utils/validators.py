@@ -399,15 +399,15 @@ def format_cep(cep: str) -> str:
 
 
 def format_placa(placa: str) -> str:
-    """Formata placa no padrão ABC-1234."""
+    """Formata placa no padrão ABC-1234 (antigo) ou ABC1D23 (Mercosul)."""
     placa = placa.upper().strip()
     placa = re.sub(r'[^A-Z0-9]', '', placa)
     
     if len(placa) == 7:
-        # Formato novo Mercosul: ABC1D23
+        # Formato Mercosul: ABC1D23 ou antigo sem traço: ABC1234
         return f"{placa[:3]}-{placa[3:]}"
-    elif len(placa) == 7 and re.match(r'^[A-Z]{3}\d{4}$', placa):
-        # Formato antigo: ABC1234
-        return f"{placa[:3]}-{placa[3:]}"
+    elif len(placa) == 8 and placa[3] == '-':
+        # Já formatado com traço: ABC-1234
+        return placa
     
     return placa

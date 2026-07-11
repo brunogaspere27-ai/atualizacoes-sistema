@@ -1,28 +1,26 @@
 # CW Transportadora - Sistema de Gestão Logística
-# Dependências do projeto
+# Dependências de produção com versões pinadas.
+# Para atualizar: edite a versão e teste antes de commitar.
 
-# Interface Gráfica
-customtkinter>=5.2.0
-Pillow>=10.0.0
+# Interface gráfica
+customtkinter==5.2.2
+Pillow==11.2.1
 
-# Requisições HTTP (para atualizações automáticas)
-requests>=2.31.0
+# Requisições HTTP (verificação de atualizações)
+requests==2.32.4
 
-# Banco de Dados
-psycopg2-binary>=2.9.0
+# Banco de dados em nuvem (opcional — apenas para sync com Supabase)
+psycopg2-binary==2.9.10
 
-# Visualização de Dados
-matplotlib>=3.7.0
-numpy>=1.24.0
+# Visualização de dados
+matplotlib==3.10.3
+numpy==2.3.1
 
-# Variáveis de Ambiente
-python-dotenv>=1.0.0
+# Variáveis de ambiente
+python-dotenv==1.1.0
 
 # Geração de PDF
-reportlab>=4.0.0
+reportlab==4.4.1
 
-# Logging Avançado
-loguru>=0.7.0
-
-# Testes
-pytest>=8.0.0
+# Logging avançado
+loguru==0.7.3

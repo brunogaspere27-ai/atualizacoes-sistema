@@ -383,7 +383,7 @@ class TelaRelatorios(ctk.CTkFrame):
             if self.tipo_periodo == "Ano":
                 return data.strftime("%Y") == self.ano
 
-        except:
+        except Exception:
             return False
 
         return True
@@ -747,8 +747,8 @@ class TelaRelatorios(ctk.CTkFrame):
 
             try:
                 os.startfile(nome_pdf)
-            except:
-                pass
+            except Exception:
+                pass  # Alguns ambientes não suportam os.startfile
 
             messagebox.showinfo(
                 "Sucesso",

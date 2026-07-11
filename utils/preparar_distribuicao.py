@@ -60,8 +60,8 @@ def limpar_sqlite_local():
 
         try:
             cursor.execute("DELETE FROM sqlite_sequence")
-        except:
-            pass
+        except sqlite3.OperationalError:
+            pass  # sqlite_sequence pode não existir se não houver AUTOINCREMENT
 
         conn.commit()
 

@@ -1,11 +1,41 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, List, Optional, Sequence
 
 from utils.database import conectar, registrar_sync
 
 
 class FinanceiroService:
+
+    def contar_contas_vencidas(self) -> int:
+        """
+        Retorna o número de contas Pendentes com vencimento anterior a hoje.
+        Usado pelo sidebar para exibir badge de alerta.
+        """
+        hoje = date.today().strftime("%d/%m/%Y")
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            # Compara strings DD/MM/YYYY usando substr para extrair ano, mês, dia
+            # de forma que a ordenação lexicográfica seja correta (YYYY + MM + DD)
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM contas
+                WHERE status = 'Pendente'
+                  AND vencimento IS NOT NULL
+                  AND vencimento != ''
+                  AND (
+                      substr(vencimento,7,4) || substr(vencimento,4,2) || substr(vencimento,1,2)
+                      < substr(?,7,4) || substr(?,4,2) || substr(?,1,2)
+                  )
+            """, (hoje, hoje, hoje))
+            return cursor.fetchone()[0]
+        except Exception:
+            return 0
+        finally:
+            conn.close()
+
     def listar_contas(
         self,
         tipo_periodo: str,

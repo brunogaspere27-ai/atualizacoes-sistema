@@ -1,42 +1,34 @@
 import customtkinter as ctk
+import threading
 from tkinter import ttk, messagebox
 from datetime import datetime
-from utils.database import criar_banco
 from services.frota_service import frota_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TelaCombustivel(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="#F4F6F8")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
-        criar_banco()
         self.criar_layout()
+        self._carregando = False
+        self._geracao = 0
         self.carregar_abastecimentos()
 
     def criar_layout(self):
-        topo = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=24)
-        topo.pack(fill="x", padx=25, pady=(20, 15))
-
-        ctk.CTkLabel(
-            topo,
-            text="CONTROLE DE COMBUSTÍVEL",
-            font=("Arial", 13, "bold"),
-            text_color="#93c5fd"
-        ).pack(anchor="w", padx=24, pady=(18, 0))
-
-        ctk.CTkLabel(
-            topo,
-            text="Abastecimentos",
-            font=("Arial", 34, "bold"),
-            text_color="white"
-        ).pack(anchor="w", padx=24)
-
-        ctk.CTkLabel(
-            topo,
-            text="Controle de consumo, média km/L, custo por km e gasto por veículo.",
-            font=("Arial", 14),
-            text_color="#cbd5e1"
-        ).pack(anchor="w", padx=24, pady=(0, 18))
+        ff = self.cores["font_family"]
+        criar_header(
+            self,
+            tag="CONTROLE DE COMBUSTÍVEL",
+            titulo="Abastecimentos",
+            subtitulo="Controle de consumo, média km/L, custo por km e gasto por veículo.",
+            cores=self.cores,
+        )
 
         filtros = ctk.CTkFrame(self, fg_color="white", corner_radius=18)
         filtros.pack(fill="x", padx=25, pady=10)
@@ -63,7 +55,8 @@ class TelaCombustivel(ctk.CTkFrame):
         self.ano = ctk.CTkEntry(filtros, width=90, placeholder_text="Ano")
         self.ano.insert(0, datetime.now().strftime("%Y"))
         self.ano.pack(side="left", padx=8)
-        self.ano.bind("<KeyRelease>", lambda e: self.carregar_abastecimentos())
+        self._debounce_id = None
+        self.ano.bind("<KeyRelease>", lambda e: self._debounce_carregar())
 
         self.busca = ctk.CTkEntry(
             filtros,
@@ -71,7 +64,7 @@ class TelaCombustivel(ctk.CTkFrame):
             placeholder_text="Buscar veículo, motorista ou posto..."
         )
         self.busca.pack(side="left", padx=8)
-        self.busca.bind("<KeyRelease>", lambda e: self.carregar_abastecimentos())
+        self.busca.bind("<KeyRelease>", lambda e: self._debounce_carregar())
 
         ctk.CTkButton(
             filtros,
@@ -152,14 +145,14 @@ class TelaCombustivel(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 12),
+            font=(self.cores["font_family"], 12),
             text_color="#6B7280"
         ).pack(pady=(10, 0))
 
         label = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         )
         label.pack(pady=(2, 10))
@@ -177,7 +170,7 @@ class TelaCombustivel(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text="Cadastro de Abastecimento",
-            font=("Arial", 24, "bold")
+            font=(self.cores["font_family"], 24, "bold")
         ).pack(pady=(20, 10))
 
         frame = ctk.CTkFrame(janela, fg_color="white", corner_radius=18)
@@ -191,7 +184,7 @@ class TelaCombustivel(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Veículo",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
 
@@ -254,7 +247,7 @@ class TelaCombustivel(ctk.CTkFrame):
         label_total = ctk.CTkLabel(
             frame,
             text="",
-            font=("Arial", 17, "bold"),
+            font=(self.cores["font_family"], 17, "bold"),
             text_color="#111827"
         )
         label_total.pack(pady=10)
@@ -346,7 +339,7 @@ class TelaCombustivel(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text=label,
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
 
@@ -355,16 +348,38 @@ class TelaCombustivel(ctk.CTkFrame):
 
         return campo
 
+    def _debounce_carregar(self):
+        if self._debounce_id:
+            self.after_cancel(self._debounce_id)
+        self._debounce_id = self.after(300, self.carregar_abastecimentos)
+
     def carregar_abastecimentos(self):
-        for item in self.tabela.get_children():
-            self.tabela.delete(item)
+        self._debounce_id = None
+        self._geracao += 1
+        geracao_atual = self._geracao
 
         tipo = self.tipo_periodo.get()
         mes = self.mes.get()
         ano = self.ano.get().strip()
         busca = self.busca.get().strip()
 
-        dados = frota_service.listar_abastecimentos(tipo, mes, ano, busca)
+        def _tarefa():
+            try:
+                dados = frota_service.listar_abastecimentos(tipo, mes, ano, busca)
+                self.after(0, lambda: self._aplicar_dados(dados, geracao_atual))
+            except Exception as erro:
+                logger.error(f"Erro ao carregar abastecimentos: {erro}")
+                self.after(0, lambda: self._aplicar_dados([], geracao_atual))
+
+        threading.Thread(target=_tarefa, daemon=True).start()
+
+    def _aplicar_dados(self, dados, geracao):
+        if geracao != self._geracao:
+            return  # resultado obsoleto, descartar
+        if not self.winfo_exists():
+            return  # tela foi fechada
+        for item in self.tabela.get_children():
+            self.tabela.delete(item)
 
         total_litros = 0
         total_gasto = 0
@@ -453,27 +468,15 @@ class TelaCombustivel(ctk.CTkFrame):
 
         return "✅ OK"
 
-    def numero(self, valor):
-        if not valor:
-            return 0.0
-
-        valor = str(valor).replace("R$", "").replace(" ", "").strip()
-
-        if "," in valor:
-            valor = valor.replace(".", "").replace(",", ".")
-
-        try:
-            return float(valor)
-        except:
-            return 0.0
+    def numero(self, valor: str) -> float:
+        """Converte string para float tratando separadores BR (vírgula decimal)."""
+        from utils.helpers import parse_numero
+        return parse_numero(valor)
 
     def moeda(self, valor):
-        return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        from utils.helpers import formatar_moeda
+        return formatar_moeda(valor)
 
     def formatar_numero(self, valor):
-        valor = float(valor or 0)
-
-        if valor.is_integer():
-            return str(int(valor))
-
-        return f"{valor:.2f}".replace(".", ",")
+        v = float(valor or 0)
+        return str(int(v)) if v == int(v) else f"{v:.2f}".replace(".", ",")

@@ -1,15 +1,22 @@
 import os
 import sys
+import threading
 import customtkinter as ctk
 from tkinter import messagebox
 from config.settings import settings
 from services.config_service import config_service
 from services.viagem_service import viagem_service
+from services.update_service import update_service, CANAL_ESTAVEL, CANAL_BETA, CANAL_DEV
+from telas.theme import setup_theme, criar_header
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TelaConfiguracoes(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="#F4F6F8")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
         self.base_dir = str(settings.project_dir)
         self.config_path = str(settings.config_path)
@@ -20,47 +27,19 @@ class TelaConfiguracoes(ctk.CTkFrame):
 
         self.criar_layout()
 
-    def configuracao_padrao(self):
-        return {
-            "empresa": "CW TRANSPORTADORA",
-            "cnpj": "",
-            "telefone": "",
-            "email": "",
-            "cidade": "Cascavel",
-            "uf": "PR",
-            "pasta_relatorios": "relatorios_gerados",
-            "meta_lucro": "10000",
-            "imposto_percentual": "3",
-            "alerta_revisao": "8000",
-            "revisao_obrigatoria": "10000",
-            "tema": "Vermelho CW",
-            "cor_tema": "Vermelho"
-        }
+    def configuracao_padrao(self) -> dict:
+        """Delega ao settings para evitar duplicação da lista de defaults."""
+        return settings._config_padrao()
 
     def criar_layout(self):
-        topo = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=24)
-        topo.pack(fill="x", padx=25, pady=(20, 15))
-
-        ctk.CTkLabel(
-            topo,
-            text="CONFIGURAÇÕES DO SISTEMA",
-            font=("Arial", 13, "bold"),
-            text_color="#93c5fd"
-        ).pack(anchor="w", padx=24, pady=(18, 0))
-
-        ctk.CTkLabel(
-            topo,
-            text="Central de Configurações",
-            font=("Arial", 34, "bold"),
-            text_color="white"
-        ).pack(anchor="w", padx=24)
-
-        ctk.CTkLabel(
-            topo,
-            text="Dados da empresa, backup, banco de dados e preferências do sistema.",
-            font=("Arial", 14),
-            text_color="#cbd5e1"
-        ).pack(anchor="w", padx=24, pady=(0, 18))
+        ff = self.cores["font_family"]
+        criar_header(
+            self,
+            tag="CONFIGURAÇÕES DO SISTEMA",
+            titulo="Central de Configurações",
+            subtitulo="Dados da empresa, backup, banco de dados e preferências do sistema.",
+            cores=self.cores,
+        )
 
         self.container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.container.pack(fill="both", expand=True, padx=25, pady=5)
@@ -70,6 +49,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
         self.criar_card_sistema()
         self.criar_card_backup()
         self.criar_card_banco()
+        self.criar_card_atualizacoes()
         self.criar_card_limpeza()
 
         botoes = ctk.CTkFrame(self, fg_color="transparent")
@@ -82,7 +62,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
             width=230,
             fg_color="#16A34A",
             hover_color="#15803D",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             command=self.salvar
         ).pack(side="left")
 
@@ -93,7 +73,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
             width=190,
             fg_color="#111827",
             hover_color="#374151",
-            font=("Arial", 14, "bold"),
+            font=(self.cores["font_family"], 14, "bold"),
             command=self.restaurar_padrao
         ).pack(side="left", padx=12)
 
@@ -110,14 +90,14 @@ class TelaConfiguracoes(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         ).pack(anchor="w", padx=22, pady=(20, 3))
 
         ctk.CTkLabel(
             card,
             text=subtitulo,
-            font=("Arial", 12),
+            font=(self.cores["font_family"], 12),
             text_color="#64748b",
             wraplength=430,
             justify="left"
@@ -157,7 +137,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text="Tema visual",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=22, pady=(7, 2))
 
@@ -173,7 +153,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text="Cor principal",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=22, pady=(7, 2))
 
@@ -201,7 +181,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text="O backup copia o banco SQLite, configurações e pasta de relatórios.",
-            font=("Arial", 11),
+            font=(self.cores["font_family"], 11),
             text_color="#64748b",
             wraplength=430,
             justify="left"
@@ -232,39 +212,160 @@ class TelaConfiguracoes(ctk.CTkFrame):
             ctk.CTkLabel(
                 linha,
                 text=titulo,
-                font=("Arial", 12, "bold"),
+                font=(self.cores["font_family"], 12, "bold"),
                 text_color="#64748b"
             ).pack(side="left", padx=12, pady=10)
 
             ctk.CTkLabel(
                 linha,
                 text=valor,
-                font=("Arial", 12, "bold"),
+                font=(self.cores["font_family"], 12, "bold"),
                 text_color="#111827"
             ).pack(side="right", padx=12, pady=10)
 
         self.botao(card, "Atualizar Informações", "#2563EB", "#1D4ED8", self.recarregar_tela)
+
+    def criar_card_atualizacoes(self):
+        """Card de configuracoes de atualizacao."""
+        card = self.criar_card(
+            "🔄 Atualizacoes",
+            "Configure canal, verificacao automatica e verifique novas versoes.",
+            2,
+            1
+        )
+
+        # Versao atual
+        info_versao = update_service.obter_versao_instalada()
+        versao = info_versao.get("versao", "0.0.0")
+
+        row_versao = ctk.CTkFrame(card, fg_color="#F0FDF4", corner_radius=12)
+        row_versao.pack(fill="x", padx=22, pady=(4, 8))
+
+        ctk.CTkLabel(
+            row_versao, text=f"Versao instalada: {versao}",
+            font=(self.cores["font_family"], 13, "bold"), text_color="#166534",
+        ).pack(side="left", padx=14, pady=10)
+
+        # Checkbox auto-check
+        self._check_auto = ctk.CTkCheckBox(
+            card, text="Verificar atualizacoes automaticamente",
+            font=(self.cores["font_family"], 12, "bold"),
+            text_color="#374151", fg_color="#16A34A",
+            hover_color="#15803D",
+        )
+        self._check_auto.pack(anchor="w", padx=22, pady=(6, 4))
+        if settings.enable_auto_update:
+            self._check_auto.select()
+
+        # Canal
+        ctk.CTkLabel(
+            card, text="Canal de atualizacao",
+            font=(self.cores["font_family"], 12, "bold"), text_color="#374151",
+        ).pack(anchor="w", padx=22, pady=(8, 2))
+
+        self._combo_canal = ctk.CTkComboBox(
+            card,
+            values=["Estavel", "Beta", "Desenvolvimento"],
+            height=39, font=(self.cores["font_family"], 12),
+        )
+        self._combo_canal.pack(fill="x", padx=22, pady=(0, 8))
+
+        canal_map = {CANAL_ESTAVEL: "Estavel", CANAL_BETA: "Beta", CANAL_DEV: "Desenvolvimento"}
+        self._combo_canal.set(canal_map.get(update_service.channel, "Estavel"))
+
+        # Botao verificar agora
+        self._btn_verificar = ctk.CTkButton(
+            card, text="Verificar Agora", height=42,
+            fg_color="#2563EB", hover_color="#1D4ED8",
+            font=(self.cores["font_family"], 13, "bold"),
+            command=self._verificar_atualizacao_manual,
+        )
+        self._btn_verificar.pack(fill="x", padx=22, pady=(4, 8))
+
+        self._label_resultado = ctk.CTkLabel(
+            card, text="",
+            font=(self.cores["font_family"], 11), text_color="#6B7280",
+        )
+        self._label_resultado.pack(anchor="w", padx=22, pady=(0, 4))
+
+        # Botao historico
+        ctk.CTkButton(
+            card, text="Ver Historico de Versoes", height=42,
+            fg_color="#111827", hover_color="#374151",
+            font=(self.cores["font_family"], 13, "bold"),
+            command=self._abrir_historico,
+        ).pack(fill="x", padx=22, pady=(4, 16))
+
+    def _verificar_atualizacao_manual(self):
+        """Verifica atualizacoes em background."""
+        self._btn_verificar.configure(state="disabled", text="Verificando...")
+        self._label_resultado.configure(text="Buscando novas versoes...", text_color="#F59E0B")
+
+        canal_nome = self._combo_canal.get()
+        canal_map_rev = {"Estavel": CANAL_ESTAVEL, "Beta": CANAL_BETA, "Desenvolvimento": CANAL_DEV}
+        canal = canal_map_rev.get(canal_nome, CANAL_ESTAVEL)
+
+        def _tarefa():
+            try:
+                resultado = update_service.check_for_updates(channel=canal)
+                if self.winfo_exists():
+                    self.after(0, lambda: self._resultado_verificacao(resultado))
+            except Exception as e:
+                if self.winfo_exists():
+                    self.after(0, lambda: self._resultado_verificacao({"error": str(e)}))
+
+        threading.Thread(target=_tarefa, daemon=True).start()
+
+    def _resultado_verificacao(self, resultado):
+        if not self.winfo_exists():
+            return
+
+        self._btn_verificar.configure(state="normal", text="Verificar Agora")
+
+        if resultado.get("error"):
+            self._label_resultado.configure(
+                text=f"Erro: {resultado['error']}", text_color="#DC2626"
+            )
+            return
+
+        if resultado.get("has_update"):
+            self._label_resultado.configure(
+                text=f"Nova versao: {resultado['latest_version']}!", text_color="#16A34A"
+            )
+            from telas.atualizacao import TelaAtualizacao
+            TelaAtualizacao(self.winfo_toplevel(), resultado)
+        else:
+            self._label_resultado.configure(
+                text="Sistema esta atualizado!", text_color="#16A34A"
+            )
+
+    def _abrir_historico(self):
+        """Abre tela de historico de versoes."""
+        # Navegar via main app
+        app = self.winfo_toplevel()
+        if hasattr(app, "mostrar_historico_versoes"):
+            app.mostrar_historico_versoes()
 
     def criar_card_limpeza(self):
         """Card para limpeza de dados do sistema."""
         card = self.criar_card(
             "🗑️ Limpeza de Dados",
             "Remova dados salvos para recadastramento. Use com cuidado!",
-            2,
+            3,
             0
         )
 
         ctk.CTkLabel(
             card,
             text="Caminhões cadastrados",
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=22, pady=(8, 4))
 
         ctk.CTkLabel(
             card,
             text="Remove todos os veículos para permitir novo cadastramento.",
-            font=("Arial", 11),
+            font=(self.cores["font_family"], 11),
             text_color="#64748b"
         ).pack(anchor="w", padx=22, pady=(0, 12))
 
@@ -316,7 +417,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text=label,
-            font=("Arial", 12, "bold"),
+            font=(self.cores["font_family"], 12, "bold"),
             text_color="#374151"
         ).pack(anchor="w")
 
@@ -333,7 +434,7 @@ class TelaConfiguracoes(ctk.CTkFrame):
             height=42,
             fg_color=cor,
             hover_color=hover,
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             command=comando
         ).pack(fill="x", padx=22, pady=7)
 

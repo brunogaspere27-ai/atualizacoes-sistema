@@ -2,12 +2,11 @@
 Testes para configurações do sistema.
 """
 
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
 
 from config.settings import settings
+
+pytestmark = pytest.mark.integration
 
 
 def test_config_singleton():
@@ -15,7 +14,6 @@ def test_config_singleton():
     settings1 = settings
     settings2 = settings
     assert settings1 is settings2
-    print("✓ test_config_singleton passou")
 
 
 def test_config_empresa():
@@ -23,7 +21,6 @@ def test_config_empresa():
     empresa = settings.empresa
     assert isinstance(empresa, str)
     assert len(empresa) > 0
-    print(f"✓ test_config_empresa passou: {empresa}")
 
 
 def test_config_meta_lucro():
@@ -31,7 +28,6 @@ def test_config_meta_lucro():
     meta = settings.meta_lucro
     assert isinstance(meta, (int, float))
     assert meta > 0
-    print(f"✓ test_config_meta_lucro passou: {meta}")
 
 
 def test_config_imposto_percentual():
@@ -39,7 +35,6 @@ def test_config_imposto_percentual():
     imposto = settings.imposto_percentual
     assert isinstance(imposto, (int, float))
     assert imposto >= 0
-    print(f"✓ test_config_imposto_percentual passou: {imposto}")
 
 
 def test_config_cores_tema():
@@ -50,7 +45,6 @@ def test_config_cores_tema():
     assert "hover" in cores
     assert "fundo" in cores
     assert "texto" in cores
-    print(f"✓ test_config_cores_tema passou")
 
 
 def test_config_paleta_cores():
@@ -60,19 +54,3 @@ def test_config_paleta_cores():
     assert "Vermelho" in paleta
     assert "Azul" in paleta
     assert "Verde" in paleta
-    print(f"✓ test_config_paleta_cores passou")
-
-
-if __name__ == "__main__":
-    print("Executando testes de configurações...")
-    print()
-    
-    test_config_singleton()
-    test_config_empresa()
-    test_config_meta_lucro()
-    test_config_imposto_percentual()
-    test_config_cores_tema()
-    test_config_paleta_cores()
-    
-    print()
-    print("Todos os testes de configuração passaram! ✓")

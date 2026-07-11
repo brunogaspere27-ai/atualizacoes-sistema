@@ -7,6 +7,9 @@ from typing import Dict, Any
 
 from config.settings import settings
 from utils.database import conectar
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigService:
@@ -77,13 +80,13 @@ class ConfigService:
                 try:
                     cursor.execute(f"SELECT COUNT(*) FROM {tabela}")
                     registros += cursor.fetchone()[0]
-                except Exception:
-                    pass
+                except Exception as erro:
+                    logger.debug(f"Tabela {tabela} não disponível para contagem: {erro}")
         finally:
             try:
                 conn.close()
             except Exception:
-                pass
+                pass  # conn pode não ter sido atribuída se conectar() falhou
 
         ultimo_backup = "Nenhum"
         if settings.backup_dir.exists():

@@ -1,42 +1,28 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from utils.database import criar_banco
 from services.frota_service import frota_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 
 class TelaManutencao(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="#F4F6F8")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
-        criar_banco()
         self.criar_layout()
         self.carregar_manutencoes()
 
     def criar_layout(self):
-        topo = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=24)
-        topo.pack(fill="x", padx=25, pady=(20, 15))
-
-        ctk.CTkLabel(
-            topo,
-            text="MANUTENÇÃO DA FROTA",
-            font=("Arial", 13, "bold"),
-            text_color="#93c5fd"
-        ).pack(anchor="w", padx=24, pady=(18, 0))
-
-        ctk.CTkLabel(
-            topo,
-            text="Manutenções",
-            font=("Arial", 34, "bold"),
-            text_color="white"
-        ).pack(anchor="w", padx=24)
-
-        ctk.CTkLabel(
-            topo,
-            text="Controle de revisões, oficinas, custos e próximos vencimentos por KM.",
-            font=("Arial", 14),
-            text_color="#cbd5e1"
-        ).pack(anchor="w", padx=24, pady=(0, 18))
+        ff = self.cores["font_family"]
+        criar_header(
+            self,
+            tag="MANUTENÇÃO DA FROTA",
+            titulo="Manutenções",
+            subtitulo="Controle de revisões, oficinas, custos e próximos vencimentos por KM.",
+            cores=self.cores,
+        )
 
         filtros = ctk.CTkFrame(self, fg_color="white", corner_radius=18)
         filtros.pack(fill="x", padx=25, pady=10)
@@ -150,14 +136,14 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 12),
+            font=(self.cores["font_family"], 12),
             text_color="#6B7280"
         ).pack(pady=(10, 0))
 
         label = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         )
         label.pack(pady=(2, 10))
@@ -175,7 +161,7 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text="Cadastro de Manutenção",
-            font=("Arial", 24, "bold")
+            font=(self.cores["font_family"], 24, "bold")
         ).pack(pady=(20, 10))
 
         frame = ctk.CTkFrame(janela, fg_color="white", corner_radius=18)
@@ -189,7 +175,7 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Veículo",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
 
@@ -253,7 +239,7 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Tipo de manutenção",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
         tipo.pack(fill="x", padx=20, pady=(0, 8))
@@ -273,7 +259,7 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Status",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
         status.pack(fill="x", padx=20, pady=(0, 8))
@@ -335,7 +321,7 @@ class TelaManutencao(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text=label,
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(8, 2))
 
@@ -425,27 +411,15 @@ class TelaManutencao(ctk.CTkFrame):
     def buscar_veiculos(self):
         return frota_service.listar_veiculos_disponiveis("manutencoes")
 
-    def numero(self, valor):
-        if not valor:
-            return 0.0
+    def numero(self, valor: str) -> float:
+        """Converte string para float tratando separadores BR."""
+        from utils.helpers import parse_numero
+        return parse_numero(str(valor).replace("R$", "").strip())
 
-        valor = str(valor).replace("R$", "").replace(" ", "").strip()
+    def moeda(self, valor) -> str:
+        from utils.helpers import formatar_moeda
+        return formatar_moeda(valor)
 
-        if "," in valor:
-            valor = valor.replace(".", "").replace(",", ".")
-
-        try:
-            return float(valor)
-        except:
-            return 0.0
-
-    def moeda(self, valor):
-        return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    def formatar_numero(self, valor):
-        valor = float(valor or 0)
-
-        if valor.is_integer():
-            return str(int(valor))
-
-        return f"{valor:.2f}".replace(".", ",")
+    def formatar_numero(self, valor) -> str:
+        v = float(valor or 0)
+        return str(int(v)) if v == int(v) else f"{v:.2f}".replace(".", ",")

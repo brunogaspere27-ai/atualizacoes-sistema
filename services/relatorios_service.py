@@ -42,14 +42,24 @@ class RelatoriosService:
             filtro_comb = "WHERE substr(data_abastecimento, 4, 2) = ? AND substr(data_abastecimento, 7, 4) = ?"
             filtro_manut = "WHERE substr(data_manutencao, 4, 2) = ? AND substr(data_manutencao, 7, 4) = ?"
             filtro_contas = "WHERE substr(vencimento, 4, 2) = ? AND substr(vencimento, 7, 4) = ?"
-            params_notas = params_folha = params_comb = params_manut = params_contas = [mes, ano]
+            # Listas independentes para evitar aliasing de objeto mutável
+            params_notas = [mes, ano]
+            params_folha = [mes, ano]
+            params_comb = [mes, ano]
+            params_manut = [mes, ano]
+            params_contas = [mes, ano]
         elif tipo_periodo == "Ano":
             filtro_notas = "WHERE substr(criado_em, 1, 4) = ?"
             filtro_folha = "WHERE ano = ?"
             filtro_comb = "WHERE substr(data_abastecimento, 7, 4) = ?"
             filtro_manut = "WHERE substr(data_manutencao, 7, 4) = ?"
             filtro_contas = "WHERE substr(vencimento, 7, 4) = ?"
-            params_notas = params_folha = params_comb = params_manut = params_contas = [ano]
+            # Listas independentes para evitar aliasing de objeto mutável
+            params_notas = [ano]
+            params_folha = [ano]
+            params_comb = [ano]
+            params_manut = [ano]
+            params_contas = [ano]
 
         try:
             cursor.execute(f"SELECT COALESCE(SUM(valor_mercadoria), 0), COALESCE(SUM(valor_frete), 0) FROM notas {filtro_notas}", params_notas)

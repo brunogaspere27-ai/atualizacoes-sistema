@@ -1,17 +1,18 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from utils.database import criar_banco
 from services.funcionarios_service import funcionarios_service
+from config.settings import settings
+from telas.theme import setup_theme, criar_header
 
 
 class TelaFuncionarios(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master, fg_color="#F4F6F8")
+        self.cores = setup_theme(settings)
+        super().__init__(master, fg_color=self.cores["fundo"])
 
         self.modo_tela = "funcionarios"
 
-        criar_banco()
         self.criar_layout_principal()
 
     def limpar_tela(self):
@@ -26,18 +27,19 @@ class TelaFuncionarios(ctk.CTkFrame):
         self.modo_tela = "funcionarios"
         self.limpar_tela()
 
-        topo = ctk.CTkFrame(self, fg_color="transparent")
-        topo.pack(fill="x", padx=25, pady=(20, 10))
+        criar_header(
+            self,
+            tag="RECURSOS HUMANOS",
+            titulo="Funcionários",
+            subtitulo="Cadastro, folha de pagamento e controle de horas extras.",
+            cores=self.cores,
+        )
 
-        ctk.CTkLabel(
-            topo,
-            text="Funcionários",
-            font=("Arial", 28, "bold"),
-            text_color="#111827"
-        ).pack(side="left")
+        botoes = ctk.CTkFrame(self, fg_color="transparent")
+        botoes.pack(fill="x", padx=25, pady=(0, 10))
 
         ctk.CTkButton(
-            topo,
+            botoes,
             text="Ver Folha do Mês",
             fg_color="#16A34A",
             hover_color="#15803D",
@@ -46,7 +48,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ).pack(side="right", padx=5)
 
         ctk.CTkButton(
-            topo,
+            botoes,
             text="+ Criar Funcionário",
             fg_color="#2563EB",
             hover_color="#1D4ED8",
@@ -177,7 +179,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             topo,
             text="Folha do Mês",
-            font=("Arial", 28, "bold"),
+            font=(self.cores["font_family"], 28, "bold"),
             text_color="#111827"
         ).pack(side="left")
 
@@ -309,14 +311,14 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             card,
             text=titulo,
-            font=("Arial", 13),
+            font=(self.cores["font_family"], 13),
             text_color="#6B7280"
         ).pack(pady=(10, 0))
 
         label_valor = ctk.CTkLabel(
             card,
             text=valor,
-            font=("Arial", 20, "bold"),
+            font=(self.cores["font_family"], 20, "bold"),
             text_color="#111827"
         )
         label_valor.pack(pady=(2, 10))
@@ -432,13 +434,13 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text=f"Folha de {nome_funcionario}",
-            font=("Arial", 22, "bold")
+            font=(self.cores["font_family"], 22, "bold")
         ).pack(pady=(20, 5))
 
         ctk.CTkLabel(
             janela,
             text=f"Referência: {mes}/{ano}",
-            font=("Arial", 14),
+            font=(self.cores["font_family"], 14),
             text_color="#6B7280"
         ).pack(pady=(0, 15))
 
@@ -448,7 +450,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Quantidade de horas extras",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(20, 2))
 
@@ -461,7 +463,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Valor de cada hora extra",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(5, 2))
 
@@ -474,7 +476,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             frame,
             text="Outros adicionais ou descontos",
-            font=("Arial", 13, "bold"),
+            font=(self.cores["font_family"], 13, "bold"),
             text_color="#374151"
         ).pack(anchor="w", padx=20, pady=(5, 2))
 
@@ -487,7 +489,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         label_total = ctk.CTkLabel(
             frame,
             text="",
-            font=("Arial", 17, "bold"),
+            font=(self.cores["font_family"], 17, "bold"),
             text_color="#111827"
         )
         label_total.pack(pady=15)
@@ -587,7 +589,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         ctk.CTkLabel(
             janela,
             text="Cadastro de Funcionário",
-            font=("Arial", 24, "bold")
+            font=(self.cores["font_family"], 24, "bold")
         ).pack(pady=(20, 10))
 
         frame = ctk.CTkFrame(janela, fg_color="white", corner_radius=16)
@@ -694,29 +696,15 @@ class TelaFuncionarios(ctk.CTkFrame):
     # UTILITÁRIOS
     # =========================
 
-    def moeda_para_float(self, valor):
-        if not valor:
-            return 0.0
+    def moeda_para_float(self, valor: str) -> float:
+        """Converte string monetária BR para float."""
+        from utils.helpers import parse_numero
+        return parse_numero(str(valor).replace("R$", "").strip())
 
-        valor = str(valor).strip()
-        valor = valor.replace("R$", "")
-        valor = valor.replace(" ", "")
+    def moeda(self, valor):
+        from utils.helpers import formatar_moeda
+        return formatar_moeda(valor)
 
-        if "," in valor:
-            valor = valor.replace(".", "").replace(",", ".")
-
-        try:
-            return float(valor)
-        except ValueError:
-            return 0.0
-
-    def formatar_moeda(self, valor):
-        return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    def formatar_numero(self, valor):
-        valor = float(valor or 0)
-
-        if valor.is_integer():
-            return str(int(valor))
-
-        return str(valor).replace(".", ",")
+    def formatar_numero(self, valor) -> str:
+        v = float(valor or 0)
+        return str(int(v)) if v == int(v) else f"{v:.2f}".replace(".", ",")

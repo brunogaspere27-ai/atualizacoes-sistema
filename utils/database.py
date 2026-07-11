@@ -56,7 +56,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     Context manager para conexão com banco de dados.
     
     Yields:
-        Conexão SQLite configurada
+        Conexão SQLite configurada com foreign keys habilitadas.
     """
     conn = sqlite3.connect(
         DB_NAME,
@@ -67,6 +67,24 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     try:
         conn.execute("PRAGMA busy_timeout = 30000")
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys = ON")
+        yield conn
+    except Exception as e:
+        logger.error(f"Erro na conexão com banco: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+@contextmanager
+def get_connection_rows() -> Iterator[sqlite3.Connection]:
+    """Conexão com row_factory ativado — permite row['coluna'] em vez de row[0]."""
+    conn = sqlite3.connect(DB_NAME, timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys = ON")
         yield conn
     except Exception as e:
         logger.error(f"Erro na conexão com banco: {e}")
@@ -76,12 +94,21 @@ def get_connection() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def tabela_existe_sqlite(cursor: sqlite3.Cursor, tabela: str) -> bool:
+    """Verifica se uma tabela existe no banco SQLite local."""
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (tabela,)
+    )
+    return cursor.fetchone() is not None
+
+
 def conectar() -> sqlite3.Connection:
     """
     Cria conexão com banco de dados (legado, usar get_connection preferencialmente).
     
     Returns:
-        Conexão SQLite configurada
+        Conexão SQLite configurada com foreign keys habilitadas.
     """
     conn = sqlite3.connect(
         DB_NAME,
@@ -91,6 +118,7 @@ def conectar() -> sqlite3.Connection:
 
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys = ON")
 
     return conn
 
@@ -134,8 +162,8 @@ def marcar_registro_para_sync(
                     deletado = 1
                 WHERE id = ?
             """, (timestamp, registro_id))
-    except Exception:
-        pass
+    except sqlite3.OperationalError as erro:
+        logger.debug(f"Tabela {tabela} não possui colunas de sync ainda: {erro}")
 
 
 def obter_referencia_sync(
@@ -144,9 +172,6 @@ def obter_referencia_sync(
     registro_id: Any,
     operacao: str = "UPSERT"
 ) -> str:
-    if operacao.upper() != "DELETE":
-        return str(registro_id)
-
     try:
         cursor.execute(
             f"SELECT sync_id FROM {tabela} WHERE id = ?",
@@ -155,8 +180,11 @@ def obter_referencia_sync(
         row = cursor.fetchone()
         if row and row[0]:
             return str(row[0])
-    except Exception:
-        pass
+    except sqlite3.OperationalError:
+        pass  # Tabela pode não ter coluna sync_id ainda
+
+    if operacao.upper() == "DELETE":
+        return str(registro_id)
 
     return str(registro_id)
 
@@ -199,14 +227,31 @@ def registrar_sync(
         """)
 
         referencia_sync = obter_referencia_sync(cursor, tabela, registro_id, operacao)
+        referencias = [referencia_sync, str(registro_id)]
 
-        cursor.execute("""
+        placeholders = ",".join(["?"] * len(referencias))
+        cursor.execute(f"""
+            UPDATE sync_log
+            SET status = 'PENDENTE',
+                operacao = ?,
+                tentativas = 0,
+                erro = NULL,
+                registro_id = ?
+            WHERE tabela = ?
+              AND registro_id IN ({placeholders})
+              AND status = 'OK'
+        """, [operacao, referencia_sync, tabela, *referencias])
+
+        if cursor.rowcount > 0:
+            return
+
+        cursor.execute(f"""
             SELECT id
             FROM sync_log
             WHERE tabela = ?
-            AND registro_id = ?
+            AND registro_id IN ({placeholders})
             AND status = 'PENDENTE'
-        """, (tabela, referencia_sync))
+        """, [tabela, *referencias])
 
         if cursor.fetchone():
             return
@@ -273,6 +318,68 @@ def criar_indices(cursor: sqlite3.Cursor) -> None:
             logger.warning(f"Erro ao criar índice {idx_name}: {e}")
 
 
+def _criar_tabelas_auth(cursor: sqlite3.Cursor) -> None:
+    """Cria tabelas de autenticação, permissões e auditoria (locais, sem sync)."""
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome_completo TEXT NOT NULL,
+        usuario TEXT NOT NULL UNIQUE,
+        senha_hash TEXT NOT NULL,
+        senha_salt TEXT NOT NULL,
+        nivel_acesso TEXT NOT NULL DEFAULT 'comum',
+        ativo INTEGER NOT NULL DEFAULT 1,
+        deve_alterar_senha INTEGER NOT NULL DEFAULT 0,
+        tentativas_falhas INTEGER NOT NULL DEFAULT 0,
+        bloqueado_ate TEXT,
+        ultimo_login TEXT,
+        criado_por INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS permissoes_usuario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER NOT NULL,
+        modulo TEXT NOT NULL,
+        pode_visualizar INTEGER DEFAULT 1,
+        pode_criar INTEGER DEFAULT 0,
+        pode_editar INTEGER DEFAULT 0,
+        pode_excluir INTEGER DEFAULT 0,
+        pode_exportar INTEGER DEFAULT 0,
+        pode_sincronizar INTEGER DEFAULT 0,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+        UNIQUE(usuario_id, modulo)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auditoria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        acao TEXT NOT NULL,
+        modulo TEXT,
+        registro_afetado TEXT,
+        detalhes TEXT,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_usuarios_usuario ON usuarios(usuario)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON auditoria(criado_em)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id)
+    """)
+
+
 def criar_banco() -> None:
     """Cria todas as tabelas do banco de dados se não existirem."""
     logger.info("Criando/verificando estrutura do banco de dados...")
@@ -309,22 +416,17 @@ def criar_banco() -> None:
     )
     """)
 
-    try:
-        cursor.execute("ALTER TABLE funcionarios ADD COLUMN salario REAL DEFAULT 0")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE funcionarios ADD COLUMN telefone TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE funcionarios ADD COLUMN data_admissao TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE funcionarios ADD COLUMN vale_refeicao REAL DEFAULT 0")
-    except:
-        pass
+    for coluna_nome, coluna_tipo in [
+        ("salario", "REAL DEFAULT 0"),
+        ("telefone", "TEXT"),
+        ("data_admissao", "TEXT"),
+        ("vale_refeicao", "REAL DEFAULT 0"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE funcionarios ADD COLUMN {coluna_nome} {coluna_tipo}")
+            logger.info(f"Coluna '{coluna_nome}' adicionada à tabela funcionarios")
+        except sqlite3.OperationalError:
+            pass  # Coluna já existe — esperado em instalações existentes
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS folha_funcionarios (
@@ -410,14 +512,15 @@ def criar_banco() -> None:
     )
     """)
 
-    try:
-        cursor.execute("ALTER TABLE folha_funcionarios ADD COLUMN qtd_horas_extra REAL DEFAULT 0")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE folha_funcionarios ADD COLUMN valor_hora_extra REAL DEFAULT 0")
-    except:
-        pass
+    for coluna_nome, coluna_tipo in [
+        ("qtd_horas_extra", "REAL DEFAULT 0"),
+        ("valor_hora_extra", "REAL DEFAULT 0"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE folha_funcionarios ADD COLUMN {coluna_nome} {coluna_tipo}")
+            logger.info(f"Coluna '{coluna_nome}' adicionada à tabela folha_funcionarios")
+        except sqlite3.OperationalError:
+            pass  # Coluna já existe — esperado em instalações existentes
 
     # Criar índices para melhorar performance
     criar_indices(cursor)
@@ -473,26 +576,19 @@ def criar_banco() -> None:
     )
     """)
 
+    colunas_sync = [
+        ("sync_id", "TEXT"),
+        ("sincronizado", "INTEGER DEFAULT 0"),
+        ("atualizado_em", "TEXT"),
+        ("deletado", "INTEGER DEFAULT 0"),
+    ]
     for tabela in TABELAS_SYNC:
-        try:
-            cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN sync_id TEXT")
-        except:
-            pass
-
-        try:
-            cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN sincronizado INTEGER DEFAULT 0")
-        except:
-            pass
-
-        try:
-            cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN atualizado_em TEXT")
-        except:
-            pass
-
-        try:
-            cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN deletado INTEGER DEFAULT 0")
-        except:
-            pass
+        for coluna_nome, coluna_tipo in colunas_sync:
+            try:
+                cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna_nome} {coluna_tipo}")
+                logger.info(f"Coluna sync '{coluna_nome}' adicionada à tabela {tabela}")
+            except sqlite3.OperationalError:
+                pass  # Coluna já existe — esperado em instalações existentes
 
         try:
             cursor.execute(f"""
@@ -506,15 +602,18 @@ def criar_banco() -> None:
                    OR atualizado_em IS NULL
                    OR atualizado_em = ''
             """, (agora_sync(),))
-        except Exception:
-            pass
+        except sqlite3.OperationalError as erro:
+            logger.debug(f"Tabela {tabela} sem colunas de sync para atualizar: {erro}")
 
         try:
             cursor.execute(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{tabela}_sync_id ON {tabela}(sync_id)"
             )
-        except Exception:
-            pass
+        except sqlite3.OperationalError as erro:
+            logger.debug(f"Não foi possível criar índice sync_id para {tabela}: {erro}")
+
+    # ── Tabelas de Autenticação e Auditoria (locais, não sincronizadas) ──
+    _criar_tabelas_auth(cursor)
 
     corrigir_tabela_viagem_notas(cursor)
     registrar_caminhoes_para_sync(cursor)
@@ -836,8 +935,6 @@ def listar_notas_por_manifesto(manifesto_id):
     return dados
 
 def apagar_manifesto(manifesto_id):
-    criar_banco()
-
     conn = conectar()
     cursor = conn.cursor()
 
@@ -928,7 +1025,7 @@ def apagar_todos_caminhoes():
         return True
 
     except Exception as erro:
-        logger.erro(f"Erro ao apagar caminhões: {erro}")
+        logger.error(f"Erro ao apagar caminhões: {erro}")
         return False
 
 
@@ -1042,9 +1139,6 @@ def criar_viagem(caminhao_id, notas_ids, data_saida, motorista):
 
 
 def apagar_viagem(viagem_id):
-
-    criar_banco()
-
     conn = conectar()
     cursor = conn.cursor()
 
@@ -1291,22 +1385,40 @@ def dados_dashboard(tipo_periodo="Geral", mes=None, ano=None):
     cursor.execute(f"SELECT COUNT(*) FROM notas {filtro_notas}", params_notas)
     total_notas = cursor.fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) FROM notas {filtro_notas + (' AND' if filtro_notas else 'WHERE')} status = 'Disponível'", params_notas)
+    separador_notas = "AND" if filtro_notas else "WHERE"
+    separador_viagens = "AND" if filtro_viagens else "WHERE"
+
+    cursor.execute(
+        f"SELECT COUNT(*) FROM notas {filtro_notas} {separador_notas} status = 'Disponível'",
+        params_notas,
+    )
     notas_disponiveis = cursor.fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) FROM notas {filtro_notas + (' AND' if filtro_notas else 'WHERE')} status = 'Em viagem'", params_notas)
+    cursor.execute(
+        f"SELECT COUNT(*) FROM notas {filtro_notas} {separador_notas} status = 'Em viagem'",
+        params_notas,
+    )
     notas_em_viagem = cursor.fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) FROM notas {filtro_notas + (' AND' if filtro_notas else 'WHERE')} status = 'Entregue'", params_notas)
+    cursor.execute(
+        f"SELECT COUNT(*) FROM notas {filtro_notas} {separador_notas} status = 'Entregue'",
+        params_notas,
+    )
     notas_entregues = cursor.fetchone()[0]
 
     cursor.execute(f"SELECT COUNT(*) FROM viagens {filtro_viagens}", params_viagens)
     total_viagens = cursor.fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) FROM viagens {filtro_viagens + (' AND' if filtro_viagens else 'WHERE')} status = 'Em viagem'", params_viagens)
+    cursor.execute(
+        f"SELECT COUNT(*) FROM viagens {filtro_viagens} {separador_viagens} status = 'Em viagem'",
+        params_viagens,
+    )
     viagens_em_andamento = cursor.fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) FROM viagens {filtro_viagens + (' AND' if filtro_viagens else 'WHERE')} status = 'Finalizada'", params_viagens)
+    cursor.execute(
+        f"SELECT COUNT(*) FROM viagens {filtro_viagens} {separador_viagens} status = 'Finalizada'",
+        params_viagens,
+    )
     viagens_finalizadas = cursor.fetchone()[0]
 
     cursor.execute(f"SELECT COALESCE(SUM(frete_total), 0) FROM viagens {filtro_viagens}", params_viagens)
@@ -1364,103 +1476,66 @@ def top_destinos_dashboard(tipo_periodo="Geral", mes=None, ano=None):
     return dados
 
 def criar_operacao_sp(dados):
-
     conn = conectar()
     cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS operacoes_sp (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data_operacao TEXT,
-            nome_caminhao TEXT,
-            placa TEXT,
-            motorista TEXT,
-            valor_notas REAL DEFAULT 0,
-            frete_carreta REAL DEFAULT 0,
-            pedagio_carreta REAL DEFAULT 0,
-            outros_custos REAL DEFAULT 0,
-            custo_total REAL DEFAULT 0,
-            liquido REAL DEFAULT 0,
-            criado_em TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cursor.execute("""
-        INSERT INTO operacoes_sp (
-            data_operacao,
-            nome_caminhao,
-            placa,
-            motorista,
-            valor_notas,
-            frete_carreta,
-            pedagio_carreta,
-            outros_custos,
-            custo_total,
-            liquido
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        dados.get("data_operacao"),
-        dados.get("nome_caminhao"),
-        dados.get("placa"),
-        dados.get("motorista"),
-        dados.get("valor_notas", 0),
-        dados.get("frete_carreta", 0),
-        dados.get("pedagio_carreta", 0),
-        dados.get("outros_custos", 0),
-        dados.get("custo_total", 0),
-        dados.get("liquido", 0)
-    ))
-
-    conn.commit()
-    conn.close()
-
+    try:
+        cursor.execute("""
+            INSERT INTO operacoes_sp (
+                data_operacao,
+                nome_caminhao,
+                placa,
+                motorista,
+                valor_notas,
+                frete_carreta,
+                pedagio_carreta,
+                outros_custos,
+                custo_total,
+                liquido
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            dados.get("data_operacao"),
+            dados.get("nome_caminhao"),
+            dados.get("placa"),
+            dados.get("motorista"),
+            dados.get("valor_notas", 0),
+            dados.get("frete_carreta", 0),
+            dados.get("pedagio_carreta", 0),
+            dados.get("outros_custos", 0),
+            dados.get("custo_total", 0),
+            dados.get("liquido", 0)
+        ))
+        operacao_id = cursor.lastrowid
+        registrar_sync(cursor, "operacoes_sp", operacao_id)
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
 def listar_operacoes_sp():
-
     conn = conectar()
     cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS operacoes_sp (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data_operacao TEXT,
-            nome_caminhao TEXT,
-            placa TEXT,
-            motorista TEXT,
-            valor_notas REAL DEFAULT 0,
-            frete_carreta REAL DEFAULT 0,
-            pedagio_carreta REAL DEFAULT 0,
-            outros_custos REAL DEFAULT 0,
-            custo_total REAL DEFAULT 0,
-            liquido REAL DEFAULT 0,
-            criado_em TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cursor.execute("""
-        SELECT
-            id,
-            data_operacao,
-            nome_caminhao,
-            placa,
-            motorista,
-            valor_notas,
-            frete_carreta,
-            pedagio_carreta,
-            outros_custos,
-            custo_total,
-            liquido
-        FROM operacoes_sp
-        ORDER BY id DESC
-    """)
-
-    dados = cursor.fetchall()
-    conn.close()
-
-    return dados
+    try:
+        cursor.execute("""
+            SELECT
+                id,
+                data_operacao,
+                nome_caminhao,
+                placa,
+                motorista,
+                valor_notas,
+                frete_carreta,
+                pedagio_carreta,
+                outros_custos,
+                custo_total,
+                liquido
+            FROM operacoes_sp
+            ORDER BY id DESC
+        """)
+        return cursor.fetchall()
+    finally:
+        conn.close()
 
 def gerar_ranking_clientes_v6(tipo_periodo="Geral", mes=None, ano=None):
 
