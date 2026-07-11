@@ -27,8 +27,7 @@ def verificar_configuracao_env() -> Tuple[bool, str]:
         "  1. Copie o arquivo '.env.example' e renomeie para '.env'.\n"
         "  2. Preencha a linha:  SUPABASE_URL=<sua_url_do_supabase>\n"
         "  3. Reinicie o sistema.\n\n"
-        "O sistema continuará funcionando em modo LOCAL até que isso seja feito.\n"
-        "Execute 'configurar_env.py' para configurar automaticamente."
+        "O sistema continuará funcionando em modo LOCAL até que isso seja feito."
     )
 
 

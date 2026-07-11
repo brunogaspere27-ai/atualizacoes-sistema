@@ -1,7 +1,0 @@
-# Dependências opcionais para inferência local com Gemma3
-# Instale com: pip install -r requirements-gemma3.txt
-transformers>=4.35.0
-accelerate>=0.20.3
-torch>=2.0.0
-huggingface-hub>=0.17.0
-bitsandbytes>=0.39.0

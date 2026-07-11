@@ -307,8 +307,11 @@ class FrotaService:
 
         nomes: List[str] = []
 
+        # Uma unica conexao compartilhada pelas duas consultas desta operacao
+        # (antes eram 2 conexoes SQLite abertas em sequencia).
+        conn = conectar()
         try:
-            for caminhao in listar_caminhoes():
+            for caminhao in listar_caminhoes(conn=conn):
                 modelo = caminhao[2] or ""
                 placa = caminhao[1] or ""
                 nome = f"{modelo} - {placa}" if placa else modelo
@@ -316,9 +319,7 @@ class FrotaService:
                     nomes.append(nome)
         except Exception as erro:
             logger.warning(f"Erro ao listar caminhões para veículos disponíveis: {erro}")
-            pass
 
-        conn = conectar()
         cursor = conn.cursor()
         try:
             # tabela_historico validada pela whitelist acima — seguro usar f-string

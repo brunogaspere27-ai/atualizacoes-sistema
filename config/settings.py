@@ -1,6 +1,32 @@
 """
 Configurações centralizadas do sistema CW Transportadora.
 Gerencia ambiente, paths, tema e persistência do JSON de configuração.
+
+Prioridade entre `.env` e `configuracoes.json`
+------------------------------------------------
+O sistema tem DUAS fontes de configuração com papéis diferentes:
+
+- `.env` (variáveis de ambiente, lido por `_carregar_env_vars`): valores de
+  instalação/ambiente — credenciais e parâmetros técnicos que normalmente não
+  mudam pela interface do sistema. Ex.: `SUPABASE_URL`, `INTERVALO_SYNC_SEGUNDOS`.
+  É a única fonte para chaves que não têm equivalente em `configuracoes.json`
+  (como `SUPABASE_URL` e `INTERVALO_SYNC_SEGUNDOS`).
+
+- `configuracoes.json` (editado pela tela "Configurações" via
+  `salvar_configuracoes`): preferências de negócio/visuais que o usuário troca
+  em tempo de uso — nome da empresa, CNPJ, tema, metas financeiras, etc.
+
+Quando a MESMA chave existe nos dois (ex.: `EMPRESA`/`empresa`, `CNPJ`/`cnpj`,
+`CIDADE`/`cidade`, `META_LUCRO`/`meta_lucro`, `ALERTA_REVISAO`/`alerta_revisao`),
+**`configuracoes.json` sempre vence** — os getters abaixo (`empresa`, `cnpj`,
+`cidade`, `meta_lucro`, etc.) usam `self._config_json.get(chave, self._env_vars[...])`,
+ou seja, o valor do `.env` só é usado como fallback caso a chave ainda não
+exista no JSON. Isso é intencional: o `.env` define o valor inicial na
+instalação, e a tela de Configurações permite ajustar sem precisar reiniciar
+o `.env`/reinstalar.
+
+Chaves exclusivas do `.env` (sem equivalente editável no JSON): `SUPABASE_URL`,
+`INTERVALO_SYNC_SEGUNDOS`.
 """
 
 from __future__ import annotations

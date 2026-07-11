@@ -1,0 +1,2 @@
+- [Conexão SQLite opcional (conn=None)](cw-transportadora-sqlite-conn-pattern.md) — padrão adotado no projeto CW Transportadora para evitar conexões redundantes sem pool.
+- [Gemma3 scaffolding removido](cw-transportadora-gemma3-removido.md) — feature experimental não usada foi removida na limpeza do repositório do CW Transportadora.

@@ -169,14 +169,30 @@ class DashboardService:
     # ------------------------------------------------------------------
 
     def carregar_dashboard(self, tipo_periodo: str, mes: str, ano: str) -> Dict[str, Any]:
-        return {
-            "dados": dados_dashboard(tipo_periodo, mes, ano),
-            "top_destinos": top_destinos_dashboard(tipo_periodo, mes, ano),
-            "ranking_clientes": gerar_ranking_clientes_v6(tipo_periodo, mes, ano)[:4],
-            "extras": self.buscar_extras(tipo_periodo, mes, ano),
-        }
+        # Uma unica conexao compartilhada para as 4 consultas desta operacao
+        # (antes eram 4 conexoes SQLite abertas/fechadas em sequencia).
+        conn = conectar()
+        try:
+            return {
+                "dados": dados_dashboard(tipo_periodo, mes, ano, conn=conn),
+                "top_destinos": top_destinos_dashboard(tipo_periodo, mes, ano, conn=conn),
+                "ranking_clientes": gerar_ranking_clientes_v6(tipo_periodo, mes, ano, conn=conn)[:4],
+                "extras": self.buscar_extras(tipo_periodo, mes, ano, conn=conn),
+            }
+        finally:
+            conn.close()
 
-    def buscar_extras(self, tipo_periodo: str, mes: str, ano: str) -> Dict[str, Any]:
+    def buscar_extras(
+        self,
+        tipo_periodo: str,
+        mes: str,
+        ano: str,
+        conn: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Args:
+            conn: conexao opcional ja aberta, reaproveitada por `carregar_dashboard`.
+        """
         filtro_notas = ""
         params_notas: List[str] = []
         filtro_folha = ""
@@ -193,7 +209,9 @@ class DashboardService:
             filtro_folha = "WHERE ano = ?"
             params_folha = [ano]
 
-        conn = conectar()
+        conexao_propria = conn is None
+        if conexao_propria:
+            conn = conectar()
         cursor = conn.cursor()
         try:
             cursor.execute(f"""
@@ -215,7 +233,8 @@ class DashboardService:
             """, params_folha)
             total_folha, total_hora_extra = cursor.fetchone()
         finally:
-            conn.close()
+            if conexao_propria:
+                conn.close()
 
         return {
             "valor_notas": valor_notas or 0,

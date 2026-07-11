@@ -81,8 +81,18 @@ class App(ctk.CTk):
         criar_banco()
         criar_caminhoes_padrao()
 
-        # Garantir usuario mestre existe
-        auth_service.garantir_usuario_mestre()
+        # Garantir usuario mestre existe (gera senha aleatoria no primeiro boot)
+        senha_inicial_mestre = auth_service.garantir_usuario_mestre()
+        if senha_inicial_mestre:
+            self.after(500, lambda s=senha_inicial_mestre: messagebox.showinfo(
+                "Usuário mestre criado",
+                "Um usuário mestre foi criado para o primeiro acesso:\n\n"
+                "  Usuário: bruno\n"
+                f"  Senha temporária: {s}\n\n"
+                "Essa senha também foi salva em "
+                f"'{auth_service.arquivo_primeiro_acesso}'.\n"
+                "Você precisará trocá-la no primeiro login."
+            ))
 
         # Verificar configuração de nuvem e avisar usuário se necessário
         _cloud_ok, _cloud_msg = verificar_configuracao_env()

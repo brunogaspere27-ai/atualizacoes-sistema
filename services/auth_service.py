@@ -146,17 +146,30 @@ class AuthService:
 
     # ── Usuario mestre ────────────────────────────────────────────────────────
 
-    def garantir_usuario_mestre(self) -> None:
-        """Cria o usuario mestre (Bruno Gabriel) se nao existir."""
+    def garantir_usuario_mestre(self) -> Optional[str]:
+        """
+        Cria o usuario mestre (Bruno Gabriel) se nao existir, com uma senha
+        aleatoria gerada no primeiro boot (nunca fica hardcoded no codigo).
+
+        A senha gerada e' gravada uma unica vez em um arquivo de primeiro
+        acesso (ver `arquivo_primeiro_acesso`) para o administrador consultar,
+        e o usuario e' obrigado a troca-la no primeiro login
+        (`deve_alterar_senha=1`).
+
+        Returns:
+            A senha gerada, se um usuario mestre novo foi criado agora.
+            None se o usuario mestre ja existia (nada foi alterado).
+        """
         conn = conectar()
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT id FROM usuarios WHERE usuario = ?", ("bruno",))
             if cursor.fetchone():
-                return  # Ja existe
+                return None  # Ja existe
 
+            senha_gerada = secrets.token_urlsafe(12)
             salt = self.gerar_salt()
-            senha_hash = self.hash_senha("Alterar123!", salt)
+            senha_hash = self.hash_senha(senha_gerada, salt)
 
             cursor.execute(
                 """
@@ -177,9 +190,37 @@ class AuthService:
                 ),
             )
             conn.commit()
-            logger.info("Usuario mestre criado com sucesso.")
+            logger.info("Usuario mestre criado com sucesso (senha gerada aleatoriamente).")
+
+            self._gravar_senha_primeiro_acesso(senha_gerada)
+            return senha_gerada
         finally:
             conn.close()
+
+    @property
+    def arquivo_primeiro_acesso(self) -> Path:
+        """Arquivo local (fora do repositorio) com a senha inicial do usuario mestre."""
+        return settings.dados_dir / "PRIMEIRO_ACESSO_LEIA_E_APAGUE.txt"
+
+    def _gravar_senha_primeiro_acesso(self, senha: str) -> None:
+        """Grava a senha inicial em um arquivo de texto para o administrador ler uma unica vez."""
+        try:
+            self.arquivo_primeiro_acesso.write_text(
+                "CW TRANSPORTADORA - Primeiro acesso\n"
+                "====================================\n\n"
+                "Usuario mestre criado automaticamente:\n\n"
+                "  Usuario: bruno\n"
+                f"  Senha temporaria: {senha}\n\n"
+                "Esta senha e' de uso unico: o sistema vai pedir para troca-la\n"
+                "no primeiro login. Apague este arquivo apos anotar a senha.\n",
+                encoding="utf-8",
+            )
+            try:
+                os.chmod(self.arquivo_primeiro_acesso, 0o600)
+            except OSError:
+                pass  # Windows pode nao suportar chmod completo
+        except Exception as erro:
+            logger.error(f"Erro ao gravar arquivo de primeiro acesso: {erro}")
 
     # ── Login ─────────────────────────────────────────────────────────────────
 

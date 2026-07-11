@@ -14,7 +14,8 @@ from utils.database import (
     calcular_resumo_notas,
     criar_viagem,
     listar_caminhoes,
-    apagar_todos_caminhoes
+    apagar_todos_caminhoes,
+    get_connection,
 )
 from utils.logger import get_logger
 from utils.validators import (
@@ -170,23 +171,26 @@ class ViagemService:
             Tuple (valido, mensagem, porcentagem_uso)
         """
         try:
-            caminhoes = listar_caminhoes()
-            caminhao = None
-            
-            for c in caminhoes:
-                if c[0] == caminhao_id:
-                    caminhao = c
-                    break
-            
-            if not caminhao:
-                return False, "Caminhão não encontrado", 0
-            
-            capacidade = caminhao[4] or 0  # capacidade_kg
-            
-            if capacidade == 0:
-                return True, "Capacidade não definida", 0
-            
-            resumo = calcular_resumo_notas(notas_ids)
+            # Uma unica conexao compartilhada pelas duas consultas desta
+            # operacao (antes eram 2 conexoes SQLite abertas em sequencia).
+            with get_connection() as conn:
+                caminhoes = listar_caminhoes(conn=conn)
+                caminhao = None
+
+                for c in caminhoes:
+                    if c[0] == caminhao_id:
+                        caminhao = c
+                        break
+
+                if not caminhao:
+                    return False, "Caminhão não encontrado", 0
+
+                capacidade = caminhao[4] or 0  # capacidade_kg
+
+                if capacidade == 0:
+                    return True, "Capacidade não definida", 0
+
+                resumo = calcular_resumo_notas(notas_ids, conn=conn)
             peso_total = resumo["peso_total"]
             
             porcentagem_uso = (peso_total / capacidade) * 100 if capacidade > 0 else 0

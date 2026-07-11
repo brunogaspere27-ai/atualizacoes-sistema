@@ -77,3 +77,13 @@ dist/
 # Sistema operacional
 Thumbs.db
 .DS_Store
+
+# Ferramentas/cache do ambiente de desenvolvimento
+.cache/
+
+# Artefatos de build/release (instaladores gerados — não versionar binários)
+release/
+instalador/*.exe
+
+# Senha de primeiro acesso gerada localmente (nunca deve ir para o repositório)
+PRIMEIRO_ACESSO_LEIA_E_APAGUE.txt

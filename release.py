@@ -35,7 +35,7 @@ from typing import Dict, Tuple
 PROJECT_DIR = Path(__file__).parent
 VERSION_FILE = PROJECT_DIR / "versao.json"
 SPEC_FILE = PROJECT_DIR / "build.spec"
-ISS_FILE = PROJECT_DIR / "installer.iss"
+ISS_FILE = PROJECT_DIR / "instalador.iss"
 DIST_DIR = PROJECT_DIR / "dist"
 BUILD_DIR = PROJECT_DIR / "build"
 RELEASE_DIR = PROJECT_DIR / "release"

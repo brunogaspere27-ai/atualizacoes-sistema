@@ -8,9 +8,15 @@ from utils.database import conectar, dados_dashboard, listar_viagens, gerar_rank
 
 class RelatoriosService:
     def carregar_relatorio(self, tipo_periodo: str, mes: str, ano: str) -> Dict[str, Any]:
-        dados = dados_dashboard(tipo_periodo, mes, ano)
-        extras = self.buscar_extras(tipo_periodo, mes, ano)
-        ranking = gerar_ranking_clientes_v6(tipo_periodo, mes, ano)
+        # Uma unica conexao compartilhada para as 3 consultas desta operacao
+        # (antes eram 3 conexoes SQLite abertas/fechadas em sequencia).
+        conn = conectar()
+        try:
+            dados = dados_dashboard(tipo_periodo, mes, ano, conn=conn)
+            extras = self.buscar_extras(tipo_periodo, mes, ano, conn=conn)
+            ranking = gerar_ranking_clientes_v6(tipo_periodo, mes, ano, conn=conn)
+        finally:
+            conn.close()
 
         receitas = extras["frete_notas"] + dados["frete_total"] + extras["contas_recebidas"]
         despesas = extras["folha"] + extras["combustivel"] + extras["manutencao"] + extras["contas_pagas"]
@@ -25,8 +31,14 @@ class RelatoriosService:
             "lucro": lucro,
         }
 
-    def buscar_extras(self, tipo_periodo: str, mes: str, ano: str) -> Dict[str, Any]:
-        conn = conectar()
+    def buscar_extras(self, tipo_periodo: str, mes: str, ano: str, conn: Any = None) -> Dict[str, Any]:
+        """
+        Args:
+            conn: conexao opcional ja aberta, reaproveitada por `carregar_relatorio`.
+        """
+        conexao_propria = conn is None
+        if conexao_propria:
+            conn = conectar()
         cursor = conn.cursor()
 
         filtro_notas = filtro_folha = filtro_comb = filtro_manut = filtro_contas = ""
@@ -94,7 +106,8 @@ class RelatoriosService:
             cursor.execute("SELECT tipo, descricao, pessoa, categoria, valor, vencimento, status FROM contas ORDER BY id DESC")
             contas = cursor.fetchall()
         finally:
-            conn.close()
+            if conexao_propria:
+                conn.close()
 
         return {
             "valor_notas": valor_notas or 0,

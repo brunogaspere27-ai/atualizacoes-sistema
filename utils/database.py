@@ -687,9 +687,15 @@ def registrar_caminhoes_para_sync(cursor):
             registrar_sync(cursor, "caminhoes", caminhao_id)
 
 
-def buscar_cliente_por_cnpj(cnpj):
-
-    conn = conectar()
+def buscar_cliente_por_cnpj(cnpj, conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta, reaproveitada por `obter_ou_criar_cliente`
+            e `salvar_nota` para evitar abrir várias conexões na mesma operação.
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -698,7 +704,8 @@ def buscar_cliente_por_cnpj(cnpj):
     )
 
     resultado = cursor.fetchone()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     if resultado:
         return resultado[0]
@@ -706,9 +713,14 @@ def buscar_cliente_por_cnpj(cnpj):
     return None
 
 
-def criar_cliente(nome, cnpj, cidade="", uf=""):
-
-    conn = conectar()
+def criar_cliente(nome, cnpj, cidade="", uf="", conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `buscar_cliente_por_cnpj`).
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -720,79 +732,89 @@ def criar_cliente(nome, cnpj, cidade="", uf=""):
     cliente_id = cursor.lastrowid
 
     conn.commit()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     return cliente_id
 
 
-def obter_ou_criar_cliente(nome, cnpj, cidade="", uf=""):
-
+def obter_ou_criar_cliente(nome, cnpj, cidade="", uf="", conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `buscar_cliente_por_cnpj`).
+    """
     if not cnpj:
         cnpj = nome
 
-    cliente_id = buscar_cliente_por_cnpj(cnpj)
+    cliente_id = buscar_cliente_por_cnpj(cnpj, conn=conn)
 
     if cliente_id:
         return cliente_id
 
-    return criar_cliente(nome, cnpj, cidade, uf)
+    return criar_cliente(nome, cnpj, cidade, uf, conn=conn)
 
 
 def salvar_nota(nota):
+    """
+    Salva uma nota, criando remetente/destinatário se necessário.
 
+    Antes: abria até 5 conexões SQLite separadas na mesma operação
+    (nota_existe, buscar_cliente_por_cnpj x2, criar_cliente x{0,2}, insert).
+    Agora tudo roda em uma única conexão/transação.
+    """
     chave_nfe = nota.get("chave_nfe") or nota.get("numero_cte")
 
-    if nota_existe(chave_nfe):
-        return False
+    with get_connection() as conn:
+        if nota_existe(chave_nfe, conn=conn):
+            return False
 
-    remetente_id = obter_ou_criar_cliente(
-        nota.get("remetente_nome", ""),
-        nota.get("remetente_cnpj", ""),
-        nota.get("origem", ""),
-        nota.get("uf_origem", "")
-    )
+        remetente_id = obter_ou_criar_cliente(
+            nota.get("remetente_nome", ""),
+            nota.get("remetente_cnpj", ""),
+            nota.get("origem", ""),
+            nota.get("uf_origem", ""),
+            conn=conn,
+        )
 
-    destinatario_id = obter_ou_criar_cliente(
-        nota.get("destinatario_nome", ""),
-        nota.get("destinatario_cnpj", ""),
-        nota.get("destino", ""),
-        nota.get("uf_destino", "")
-    )
+        destinatario_id = obter_ou_criar_cliente(
+            nota.get("destinatario_nome", ""),
+            nota.get("destinatario_cnpj", ""),
+            nota.get("destino", ""),
+            nota.get("uf_destino", ""),
+            conn=conn,
+        )
 
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO notas (
-            manifesto_id,
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO notas (
+                manifesto_id,
+                chave_nfe,
+                numero_cte,
+                remetente_id,
+                destinatario_id,
+                valor_mercadoria,
+                valor_frete,
+                peso,
+                origem,
+                destino,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            nota.get("manifesto_id"),
             chave_nfe,
-            numero_cte,
+            nota.get("numero_cte", ""),
             remetente_id,
             destinatario_id,
-            valor_mercadoria,
-            valor_frete,
-            peso,
-            origem,
-            destino,
-            status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        nota.get("manifesto_id"),
-        chave_nfe,
-        nota.get("numero_cte", ""),
-        remetente_id,
-        destinatario_id,
-        nota.get("valor_mercadoria", 0),
-        nota.get("valor_frete", 0),
-        nota.get("peso", 0),
-        nota.get("origem", ""),
-        nota.get("destino", ""),
-        nota.get("status", "Disponível")
-    ))
+            nota.get("valor_mercadoria", 0),
+            nota.get("valor_frete", 0),
+            nota.get("peso", 0),
+            nota.get("origem", ""),
+            nota.get("destino", ""),
+            nota.get("status", "Disponível")
+        ))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     return True
 
@@ -827,9 +849,14 @@ def listar_notas():
 
     return dados
 
-def nota_existe(chave_nfe):
-
-    conn = conectar()
+def nota_existe(chave_nfe, conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `buscar_cliente_por_cnpj`).
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -838,7 +865,8 @@ def nota_existe(chave_nfe):
     )
 
     resultado = cursor.fetchone()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     return resultado is not None
 
@@ -994,9 +1022,14 @@ def apagar_manifesto(manifesto_id):
     finally:
         conn.close()
 
-def listar_caminhoes():
-
-    conn = conectar()
+def listar_caminhoes(conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `dados_dashboard`).
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -1006,7 +1039,8 @@ def listar_caminhoes():
     """)
 
     dados = cursor.fetchall()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     return dados
 
@@ -1345,9 +1379,16 @@ def buscar_detalhes_viagem(viagem_id):
 
     return dados
 
-def dados_dashboard(tipo_periodo="Geral", mes=None, ano=None):
-
-    conn = conectar()
+def dados_dashboard(tipo_periodo="Geral", mes=None, ano=None, conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta para reaproveitar em operações que
+            combinam várias consultas (ex.: carregar_dashboard). Se omitida,
+            uma conexão própria é aberta e fechada aqui.
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     filtro_viagens = ""
@@ -1427,7 +1468,8 @@ def dados_dashboard(tipo_periodo="Geral", mes=None, ano=None):
     cursor.execute(f"SELECT COALESCE(SUM(peso_total), 0) FROM viagens {filtro_viagens}", params_viagens)
     peso_total = cursor.fetchone()[0]
 
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     return {
         "total_manifestos": total_manifestos,
@@ -1442,9 +1484,14 @@ def dados_dashboard(tipo_periodo="Geral", mes=None, ano=None):
         "peso_total": peso_total
     }
 
-def top_destinos_dashboard(tipo_periodo="Geral", mes=None, ano=None):
-
-    conn = conectar()
+def top_destinos_dashboard(tipo_periodo="Geral", mes=None, ano=None, conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `dados_dashboard`).
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     filtro = ""
@@ -1471,7 +1518,8 @@ def top_destinos_dashboard(tipo_periodo="Geral", mes=None, ano=None):
     """, params)
 
     dados = cursor.fetchall()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     return dados
 
@@ -1537,9 +1585,14 @@ def listar_operacoes_sp():
     finally:
         conn.close()
 
-def gerar_ranking_clientes_v6(tipo_periodo="Geral", mes=None, ano=None):
-
-    conn = conectar()
+def gerar_ranking_clientes_v6(tipo_periodo="Geral", mes=None, ano=None, conn: Optional[sqlite3.Connection] = None):
+    """
+    Args:
+        conn: conexão opcional já aberta (ver `dados_dashboard`).
+    """
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
 
     filtro = ""
@@ -1569,7 +1622,8 @@ def gerar_ranking_clientes_v6(tipo_periodo="Geral", mes=None, ano=None):
     """, params)
 
     dados = cursor.fetchall()
-    conn.close()
+    if conexao_propria:
+        conn.close()
 
     ranking = []
 
@@ -1680,12 +1734,13 @@ def listar_notas_por_cliente(
     return dados
 
 
-def calcular_resumo_notas(notas_ids: list):
+def calcular_resumo_notas(notas_ids: list, conn: Optional[sqlite3.Connection] = None):
     """
     Calcula resumo das notas selecionadas.
     
     Args:
         notas_ids: Lista de IDs das notas
+        conn: conexão opcional já aberta (ver `dados_dashboard`).
         
     Returns:
         Dict com quantidade, peso_total, frete_total, volumes
@@ -1698,7 +1753,9 @@ def calcular_resumo_notas(notas_ids: list):
             "volumes": 0
         }
     
-    conn = conectar()
+    conexao_propria = conn is None
+    if conexao_propria:
+        conn = conectar()
     cursor = conn.cursor()
     
     placeholders = ",".join(["?"] * len(notas_ids))
@@ -1717,7 +1774,8 @@ def calcular_resumo_notas(notas_ids: list):
     # Volumes é estimado como 1 volume por nota (pode ser ajustado no futuro)
     volumes = quantidade
     
-    conn.close()
+    if conexao_propria:
+        conn.close()
     
     return {
         "quantidade": quantidade or 0,
