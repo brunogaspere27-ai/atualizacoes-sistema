@@ -198,6 +198,8 @@ class Settings:
             "REVISAO_OBRIGATORIA": os.getenv("REVISAO_OBRIGATORIA", "10000"),
             "PASTA_RELATORIOS": os.getenv("PASTA_RELATORIOS", "relatorios_gerados"),
             "INTERVALO_SYNC_SEGUNDOS": os.getenv("INTERVALO_SYNC_SEGUNDOS", "60"),
+            "DIAGNOSTICO_PERFORMANCE": os.getenv("DIAGNOSTICO_PERFORMANCE", "").strip(),
+            "CW_DIAGNOSTICO_PERFORMANCE": os.getenv("CW_DIAGNOSTICO_PERFORMANCE", "").strip(),
         }
 
     def salvar_configuracoes(self, dados: Dict[str, Any]) -> Dict[str, Any]:
@@ -292,6 +294,13 @@ class Settings:
     @property
     def intervalo_sync_ms(self) -> int:
         return self.intervalo_sync_segundos * 1000
+
+    @property
+    def diagnostico_performance(self) -> bool:
+        return any(
+            self._env_vars.get(chave, "").strip().lower() in {"1", "true", "on", "yes"}
+            for chave in ("DIAGNOSTICO_PERFORMANCE", "CW_DIAGNOSTICO_PERFORMANCE")
+        )
 
     @property
     def tema(self) -> str:

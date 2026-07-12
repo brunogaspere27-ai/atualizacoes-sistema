@@ -10,6 +10,10 @@ configuracoes.json
 # Variáveis de ambiente (credenciais)
 .env
 
+# EXCEÇÃO: Arquivos .example são templates e DEVEM ser versionados
+!configuracoes.json.example
+!.env.example
+
 # Python
 __pycache__/
 *.py[cod]
