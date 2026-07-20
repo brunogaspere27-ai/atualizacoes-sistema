@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, List, Optional, Sequence
 
+from utils.cache import runtime_cache
 from utils.database import conectar, registrar_sync
 
 
@@ -14,6 +15,11 @@ class FinanceiroService:
         Usado pelo sidebar para exibir badge de alerta.
         """
         hoje = date.today().strftime("%d/%m/%Y")
+        cache_key = f"contas_vencidas:{hoje}"
+        cached = runtime_cache.get("financeiro", cache_key)
+        if cached is not None:
+            return cached
+
         conn = conectar()
         cursor = conn.cursor()
         try:
@@ -30,7 +36,8 @@ class FinanceiroService:
                       < substr(?,7,4) || substr(?,4,2) || substr(?,1,2)
                   )
             """, (hoje, hoje, hoje))
-            return cursor.fetchone()[0]
+            total = cursor.fetchone()[0]
+            return runtime_cache.set("financeiro", cache_key, total, ttl_seconds=15)
         except Exception:
             return 0
         finally:
@@ -149,6 +156,7 @@ class FinanceiroService:
                 registrar_sync(cursor, "contas", registro_id)
 
             conn.commit()
+            self._invalidar_cache()
             return registro_id
         finally:
             conn.close()
@@ -166,6 +174,7 @@ class FinanceiroService:
             """, (novo_status, data_pagamento, conta_id))
             registrar_sync(cursor, "contas", conta_id)
             conn.commit()
+            self._invalidar_cache()
         finally:
             conn.close()
 
@@ -176,8 +185,12 @@ class FinanceiroService:
             registrar_sync(cursor, "contas", conta_id, "DELETE")
             cursor.execute("DELETE FROM contas WHERE id = ?", (conta_id,))
             conn.commit()
+            self._invalidar_cache()
         finally:
             conn.close()
+
+    def _invalidar_cache(self) -> None:
+        runtime_cache.invalidate_namespace("financeiro")
 
 
 financeiro_service = FinanceiroService()

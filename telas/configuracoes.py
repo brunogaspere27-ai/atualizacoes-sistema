@@ -371,6 +371,27 @@ class TelaConfiguracoes(ctk.CTkFrame):
 
         self.botao(card, "🗑️ Apagar Todos os Caminhões", "#DC2626", "#B91C1C", self.apagar_caminhoes)
 
+        # Separador
+        ctk.CTkFrame(card, height=2, fg_color="#e5e7eb").pack(fill="x", padx=22, pady=(20, 16))
+
+        ctk.CTkLabel(
+            card,
+            text="🔐 Reset Completo (Mestre)",
+            font=(self.cores["font_family"], 12, "bold"),
+            text_color="#DC2626"
+        ).pack(anchor="w", padx=22, pady=(8, 4))
+
+        ctk.CTkLabel(
+            card,
+            text="Apaga TODOS os dados (manifestos, notas, contas, etc.) EXCETO usuários.\nApenas para usuário mestre.",
+            font=(self.cores["font_family"], 11),
+            text_color="#64748b",
+            wraplength=430,
+            justify="left"
+        ).pack(anchor="w", padx=22, pady=(0, 12))
+
+        self.botao(card, "⚠️ Apagar Todos os Dados (Exceto Usuários)", "#7C2D12", "#991B1B", self.apagar_todos_dados_exceto_usuarios)
+
     def apagar_caminhoes(self):
         """Apaga todos os caminhões do sistema."""
         confirmar = messagebox.askyesno(
@@ -409,6 +430,71 @@ class TelaConfiguracoes(ctk.CTkFrame):
 
         except Exception as erro:
             messagebox.showerror("Erro", f"Erro ao apagar caminhões:\n{erro}")
+
+    def apagar_todos_dados_exceto_usuarios(self):
+        """Apaga todos os dados do sistema EXCETO usuários (apenas mestre)."""
+        from services.auth_service import auth_service
+        
+        # Verificar se é usuário mestre
+        if not auth_service.eh_mestre:
+            messagebox.showerror(
+                "Acesso Negado",
+                "Esta função está disponível apenas para o usuário mestre do sistema."
+            )
+            return
+        
+        confirmar = messagebox.askyesno(
+            "⚠️ RESET COMPLETO DO SISTEMA",
+            "Tem certeza que deseja apagar TODOS os dados do sistema?\n\n"
+            "Isso irá apagar:\n"
+            "• Todos os manifestos baixados\n"
+            "• Todas as notas fiscais\n"
+            "• Todos os clientes cadastrados\n"
+            "• Todos os caminhões\n"
+            "• Todas as viagens\n"
+            "• Todas as contas a pagar/receber\n"
+            "• Todos os abastecimentos\n"
+            "• Todas as manutenções\n"
+            "• Todos os funcionários\n\n"
+            "O que será MANTIDO:\n"
+            "• Todos os usuários do sistema\n"
+            "• Permissões dos usuários\n"
+            "• Histórico de auditoria\n\n"
+            "Esta ação NÃO PODE ser desfeita!"
+        )
+
+        if not confirmar:
+            return
+
+        confirmar_novamente = messagebox.askyesno(
+            "🔐 CONFIRMAÇÃO FINAL",
+            "ÚLTIMA CONFIRMAÇÃO: Você realmente deseja apagar TODOS os dados?\n\n"
+            "Clique SIM apenas se tiver certeza absoluta.\n\n"
+            "Esta ação apagará permanentemente todos os dados operacionais do sistema."
+        )
+
+        if not confirmar_novamente:
+            return
+
+        try:
+            sucesso = viagem_service.apagar_todos_dados_exceto_usuarios()
+
+            if sucesso:
+                messagebox.showinfo(
+                    "Sucesso",
+                    "Todos os dados foram apagados com sucesso!\n\n"
+                    "Os usuários foram mantidos.\n"
+                    "Você pode começar a recadastrar os dados agora."
+                )
+                self.recarregar_tela()
+            else:
+                messagebox.showerror(
+                    "Erro",
+                    "Não foi possível apagar os dados. Verifique o banco de dados."
+                )
+
+        except Exception as erro:
+            messagebox.showerror("Erro", f"Erro ao apagar dados:\n{erro}")
 
     def criar_entry(self, master, chave, label):
         frame = ctk.CTkFrame(master, fg_color="transparent")

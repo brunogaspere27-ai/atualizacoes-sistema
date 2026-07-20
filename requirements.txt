@@ -2,25 +2,27 @@
 # Dependências de produção com versões pinadas.
 # Para atualizar: edite a versão e teste antes de commitar.
 
-# Interface gráfica
-customtkinter==5.2.2
-Pillow==11.2.1
+# Interface gráfica (PySide6 - Qt6)
+PySide6==6.11.1
+PySide6-Addons==6.11.1
+# Pillow==11.2.1  # Comentado - Python 3.14 não tem suporte pré-compilado
 
 # Requisições HTTP (verificação de atualizações)
 requests==2.32.4
 
-# Banco de dados em nuvem (opcional — apenas para sync com Supabase)
-psycopg2-binary==2.9.10
-
-# Visualização de dados
-matplotlib==3.10.3
-numpy==2.3.1
-
 # Variáveis de ambiente
 python-dotenv==1.1.0
 
-# Geração de PDF
-reportlab==4.4.1
-
 # Logging avançado
 loguru==0.7.3
+
+# Banco de dados em nuvem (opcional — apenas para sync com Supabase)
+# psycopg2-binary==2.9.10  # Comentado temporariamente devido a problemas de instalação no Windows
+# Para instalar manualmente se necessário: pip install psycopg2-binary
+
+# Visualização de dados — gráficos premium no dashboard
+pyqtgraph==0.13.7
+numpy==2.3.1
+
+# Geração de PDF (opcional - usado apenas em relatórios)
+# reportlab==4.4.1

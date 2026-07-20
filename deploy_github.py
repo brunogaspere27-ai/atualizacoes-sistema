@@ -114,8 +114,12 @@ class GitHubDeployManager:
                 return
             
             # Adicionar arquivos
+            files_to_add = ["versao.json"]
+            if (PROJECT_DIR / "release.json").exists():
+                files_to_add.append("release.json")
+            
             subprocess.run(
-                ["git", "add", "versao.json", "release.json"],
+                ["git", "add"] + files_to_add,
                 cwd=PROJECT_DIR,
                 check=True,
                 capture_output=True

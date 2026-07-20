@@ -11,5 +11,18 @@
     "alerta_revisao": "8000",
     "revisao_obrigatoria": "10000",
     "tema": "Premium Escuro",
-    "cor_tema": "Vermelho"
+    "cor_tema": "Vermelho",
+    "update_server_type": "http",
+    "update_server_path": "",
+    "update_server_username": "",
+    "update_server_password": "",
+    "update_channel": "stable",
+    "enable_auto_update": true,
+    "update_url": "",
+    "update_timeout": 10,
+    "github_repo_owner": "brunogaspere27-ai",
+    "github_repo_name": "atualizacoes-sistema",
+    "github_token": "",
+    "github_use_cdn": true,
+    "github_release_branch": "main"
 }

@@ -492,5 +492,41 @@ class AuthService:
         finally:
             conn.close()
 
+    # ── Alterar senha ────────────────────────────────────────────────────────
+
+    def alterar_senha(self, usuario_id: int, senha_atual: str, senha_nova: str) -> bool:
+        """
+        Altera a senha do usuário após verificar a senha atual.
+        Retorna True se a alteração foi bem-sucedida.
+        """
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT senha_hash, senha_salt FROM usuarios WHERE id = ?",
+                (usuario_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError("Usuário não encontrado")
+
+            senha_hash_atual, salt_hex = row
+            if not self.verificar_senha(senha_atual, senha_hash_atual, salt_hex):
+                return False
+
+            novo_salt = self.gerar_salt()
+            novo_hash = self.hash_senha(senha_nova, novo_salt)
+
+            cursor.execute(
+                "UPDATE usuarios SET senha_hash = ?, senha_salt = ?, "
+                "deve_alterar_senha = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?",
+                (novo_hash, novo_salt.hex(), usuario_id),
+            )
+            conn.commit()
+            logger.info(f"Senha alterada com sucesso para usuário {usuario_id}")
+            return True
+        finally:
+            conn.close()
+
 
 auth_service = AuthService()

@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from utils.cache import runtime_cache
 from utils.database import (
     conectar,
     dados_dashboard,
@@ -19,6 +20,7 @@ from utils.database import (
     gerar_ranking_clientes_v6,
 )
 from utils.logger import get_logger
+from utils.performance import timed_block
 
 logger = get_logger(__name__)
 
@@ -164,23 +166,77 @@ def _calc_growth(current: float, previous: float) -> float:
 class DashboardService:
     """Servico de dados para o dashboard executivo."""
 
+    def __init__(self) -> None:
+        self._ttl_dashboard = 10
+        self._ttl_graficos = 20
+
+    def _cache_key(
+        self,
+        tipo_periodo: str,
+        mes: str = "",
+        ano: str = "",
+        data_inicio: str = "",
+        data_fim: str = "",
+        extra: str = "",
+    ) -> tuple:
+        return (tipo_periodo, mes, ano, data_inicio, data_fim, extra)
+
     # ------------------------------------------------------------------
     # Dashboard legado (compatibilidade)
     # ------------------------------------------------------------------
 
     def carregar_dashboard(self, tipo_periodo: str, mes: str, ano: str) -> Dict[str, Any]:
-        # Uma unica conexao compartilhada para as 4 consultas desta operacao
-        # (antes eram 4 conexoes SQLite abertas/fechadas em sequencia).
-        conn = conectar()
-        try:
-            return {
-                "dados": dados_dashboard(tipo_periodo, mes, ano, conn=conn),
-                "top_destinos": top_destinos_dashboard(tipo_periodo, mes, ano, conn=conn),
-                "ranking_clientes": gerar_ranking_clientes_v6(tipo_periodo, mes, ano, conn=conn)[:4],
-                "extras": self.buscar_extras(tipo_periodo, mes, ano, conn=conn),
-            }
-        finally:
-            conn.close()
+        cache_key = self._cache_key(tipo_periodo, mes, ano, extra="legado")
+
+        def _load():
+            # Uma unica conexao compartilhada para as 4 consultas desta operacao
+            # (antes eram 4 conexoes SQLite abertas/fechadas em sequencia).
+            with timed_block("dashboard.legado", extra=f"{tipo_periodo}|{mes}|{ano}"):
+                conn = conectar()
+                try:
+                    return {
+                        "dados": dados_dashboard(tipo_periodo, mes, ano, conn=conn),
+                        "top_destinos": top_destinos_dashboard(tipo_periodo, mes, ano, conn=conn),
+                        "ranking_clientes": gerar_ranking_clientes_v6(tipo_periodo, mes, ano, conn=conn)[:4],
+                        "extras": self.buscar_extras(tipo_periodo, mes, ano, conn=conn),
+                    }
+                finally:
+                    conn.close()
+
+        return runtime_cache.get_or_set("dashboard", cache_key, _load, ttl_seconds=self._ttl_dashboard)
+
+    def carregar_dashboard_executivo(
+        self,
+        tipo_periodo: str = "Geral",
+        mes: str = "",
+        ano: str = "",
+        data_inicio: str = "",
+        data_fim: str = "",
+    ) -> Dict[str, Any]:
+        cache_key = self._cache_key(tipo_periodo, mes, ano, data_inicio, data_fim, extra="executivo")
+
+        def _load():
+            with timed_block(
+                "dashboard.executivo",
+                extra=f"{tipo_periodo}|{mes}|{ano}|{data_inicio}|{data_fim}",
+            ):
+                return {
+                    "kpis": self.calcular_kpis(tipo_periodo, mes, ano, data_inicio, data_fim),
+                    "receita": self.dados_graficos_receita_mensal(ano),
+                    "fretes": self.dados_graficos_fretes_mensal(ano),
+                    "clientes": self.dados_graficos_clientes_lucrativos(ano),
+                    "motoristas": self.dados_graficos_motoristas_faturamento(ano),
+                    "despesas": self.dados_graficos_despesas_categoria(tipo_periodo, mes, ano),
+                    "combustivel": self.dados_graficos_consumo_combustivel(ano),
+                    "comparativo": self.dados_graficos_comparativo_mensal(ano),
+                }
+
+        return runtime_cache.get_or_set(
+            "dashboard",
+            cache_key,
+            _load,
+            ttl_seconds=self._ttl_dashboard,
+        )
 
     def buscar_extras(
         self,
@@ -302,105 +358,115 @@ class DashboardService:
             "data_abastecimento", "br",
         )
 
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            kpis = {}
+        cache_key = self._cache_key(tipo_periodo, mes, ano, data_inicio, data_fim, extra="kpis")
 
-            # 1. Receita total (SUM frete_total viagens)
-            kpis["receita_total"] = self._kpi_soma(
-                cur, "viagens", "frete_total", f_viagem_cur, p_viagem_cur,
-                f_viagem_ant, p_viagem_ant,
-            )
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                kpis = {}
 
-            # 2. Lucro estimado (SUM lucro_total viagens)
-            kpis["lucro_estimado"] = self._kpi_soma(
-                cur, "viagens", "lucro_total", f_viagem_cur, p_viagem_cur,
-                f_viagem_ant, p_viagem_ant,
-            )
+                # 1. Receita total (SUM frete_total viagens)
+                kpis["receita_total"] = self._kpi_soma(
+                    cur, "viagens", "frete_total", f_viagem_cur, p_viagem_cur,
+                    f_viagem_ant, p_viagem_ant,
+                )
 
-            # 3. Fretes realizados (COUNT viagens finalizadas)
-            sep_cur = "AND" if f_viagem_cur else "WHERE"
-            sep_ant = "AND" if f_viagem_ant else "WHERE"
-            kpis["fretes_realizados"] = self._kpi_count(
-                cur, "viagens",
-                f"{f_viagem_cur} {sep_cur} status = 'Finalizada'" if f_viagem_cur else "WHERE status = 'Finalizada'",
-                p_viagem_cur,
-                f"{f_viagem_ant} {sep_ant} status = 'Finalizada'" if f_viagem_ant else "WHERE status = 'Finalizada'",
-                p_viagem_ant,
-            )
+                # 2. Lucro estimado (SUM lucro_total viagens)
+                kpis["lucro_estimado"] = self._kpi_soma(
+                    cur, "viagens", "lucro_total", f_viagem_cur, p_viagem_cur,
+                    f_viagem_ant, p_viagem_ant,
+                )
 
-            # 4. Fretes em andamento
-            kpis["fretes_andamento"] = self._kpi_count(
-                cur, "viagens",
-                f"{f_viagem_cur} {sep_cur} status = 'Em viagem'" if f_viagem_cur else "WHERE status = 'Em viagem'",
-                p_viagem_cur,
-                f"{f_viagem_ant} {sep_ant} status = 'Em viagem'" if f_viagem_ant else "WHERE status = 'Em viagem'",
-                p_viagem_ant,
-            )
+                # 3. Fretes realizados (COUNT viagens finalizadas)
+                sep_cur = "AND" if f_viagem_cur else "WHERE"
+                sep_ant = "AND" if f_viagem_ant else "WHERE"
+                kpis["fretes_realizados"] = self._kpi_count(
+                    cur, "viagens",
+                    f"{f_viagem_cur} {sep_cur} status = 'Finalizada'" if f_viagem_cur else "WHERE status = 'Finalizada'",
+                    p_viagem_cur,
+                    f"{f_viagem_ant} {sep_ant} status = 'Finalizada'" if f_viagem_ant else "WHERE status = 'Finalizada'",
+                    p_viagem_ant,
+                )
 
-            # 5. Clientes ativos (COUNT DISTINCT destinatario em notas)
-            kpis["clientes_ativos"] = self._kpi_count_distinct(
-                cur, "notas", "destinatario_id", f_nota_cur, p_nota_cur,
-                f_nota_ant, p_nota_ant,
-            )
+                # 4. Fretes em andamento
+                kpis["fretes_andamento"] = self._kpi_count(
+                    cur, "viagens",
+                    f"{f_viagem_cur} {sep_cur} status = 'Em viagem'" if f_viagem_cur else "WHERE status = 'Em viagem'",
+                    p_viagem_cur,
+                    f"{f_viagem_ant} {sep_ant} status = 'Em viagem'" if f_viagem_ant else "WHERE status = 'Em viagem'",
+                    p_viagem_ant,
+                )
 
-            # 6. Motoristas ativos (COUNT DISTINCT motorista em viagens)
-            kpis["motoristas_ativos"] = self._kpi_count_distinct(
-                cur, "viagens", "motorista", f_viagem_cur, p_viagem_cur,
-                f_viagem_ant, p_viagem_ant,
-            )
+                # 5. Clientes ativos (COUNT DISTINCT destinatario em notas)
+                kpis["clientes_ativos"] = self._kpi_count_distinct(
+                    cur, "notas", "destinatario_id", f_nota_cur, p_nota_cur,
+                    f_nota_ant, p_nota_ant,
+                )
 
-            # 7. Valor recebido (contas Receber Recebido)
-            f_rec_cur = f"{f_conta_cur} {'AND' if f_conta_cur else 'WHERE'} tipo = 'Receber' AND status = 'Recebido'"
-            f_rec_ant = f"{f_conta_ant} {'AND' if f_conta_ant else 'WHERE'} tipo = 'Receber' AND status = 'Recebido'"
-            kpis["valor_recebido"] = self._kpi_soma(
-                cur, "contas", "valor", f_rec_cur, p_conta_cur,
-                f_rec_ant, p_conta_ant,
-            )
+                # 6. Motoristas ativos (COUNT DISTINCT motorista em viagens)
+                kpis["motoristas_ativos"] = self._kpi_count_distinct(
+                    cur, "viagens", "motorista", f_viagem_cur, p_viagem_cur,
+                    f_viagem_ant, p_viagem_ant,
+                )
 
-            # 8. Valor pendente (contas Receber Pendente)
-            f_pend_cur = f"{f_conta_cur} {'AND' if f_conta_cur else 'WHERE'} tipo = 'Receber' AND status = 'Pendente'"
-            f_pend_ant = f"{f_conta_ant} {'AND' if f_conta_ant else 'WHERE'} tipo = 'Receber' AND status = 'Pendente'"
-            kpis["valor_pendente"] = self._kpi_soma(
-                cur, "contas", "valor", f_pend_cur, p_conta_cur,
-                f_pend_ant, p_conta_ant,
-            )
+                # 7. Valor recebido (contas Receber Recebido)
+                f_rec_cur = f"{f_conta_cur} {'AND' if f_conta_cur else 'WHERE'} tipo = 'Receber' AND status = 'Recebido'"
+                f_rec_ant = f"{f_conta_ant} {'AND' if f_conta_ant else 'WHERE'} tipo = 'Receber' AND status = 'Recebido'"
+                kpis["valor_recebido"] = self._kpi_soma(
+                    cur, "contas", "valor", f_rec_cur, p_conta_cur,
+                    f_rec_ant, p_conta_ant,
+                )
 
-            # 9. Total abastecido (SUM valor_total abastecimentos)
-            kpis["total_abastecido"] = self._kpi_soma(
-                cur, "abastecimentos", "valor_total", f_abast_cur, p_abast_cur,
-                f_abast_ant, p_abast_ant,
-            )
+                # 8. Valor pendente (contas Receber Pendente)
+                f_pend_cur = f"{f_conta_cur} {'AND' if f_conta_cur else 'WHERE'} tipo = 'Receber' AND status = 'Pendente'"
+                f_pend_ant = f"{f_conta_ant} {'AND' if f_conta_ant else 'WHERE'} tipo = 'Receber' AND status = 'Pendente'"
+                kpis["valor_pendente"] = self._kpi_soma(
+                    cur, "contas", "valor", f_pend_cur, p_conta_cur,
+                    f_pend_ant, p_conta_ant,
+                )
 
-            # 10. Consumo medio (AVG media_km_l abastecimentos)
-            kpis["consumo_medio"] = self._kpi_avg(
-                cur, "abastecimentos", "media_km_l", f_abast_cur, p_abast_cur,
-                f_abast_ant, p_abast_ant,
-            )
+                # 9. Total abastecido (SUM valor_total abastecimentos)
+                kpis["total_abastecido"] = self._kpi_soma(
+                    cur, "abastecimentos", "valor_total", f_abast_cur, p_abast_cur,
+                    f_abast_ant, p_abast_ant,
+                )
 
-            # 11. Quilometragem (SUM km_atual abastecimentos - max km por veiculo)
-            kpis["quilometragem"] = self._kpi_soma(
-                cur, "abastecimentos", "km_atual", f_abast_cur, p_abast_cur,
-                f_abast_ant, p_abast_ant,
-            )
+                # 10. Consumo medio (AVG media_km_l abastecimentos)
+                kpis["consumo_medio"] = self._kpi_avg(
+                    cur, "abastecimentos", "media_km_l", f_abast_cur, p_abast_cur,
+                    f_abast_ant, p_abast_ant,
+                )
 
-            # 12. Media por viagem (frete_total / total_viagens)
-            receita = kpis["receita_total"]["valor"]
-            total_viag = kpis["fretes_realizados"]["valor"]
-            receita_ant = kpis["receita_total"]["valor_anterior"]
-            total_viag_ant = kpis["fretes_realizados"]["valor_anterior"]
-            media = receita / total_viag if total_viag > 0 else 0
-            media_ant = receita_ant / total_viag_ant if total_viag_ant > 0 else 0
-            kpis["media_viagem"] = {
-                "valor": media,
-                "valor_anterior": media_ant,
-                "crescimento": _calc_growth(media, media_ant),
-            }
+                # 11. Quilometragem (SUM km_atual abastecimentos - max km por veiculo)
+                kpis["quilometragem"] = self._kpi_soma(
+                    cur, "abastecimentos", "km_atual", f_abast_cur, p_abast_cur,
+                    f_abast_ant, p_abast_ant,
+                )
 
-            return kpis
-        finally:
-            conn.close()
+                # 12. Media por viagem (frete_total / total_viagens)
+                receita = kpis["receita_total"]["valor"]
+                total_viag = kpis["fretes_realizados"]["valor"]
+                receita_ant = kpis["receita_total"]["valor_anterior"]
+                total_viag_ant = kpis["fretes_realizados"]["valor_anterior"]
+                media = receita / total_viag if total_viag > 0 else 0
+                media_ant = receita_ant / total_viag_ant if total_viag_ant > 0 else 0
+                kpis["media_viagem"] = {
+                    "valor": media,
+                    "valor_anterior": media_ant,
+                    "crescimento": _calc_growth(media, media_ant),
+                }
+
+                return kpis
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard",
+            cache_key,
+            _load,
+            ttl_seconds=self._ttl_dashboard,
+        )
 
     def _kpi_soma(self, cur, tabela, coluna, f_cur, p_cur, f_ant, p_ant):
         cur.execute(f"SELECT COALESCE(SUM({coluna}), 0) FROM {tabela} {f_cur}", p_cur)
@@ -436,169 +502,445 @@ class DashboardService:
 
     def dados_graficos_receita_mensal(self, ano: str) -> Dict[str, Any]:
         """Receita por mes (12 barras) para grafico."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT substr(data_saida, 4, 2) AS mes,
-                       COALESCE(SUM(frete_total), 0)
-                FROM viagens
-                WHERE substr(data_saida, 7, 4) = ?
-                GROUP BY mes
-                ORDER BY mes
-            """, (ano,))
-            rows = {r[0]: r[1] for r in cur.fetchall()}
-        finally:
-            conn.close()
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT substr(data_saida, 4, 2) AS mes,
+                           COALESCE(SUM(frete_total), 0)
+                    FROM viagens
+                    WHERE substr(data_saida, 7, 4) = ?
+                    GROUP BY mes
+                    ORDER BY mes
+                """, (ano,))
+                rows = {r[0]: r[1] for r in cur.fetchall()}
+            finally:
+                conn.close()
 
-        labels = _MESES[:]
-        valores = [rows.get(f"{m:02d}", 0) for m in range(1, 13)]
-        return {"labels": labels, "valores": valores}
+            labels = _MESES[:]
+            valores = [rows.get(f"{m:02d}", 0) for m in range(1, 13)]
+            return {"labels": labels, "valores": valores}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("receita_mensal", ano),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_fretes_mensal(self, ano: str) -> Dict[str, Any]:
         """Fretes realizados por mes (12 barras)."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT substr(data_saida, 4, 2) AS mes,
-                       COUNT(*)
-                FROM viagens
-                WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
-                GROUP BY mes
-                ORDER BY mes
-            """, (ano,))
-            rows = {r[0]: r[1] for r in cur.fetchall()}
-        finally:
-            conn.close()
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT substr(data_saida, 4, 2) AS mes,
+                           COUNT(*)
+                    FROM viagens
+                    WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
+                    GROUP BY mes
+                    ORDER BY mes
+                """, (ano,))
+                rows = {r[0]: r[1] for r in cur.fetchall()}
+            finally:
+                conn.close()
 
-        labels = _MESES[:]
-        valores = [rows.get(f"{m:02d}", 0) for m in range(1, 13)]
-        return {"labels": labels, "valores": valores}
+            labels = _MESES[:]
+            valores = [rows.get(f"{m:02d}", 0) for m in range(1, 13)]
+            return {"labels": labels, "valores": valores}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("fretes_mensal", ano),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_clientes_lucrativos(self, ano: str, top_n: int = 5) -> Dict[str, Any]:
         """Top clientes por frete no ano."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT COALESCE(c.nome, 'Nao informado') AS cliente,
-                       COALESCE(SUM(n.valor_frete), 0) AS frete
-                FROM notas n
-                LEFT JOIN clientes c ON c.id = n.destinatario_id
-                WHERE substr(n.criado_em, 1, 4) = ?
-                GROUP BY c.nome
-                ORDER BY frete DESC
-                LIMIT ?
-            """, (ano, top_n))
-            rows = cur.fetchall()
-        finally:
-            conn.close()
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT COALESCE(c.nome, 'Nao informado') AS cliente,
+                           COALESCE(SUM(n.valor_frete), 0) AS frete
+                    FROM notas n
+                    LEFT JOIN clientes c ON c.id = n.destinatario_id
+                    WHERE substr(n.criado_em, 1, 4) = ?
+                    GROUP BY c.nome
+                    ORDER BY frete DESC
+                    LIMIT ?
+                """, (ano, top_n))
+                rows = cur.fetchall()
+            finally:
+                conn.close()
 
-        labels = [r[0] for r in rows]
-        valores = [r[1] for r in rows]
-        return {"labels": labels, "valores": valores}
+            labels = [r[0] for r in rows]
+            valores = [r[1] for r in rows]
+            return {"labels": labels, "valores": valores}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("clientes_lucrativos", ano, top_n),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_motoristas_faturamento(self, ano: str, top_n: int = 5) -> Dict[str, Any]:
         """Top motoristas por frete no ano."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT COALESCE(motorista, 'Nao informado') AS motorista,
-                       COALESCE(SUM(frete_total), 0) AS frete
-                FROM viagens
-                WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
-                GROUP BY motorista
-                ORDER BY frete DESC
-                LIMIT ?
-            """, (ano, top_n))
-            rows = cur.fetchall()
-        finally:
-            conn.close()
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT COALESCE(motorista, 'Nao informado') AS motorista,
+                           COALESCE(SUM(frete_total), 0) AS frete
+                    FROM viagens
+                    WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
+                    GROUP BY motorista
+                    ORDER BY frete DESC
+                    LIMIT ?
+                """, (ano, top_n))
+                rows = cur.fetchall()
+            finally:
+                conn.close()
 
-        labels = [r[0] for r in rows]
-        valores = [r[1] for r in rows]
-        return {"labels": labels, "valores": valores}
+            labels = [r[0] for r in rows]
+            valores = [r[1] for r in rows]
+            return {"labels": labels, "valores": valores}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("motoristas_faturamento", ano, top_n),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_despesas_categoria(
         self, tipo_periodo: str = "Geral", mes: str = "", ano: str = "",
     ) -> Dict[str, Any]:
         """Despesas por categoria (contas tipo=Pagar)."""
-        f, p = _build_period_filter(tipo_periodo, mes, ano, "", "", "vencimento", "br")
-        sep = "AND" if f else "WHERE"
-        sql = f"SELECT categoria, COALESCE(SUM(valor), 0) FROM contas {f} {sep} tipo = 'Pagar' GROUP BY categoria ORDER BY SUM(valor) DESC"
+        cache_key = self._cache_key(tipo_periodo, mes, ano, extra="despesas_categoria")
 
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute(sql, p)
-            rows = cur.fetchall()
-        finally:
-            conn.close()
+        def _load():
+            f, p = _build_period_filter(tipo_periodo, mes, ano, "", "", "vencimento", "br")
+            sep = "AND" if f else "WHERE"
+            sql = f"SELECT categoria, COALESCE(SUM(valor), 0) FROM contas {f} {sep} tipo = 'Pagar' GROUP BY categoria ORDER BY SUM(valor) DESC"
 
-        labels = [r[0] or "Sem categoria" for r in rows]
-        valores = [r[1] for r in rows]
-        return {"labels": labels, "valores": valores}
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute(sql, p)
+                rows = cur.fetchall()
+            finally:
+                conn.close()
+
+            labels = [r[0] or "Sem categoria" for r in rows]
+            valores = [r[1] for r in rows]
+            return {"labels": labels, "valores": valores}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            cache_key,
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_consumo_combustivel(self, ano: str) -> Dict[str, Any]:
         """Consumo de combustivel por mes (litros e media km/l)."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT substr(data_abastecimento, 4, 2) AS mes,
-                       COALESCE(SUM(litros), 0),
-                       COALESCE(AVG(media_km_l), 0)
-                FROM abastecimentos
-                WHERE substr(data_abastecimento, 7, 4) = ?
-                GROUP BY mes
-                ORDER BY mes
-            """, (ano,))
-            rows = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
-        finally:
-            conn.close()
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT substr(data_abastecimento, 4, 2) AS mes,
+                           COALESCE(SUM(litros), 0),
+                           COALESCE(AVG(media_km_l), 0)
+                    FROM abastecimentos
+                    WHERE substr(data_abastecimento, 7, 4) = ?
+                    GROUP BY mes
+                    ORDER BY mes
+                """, (ano,))
+                rows = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+            finally:
+                conn.close()
 
-        labels = _MESES[:]
-        litros = [rows.get(f"{m:02d}", (0, 0))[0] for m in range(1, 13)]
-        medias = [rows.get(f"{m:02d}", (0, 0))[1] for m in range(1, 13)]
-        return {"labels": labels, "litros": litros, "medias": medias}
+            labels = _MESES[:]
+            litros = [rows.get(f"{m:02d}", (0, 0))[0] for m in range(1, 13)]
+            medias = [rows.get(f"{m:02d}", (0, 0))[1] for m in range(1, 13)]
+            return {"labels": labels, "litros": litros, "medias": medias}
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("combustivel", ano),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
 
     def dados_graficos_comparativo_mensal(self, ano: str) -> Dict[str, Any]:
         """Receita vs Despesas vs Lucro por mes."""
-        conn = conectar()
-        cur = conn.cursor()
-        try:
-            # Receita por mes (viagens)
-            cur.execute("""
-                SELECT substr(data_saida, 4, 2), COALESCE(SUM(frete_total), 0)
-                FROM viagens
-                WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
-                GROUP BY substr(data_saida, 4, 2)
-            """, (ano,))
-            receita_map = {r[0]: r[1] for r in cur.fetchall()}
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                # Receita por mes (viagens)
+                cur.execute("""
+                    SELECT substr(data_saida, 4, 2), COALESCE(SUM(frete_total), 0)
+                    FROM viagens
+                    WHERE substr(data_saida, 7, 4) = ? AND status = 'Finalizada'
+                    GROUP BY substr(data_saida, 4, 2)
+                """, (ano,))
+                receita_map = {r[0]: r[1] for r in cur.fetchall()}
 
-            # Despesas por mes (contas Pagar)
-            cur.execute("""
-                SELECT substr(vencimento, 4, 2), COALESCE(SUM(valor), 0)
-                FROM contas
-                WHERE substr(vencimento, 7, 4) = ? AND tipo = 'Pagar'
-                GROUP BY substr(vencimento, 4, 2)
-            """, (ano,))
-            despesa_map = {r[0]: r[1] for r in cur.fetchall()}
-        finally:
-            conn.close()
+                # Despesas por mes (contas Pagar)
+                cur.execute("""
+                    SELECT substr(vencimento, 4, 2), COALESCE(SUM(valor), 0)
+                    FROM contas
+                    WHERE substr(vencimento, 7, 4) = ? AND tipo = 'Pagar'
+                    GROUP BY substr(vencimento, 4, 2)
+                """, (ano,))
+                despesa_map = {r[0]: r[1] for r in cur.fetchall()}
+            finally:
+                conn.close()
 
-        labels = _MESES[:]
-        receitas = [receita_map.get(f"{m:02d}", 0) for m in range(1, 13)]
-        despesas = [despesa_map.get(f"{m:02d}", 0) for m in range(1, 13)]
-        lucros = [r - d for r, d in zip(receitas, despesas)]
-        return {
-            "labels": labels,
-            "receitas": receitas,
-            "despesas": despesas,
-            "lucros": lucros,
-        }
+            labels = _MESES[:]
+            receitas = [receita_map.get(f"{m:02d}", 0) for m in range(1, 13)]
+            despesas = [despesa_map.get(f"{m:02d}", 0) for m in range(1, 13)]
+            lucros = [r - d for r, d in zip(receitas, despesas)]
+            return {
+                "labels": labels,
+                "receitas": receitas,
+                "despesas": despesas,
+                "lucros": lucros,
+            }
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos",
+            ("comparativo_mensal", ano),
+            _load,
+            ttl_seconds=self._ttl_graficos,
+        )
+
+
+    # ------------------------------------------------------------------
+    # Dashboard v2 — cards/gráficos adicionais (redesign visual)
+    # Métodos somente-leitura, adicionais aos já existentes acima.
+    # ------------------------------------------------------------------
+
+    def resumo_fretes_status(
+        self,
+        tipo_periodo: str = "Geral", mes: str = "", ano: str = "",
+        data_inicio: str = "", data_fim: str = "",
+    ) -> List[Tuple[str, int]]:
+        """Contagem de viagens agrupada por status, para o donut 'Fretes por Status'."""
+        f, p = _build_period_filter(
+            tipo_periodo, mes, ano, data_inicio, data_fim, "data_saida", "br",
+        )
+        cache_key = self._cache_key(tipo_periodo, mes, ano, data_inicio, data_fim, extra="fretes_status")
+
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"SELECT COALESCE(NULLIF(status, ''), 'Sem status'), COUNT(*) "
+                    f"FROM viagens {f} GROUP BY status ORDER BY COUNT(*) DESC",
+                    p,
+                )
+                return [(row[0], row[1]) for row in cur.fetchall()]
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", cache_key, _load, ttl_seconds=self._ttl_graficos,
+        )
+
+    def resumo_contas_receber_pagar(
+        self, tipo_periodo: str = "Geral", mes: str = "", ano: str = "",
+    ) -> Dict[str, Dict[str, float]]:
+        """Contas a Receber/Pagar em aberto, separadas em vencidas x a vencer."""
+        f, p = _build_period_filter(tipo_periodo, mes, ano, "", "", "vencimento", "br")
+        hoje = datetime.now().strftime("%d/%m/%Y")
+        hoje_sql = f"substr(?, 7, 4) || '-' || substr(?, 4, 2) || '-' || substr(?, 1, 2)"
+        cache_key = self._cache_key(tipo_periodo, mes, ano, extra="contas_resumo")
+
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                resultado: Dict[str, Dict[str, float]] = {}
+                for tipo in ("Receber", "Pagar"):
+                    sep = "AND" if f else "WHERE"
+                    base = f"{f} {sep} tipo = ? AND status IN ('Pendente', 'Atrasado')"
+                    data_col = "substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2)"
+
+                    cur.execute(
+                        f"SELECT COALESCE(SUM(valor), 0) FROM contas {base} "
+                        f"AND {data_col} < ({hoje_sql})",
+                        p + [tipo, hoje, hoje, hoje],
+                    )
+                    vencidas = cur.fetchone()[0] or 0
+
+                    cur.execute(
+                        f"SELECT COALESCE(SUM(valor), 0) FROM contas {base} "
+                        f"AND {data_col} >= ({hoje_sql})",
+                        p + [tipo, hoje, hoje, hoje],
+                    )
+                    a_vencer = cur.fetchone()[0] or 0
+
+                    resultado[tipo] = {
+                        "vencidas": vencidas,
+                        "a_vencer": a_vencer,
+                        "total": vencidas + a_vencer,
+                    }
+                return resultado
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", cache_key, _load, ttl_seconds=self._ttl_dashboard,
+        )
+
+    def resumo_combustivel_mes(self) -> Dict[str, float]:
+        """Totais de combustível do mês corrente (independente do filtro selecionado)."""
+        mes_atual = datetime.now().strftime("%m")
+        ano_atual = datetime.now().strftime("%Y")
+        cache_key = self._cache_key("Mês", mes_atual, ano_atual, extra="combustivel_mes")
+
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT COALESCE(SUM(valor_total), 0), COALESCE(SUM(litros), 0), "
+                    "COALESCE(AVG(NULLIF(valor_litro, 0)), 0) FROM abastecimentos "
+                    "WHERE substr(data_abastecimento, 4, 2) = ? AND substr(data_abastecimento, 7, 4) = ?",
+                    (mes_atual, ano_atual),
+                )
+                total, litros, media_litro = cur.fetchone()
+                return {
+                    "total": total or 0,
+                    "litros": litros or 0,
+                    "media_litro": media_litro or 0,
+                }
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", cache_key, _load, ttl_seconds=self._ttl_dashboard,
+        )
+
+    def resumo_manutencoes(self) -> Dict[str, int]:
+        """Manutenções agendadas x atrasadas (data_manutencao no passado e ainda pendentes)."""
+        hoje = datetime.now().strftime("%d/%m/%Y")
+
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                data_col = "substr(data_manutencao, 7, 4) || '-' || substr(data_manutencao, 4, 2) || '-' || substr(data_manutencao, 1, 2)"
+                hoje_sql = "substr(?, 7, 4) || '-' || substr(?, 4, 2) || '-' || substr(?, 1, 2)"
+
+                cur.execute(
+                    f"SELECT COUNT(*) FROM manutencoes WHERE status IN ('Pendente', 'Agendado') "
+                    f"AND {data_col} < ({hoje_sql})",
+                    (hoje, hoje, hoje),
+                )
+                atrasadas = cur.fetchone()[0] or 0
+
+                cur.execute(
+                    f"SELECT COUNT(*) FROM manutencoes WHERE status IN ('Pendente', 'Agendado') "
+                    f"AND {data_col} >= ({hoje_sql})",
+                    (hoje, hoje, hoje),
+                )
+                agendadas = cur.fetchone()[0] or 0
+
+                return {"atrasadas": atrasadas, "agendadas": agendadas, "total": atrasadas + agendadas}
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", ("manutencoes_resumo",), _load, ttl_seconds=self._ttl_dashboard,
+        )
+
+    def atividades_recentes(self, limite: int = 4) -> List[Dict[str, str]]:
+        """Últimas atividades do sistema (notas, coletas/viagens, manutenções) para o feed do dashboard."""
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                itens: List[Dict[str, str]] = []
+
+                cur.execute(
+                    "SELECT id, origem, destino, criado_em FROM notas ORDER BY criado_em DESC LIMIT ?",
+                    (limite,),
+                )
+                for nid, origem, destino, criado_em in cur.fetchall():
+                    itens.append({
+                        "tipo": "Fretes",
+                        "titulo": f"Novo frete criado",
+                        "detalhe": f"Frete #{nid} - {origem or '-'} → {destino or '-'}",
+                        "quando": criado_em or "",
+                    })
+
+                cur.execute(
+                    "SELECT id, veiculo, descricao, criado_em, status FROM manutencoes ORDER BY criado_em DESC LIMIT ?",
+                    (limite,),
+                )
+                for mid, veiculo, descricao, criado_em, status in cur.fetchall():
+                    itens.append({
+                        "tipo": "Manutenção",
+                        "titulo": "Manutenção registrada" if status != "Pago" else "Manutenção concluída",
+                        "detalhe": f"Veículo: {veiculo or '-'} - {descricao or ''}",
+                        "quando": criado_em or "",
+                    })
+
+                itens.sort(key=lambda i: i.get("quando") or "", reverse=True)
+                return itens[:limite]
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", ("atividades_recentes", limite), _load, ttl_seconds=self._ttl_dashboard,
+        )
+
+    def proximas_entregas(self, limite: int = 3) -> List[Dict[str, str]]:
+        """Viagens em andamento com previsão de retorno/entrega para o painel 'Próximas Entregas'."""
+        def _load():
+            conn = conectar()
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    SELECT v.id, v.motorista, v.data_retorno, v.status,
+                           (SELECT n.destino FROM viagem_notas vn
+                            JOIN notas n ON n.id = vn.nota_id
+                            WHERE vn.viagem_id = v.id LIMIT 1) AS destino
+                    FROM viagens v
+                    WHERE v.status = 'Em viagem'
+                    ORDER BY v.data_retorno ASC
+                    LIMIT ?
+                    """,
+                    (limite,),
+                )
+                itens = []
+                for vid, motorista, data_retorno, status, destino in cur.fetchall():
+                    itens.append({
+                        "titulo": f"Entrega #{vid}",
+                        "detalhe": f"Motorista: {motorista or '-'} → {destino or 'Destino não informado'}",
+                        "quando": data_retorno or "Sem previsão",
+                        "status": status or "Em andamento",
+                    })
+                return itens
+            finally:
+                conn.close()
+
+        return runtime_cache.get_or_set(
+            "dashboard_graficos", ("proximas_entregas", limite), _load, ttl_seconds=self._ttl_dashboard,
+        )
 
 
 dashboard_service = DashboardService()

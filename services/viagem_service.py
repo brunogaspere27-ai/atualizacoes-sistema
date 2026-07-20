@@ -216,5 +216,69 @@ class ViagemService:
             logger.error(f"Erro ao apagar caminhões: {e}")
             return False
 
+    def apagar_todos_dados_exceto_usuarios(self) -> bool:
+        """
+        Apaga todos os dados do sistema EXCETO usuários e tabelas de autenticação.
+        Esta função deve ser usada apenas pelo usuário mestre para limpar o sistema
+        mantendo apenas os usuários cadastrados.
+        
+        Tabelas mantidas (não apagadas):
+        - usuarios (tabela de usuários)
+        - permissoes_usuario (permissões dos usuários)
+        - auditoria (log de auditoria)
+        - sync_log (log de sincronização)
+        
+        Tabelas apagadas:
+        - manifestos, clientes, funcionarios, folha_funcionarios
+        - notas, caminhoes, viagens, viagem_notas
+        - operacoes_sp, contas, abastecimentos, manutencoes
+        
+        Returns:
+            bool: True se sucesso, False se erro
+        """
+        from utils.database import conectar
+        
+        tabelas_apagar = [
+            "manifestos",
+            "clientes",
+            "funcionarios",
+            "folha_funcionarios",
+            "notas",
+            "caminhoes",
+            "viagens",
+            "viagem_notas",
+            "operacoes_sp",
+            "contas",
+            "abastecimentos",
+            "manutencoes"
+        ]
+        
+        try:
+            conn = conectar()
+            cursor = conn.cursor()
+            
+            # Desabilitar foreign keys temporariamente para permitir deleção em cascata
+            cursor.execute("PRAGMA foreign_keys = OFF")
+            
+            for tabela in tabelas_apagar:
+                try:
+                    cursor.execute(f"DELETE FROM {tabela}")
+                    logger.info(f"Dados da tabela {tabela} apagados")
+                except Exception as e:
+                    logger.warning(f"Erro ao apagar tabela {tabela}: {e}")
+            
+            # Reabilitar foreign keys
+            cursor.execute("PRAGMA foreign_keys = ON")
+            
+            conn.commit()
+            conn.close()
+            
+            logger.info("Todos os dados (exceto usuários) foram apagados com sucesso")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Erro ao apagar todos os dados: {e}")
+            return False
+
 
 viagem_service = ViagemService()

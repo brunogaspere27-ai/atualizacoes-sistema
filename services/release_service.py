@@ -508,7 +508,17 @@ class ReleaseService:
     def _get_latest_version_info_http(self, channel: Channel = Channel.STABLE) -> Optional[Dict[str, Any]]:
         """Retorna informações da versão mais recente via HTTP."""
         try:
+            # Verificar se o server_path está configurado
+            if not self.server_path or not self.server_path.strip():
+                logger.warning("Server path não configurado para HTTP, usando fallback local")
+                return self._get_latest_version_info_local(channel)
+            
             url = f"{self.server_path.rstrip('/')}/{channel.value}/version.json"
+            
+            # Verificar se a URL tem um esquema válido (http:// ou https://)
+            if not url.startswith(("http://", "https://")):
+                logger.warning(f"URL inválida (sem esquema): {url}, usando fallback local")
+                return self._get_latest_version_info_local(channel)
             
             logger.info(f"Buscando version.json via HTTP: {url}")
             

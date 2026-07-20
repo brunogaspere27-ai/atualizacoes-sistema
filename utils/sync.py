@@ -18,6 +18,7 @@ from utils.database import (
     tabela_existe_sqlite,
 )
 from utils.logger import get_logger
+from utils.performance import sqlite_connection_factory
 from utils.supabase_db import (
     conectar_supabase,
     supabase_habilitado,
@@ -36,7 +37,12 @@ def agora() -> str:
 
 
 def conectar_local() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_LOCAL, timeout=30, check_same_thread=False)
+    conn = sqlite3.connect(
+        DB_LOCAL,
+        timeout=30,
+        check_same_thread=False,
+        factory=sqlite_connection_factory(),
+    )
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA journal_mode=WAL")

@@ -209,7 +209,7 @@ Name: "portuguese"; MessagesFile: "compiler:Languages\\Portuguese.isl"
 Name: "desktopicon"; Description: "Criar ícone na área de trabalho"; GroupDescription: "Ícones adicionais:"
 
 [Files]
-Source: "{exe_path}"; DestDir: "{{app}}"; Flags: ignoreversion
+Source: "{exe_path}"; DestDir: "{{app}}"; Flags: ignoreversion; DestName: "CW_Transportadora.exe"
 Source: "{project_dir_str}\\assets\\*"; DestDir: "{{app}}\\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{project_dir_str}\\config\\*"; DestDir: "{{app}}\\config"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{project_dir_str}\\telas\\*"; DestDir: "{{app}}\\telas"; Flags: ignoreversion recursesubdirs createallsubdirs

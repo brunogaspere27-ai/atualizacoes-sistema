@@ -94,6 +94,9 @@ class AuditoriaService:
             # Auditoria nao deve quebrar o fluxo principal
             logger.error(f"Erro ao registrar auditoria ({acao}): {erro}")
 
+    # Alias para compatibilidade
+    registrar_acao = registrar
+
     def listar(
         self,
         usuario_id: Optional[int] = None,

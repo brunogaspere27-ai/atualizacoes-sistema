@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from config.settings import settings
+from utils.cache import runtime_cache
 from utils.database import conectar
 from utils.logger import get_logger
 
@@ -14,14 +15,26 @@ logger = get_logger(__name__)
 
 class ConfigService:
     def carregar_configuracoes(self) -> Dict[str, Any]:
-        settings.reload()
-        return settings.configuracoes
+        def _load():
+            settings.reload()
+            return settings.configuracoes
+
+        return runtime_cache.get_or_set(
+            "configuracoes",
+            "dados",
+            _load,
+            ttl_seconds=3,
+        )
 
     def salvar_configuracoes(self, dados: Dict[str, Any]) -> Dict[str, Any]:
-        return settings.salvar_configuracoes(dados)
+        resultado = settings.salvar_configuracoes(dados)
+        self._invalidar_cache()
+        return resultado
 
     def restaurar_padrao(self) -> Dict[str, Any]:
-        return settings.restaurar_padrao()
+        resultado = settings.restaurar_padrao()
+        self._invalidar_cache()
+        return resultado
 
     def abrir_pasta_sistema(self) -> str:
         return str(settings.project_dir)
@@ -48,9 +61,14 @@ class ConfigService:
                 dirs_exist_ok=True
             )
 
+        self._invalidar_cache()
         return str(destino)
 
     def info_banco(self) -> Dict[str, Any]:
+        cached = runtime_cache.get("configuracoes", "info_banco")
+        if cached is not None:
+            return cached
+
         tamanho = "Não encontrado"
         tabelas = 0
         registros = 0
@@ -94,12 +112,16 @@ class ConfigService:
             if backups:
                 ultimo_backup = backups[0]
 
-        return {
+        info = {
             "tamanho": tamanho,
             "tabelas": tabelas,
             "registros": registros,
             "ultimo_backup": ultimo_backup,
         }
+        return runtime_cache.set("configuracoes", "info_banco", info, ttl_seconds=5)
+
+    def _invalidar_cache(self) -> None:
+        runtime_cache.invalidate_namespace("configuracoes")
 
 
 config_service = ConfigService()
