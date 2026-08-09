@@ -1,221 +1,255 @@
-"""
-CW Button - Botões profissionais para CW Transportadora
-Design System baseado em Linear, Stripe, Attio
-
-Características:
-- Cores sólidas (sem gradientes)
-- Hover e press states refinados
-- Sizes consistentes
-- Variants: Primary, Secondary, Ghost, Danger, Success
+"""Modern Button Component - CW Transportadora
+Botões com múltiplas variantes e sizes
 """
 
-from PySide6.QtWidgets import QPushButton
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize
-from PySide6.QtGui import QFont
 from enum import Enum
-from typing import Optional
+from PySide6.QtWidgets import QPushButton
+from PySide6.QtGui import QFont, QColor, QIcon
+from PySide6.QtCore import Qt, QSize
 
-from ui.theme.cw_theme import cw_theme, CWColor, CWRadius, CWSpacing
+from ui.theme.cw_theme import cw_theme
 
 
 class ButtonVariant(Enum):
-    """Variantes de botão CW"""
-    PRIMARY = "primary"      # Vermelho CW - ação principal
-    SECONDARY = "secondary"  # Cinza neutro - ação secundária
-    GHOST = "ghost"          # Transparente - ação discreta
-    DANGER = "danger"        # Vermelho erro - ação destrutiva
-    SUCCESS = "success"      # Verde - ação de sucesso
+    """Variantes de botão."""
+    PRIMARY = "primary"        # Vermelho CW
+    SECONDARY = "secondary"    # Cinza
+    DANGER = "danger"         # Vermelho de erro
+    SUCCESS = "success"       # Verde
+    WARNING = "warning"       # Laranja
+    GHOST = "ghost"           # Transparente com borda
+    LINK = "link"            # Apenas texto
 
 
 class ButtonSize(Enum):
-    """Tamanhos de botão CW"""
-    SM = "sm"    # 32px altura
-    MD = "md"    # 40px altura
-    LG = "lg"    # 48px altura
+    """Tamanhos de botão."""
+    XS = 24     # Micro
+    SM = 32     # Pequeno
+    MD = 40     # Médio (default)
+    LG = 48     # Grande
+    XL = 56     # Extra grande
 
 
 class CWButton(QPushButton):
-    """Botão profissional CW Transportadora"""
+    """
+    Botão moderno com Design System CW
+    Suporta múltiplas variantes, tamanhos e ícones
+    """
     
     def __init__(
         self,
-        text: str,
+        text: str = "",
         variant: ButtonVariant = ButtonVariant.PRIMARY,
         size: ButtonSize = ButtonSize.MD,
-        icon: Optional[str] = None,
-        disabled: bool = False,
-        parent: Optional[object] = None
+        icon: str = None,
+        parent=None
     ):
         super().__init__(text, parent)
+        self.variant = variant
+        self.size = size
+        self.icon_name = icon
         
-        self._variant = variant
-        self._size = size
-        self._icon_name = icon
-        
-        self._apply_style()
-        self._apply_icon()
-        
-        if disabled:
-            self.setEnabled(False)
+        self._setup_style()
+        self._setup_size()
     
-    def _apply_style(self):
-        """Aplica estilos baseados na variante e tamanho"""
-        c = cw_theme.colors
-        t = cw_theme.spacing
-        r = cw_theme.radius
+    def _setup_size(self):
+        """Configura tamanho do botão."""
+        height = self.size.value
         
-        # Size configurations
-        sizes = {
-            ButtonSize.SM: (32, t.SM, t.LG, cw_theme.typography.FONT_SIZE_SM),
-            ButtonSize.MD: (40, t.LG, t.XL, cw_theme.typography.FONT_SIZE_MD),
-            ButtonSize.LG: (48, t.XL, t._2XL, cw_theme.typography.FONT_SIZE_LG),
-        }
-        height, px, py, font_size = sizes[self._size]
+        # Calcular padding horizontal baseado no tamanho
+        padding_h = 16 if self.size in [ButtonSize.XS, ButtonSize.SM] else 24
+        
+        font_size = {
+            ButtonSize.XS: 10,
+            ButtonSize.SM: 11,
+            ButtonSize.MD: 13,
+            ButtonSize.LG: 14,
+            ButtonSize.XL: 16,
+        }.get(self.size, 13)
+        
+        font = QFont(cw_theme.typography.FONT_FAMILY_QT, font_size)
+        font.setWeight(QFont.Weight.Medium)
+        self.setFont(font)
         
         self.setMinimumHeight(height)
-        self.setMaximumHeight(height)
+        self.setMinimumWidth(height * 2 if self.text() else height)
+        
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFont(cw_theme.get_font(font_size, bold=True))
-        
-        # Variant styles
-        variant_styles = {
-            ButtonVariant.PRIMARY: self._primary_style,
-            ButtonVariant.SECONDARY: self._secondary_style,
-            ButtonVariant.GHOST: self._ghost_style,
-            ButtonVariant.DANGER: self._danger_style,
-            ButtonVariant.SUCCESS: self._success_style,
-        }
-        
-        variant_styles[self._variant](c, t, r, px, py)
     
-    def _primary_style(self, c: dict, t: object, r: object, px: int, py: int):
-        """Botão primário - Vermelho CW"""
-        self.setStyleSheet(f"""
+    def _setup_style(self):
+        """Aplica styling baseado na variante."""
+        if self.variant == ButtonVariant.PRIMARY:
+            stylesheet = self._get_primary_style()
+        elif self.variant == ButtonVariant.SECONDARY:
+            stylesheet = self._get_secondary_style()
+        elif self.variant == ButtonVariant.DANGER:
+            stylesheet = self._get_danger_style()
+        elif self.variant == ButtonVariant.SUCCESS:
+            stylesheet = self._get_success_style()
+        elif self.variant == ButtonVariant.WARNING:
+            stylesheet = self._get_warning_style()
+        elif self.variant == ButtonVariant.GHOST:
+            stylesheet = self._get_ghost_style()
+        elif self.variant == ButtonVariant.LINK:
+            stylesheet = self._get_link_style()
+        else:
+            stylesheet = self._get_primary_style()
+        
+        self.setStyleSheet(stylesheet)
+    
+    def _get_primary_style(self) -> str:
+        """Estilo PRIMARY: Vermelho CW"""
+        return f"""
             QPushButton {{
-                background-color: {c['primary']};
-                color: {c['text_inverted']};
+                background-color: {cw_theme.colors['primary']};
+                color: #FFFFFF;
                 border: none;
-                border-radius: {r.MD}px;
-                padding: {py}px {px}px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {c['primary_dark']};
-            }}
-            QPushButton:pressed {{
-                background-color: {c['primary_dark']};
-                transform: translateY(1px);
-            }}
-            QPushButton:disabled {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_disabled']};
-                cursor: not-allowed;
-            }}
-        """)
-    
-    def _secondary_style(self, c: dict, t: object, r: object, px: int, py: int):
-        """Botão secundário - Cinza neutro"""
-        self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_primary']};
-                border: 1px solid {c['border_default']};
-                border-radius: {r.MD}px;
-                padding: {py}px {px}px;
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
                 font-weight: 500;
             }}
             QPushButton:hover {{
-                background-color: {c['bg_overlay']};
-                border-color: {c['border_strong']};
+                background-color: {cw_theme.colors['brand_hover']};
             }}
             QPushButton:pressed {{
-                background-color: {c['bg_overlay']};
-                transform: translateY(1px);
+                background-color: {cw_theme.colors['brand_active']};
             }}
             QPushButton:disabled {{
-                background-color: {c['bg_secondary']};
-                color: {c['text_disabled']};
-                border-color: {c['border_subtle']};
-                cursor: not-allowed;
+                background-color: {cw_theme.colors['text_disabled']};
+                color: {cw_theme.colors['text_tertiary']};
             }}
-        """)
+        """
     
-    def _ghost_style(self, c: dict, t: object, r: object, px: int, py: int):
-        """Botão ghost - Transparente"""
-        self.setStyleSheet(f"""
+    def _get_secondary_style(self) -> str:
+        """Estilo SECONDARY: Cinza"""
+        return f"""
             QPushButton {{
-                background-color: transparent;
-                color: {c['text_secondary']};
-                border: none;
-                border-radius: {r.MD}px;
-                padding: {py}px {px}px;
+                background-color: {cw_theme.colors['bg_secondary']};
+                color: {cw_theme.colors['text_primary']};
+                border: 1px solid {cw_theme.colors['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
                 font-weight: 500;
             }}
             QPushButton:hover {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_primary']};
+                background-color: {cw_theme.colors['bg_tertiary']};
             }}
             QPushButton:pressed {{
-                background-color: {c['bg_overlay']};
+                background-color: {cw_theme.colors['bg_overlay']};
             }}
             QPushButton:disabled {{
-                color: {c['text_disabled']};
-                cursor: not-allowed;
+                color: {cw_theme.colors['text_disabled']};
             }}
-        """)
+        """
     
-    def _danger_style(self, c: dict, t: object, r: object, px: int, py: int):
-        """Botão danger - Vermelho erro"""
-        self.setStyleSheet(f"""
+    def _get_danger_style(self) -> str:
+        """Estilo DANGER: Vermelho de erro"""
+        return f"""
             QPushButton {{
-                background-color: {c['error']};
-                color: {c['text_inverted']};
+                background-color: {cw_theme.colors['error']};
+                color: #FFFFFF;
                 border: none;
-                border-radius: {r.MD}px;
-                padding: {py}px {px}px;
-                font-weight: 600;
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
+                font-weight: 500;
             }}
             QPushButton:hover {{
                 background-color: #DC2626;
             }}
             QPushButton:pressed {{
-                background-color: #B91C1C;
-                transform: translateY(1px);
+                background-color: #991B1B;
             }}
             QPushButton:disabled {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_disabled']};
-                cursor: not-allowed;
+                background-color: {cw_theme.colors['text_disabled']};
             }}
-        """)
+        """
     
-    def _success_style(self, c: dict, t: object, r: object, px: int, py: int):
-        """Botão success - Verde"""
-        self.setStyleSheet(f"""
+    def _get_success_style(self) -> str:
+        """Estilo SUCCESS: Verde"""
+        return f"""
             QPushButton {{
-                background-color: {c['success']};
-                color: {c['text_inverted']};
+                background-color: {cw_theme.colors['success']};
+                color: #FFFFFF;
                 border: none;
-                border-radius: {r.MD}px;
-                padding: {py}px {px}px;
-                font-weight: 600;
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
+                font-weight: 500;
             }}
             QPushButton:hover {{
-                background-color: #059669;
+                background-color: #16A34A;
             }}
             QPushButton:pressed {{
-                background-color: #047857;
-                transform: translateY(1px);
+                background-color: #15803D;
             }}
             QPushButton:disabled {{
-                background-color: {c['bg_tertiary']};
-                color: {c['text_disabled']};
-                cursor: not-allowed;
+                background-color: {cw_theme.colors['text_disabled']};
             }}
-        """)
+        """
     
-    def _apply_icon(self):
-        """Aplica ícone se fornecido"""
-        if self._icon_name:
-            # TODO: Implementar sistema de ícones
-            pass
+    def _get_warning_style(self) -> str:
+        """Estilo WARNING: Laranja"""
+        return f"""
+            QPushButton {{
+                background-color: {cw_theme.colors['warning']};
+                color: #FFFFFF;
+                border: none;
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: #D97706;
+            }}
+            QPushButton:pressed {{
+                background-color: #92400E;
+            }}
+            QPushButton:disabled {{
+                background-color: {cw_theme.colors['text_disabled']};
+            }}
+        """
+    
+    def _get_ghost_style(self) -> str:
+        """Estilo GHOST: Transparente com borda"""
+        return f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {cw_theme.colors['text_primary']};
+                border: 1px solid {cw_theme.colors['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0px 16px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {cw_theme.colors['bg_secondary']};
+                border: 1px solid {cw_theme.colors['border_strong']};
+            }}
+            QPushButton:pressed {{
+                background-color: {cw_theme.colors['bg_tertiary']};
+            }}
+            QPushButton:disabled {{
+                color: {cw_theme.colors['text_disabled']};
+                border: 1px solid {cw_theme.colors['border_subtle']};
+            }}
+        """
+    
+    def _get_link_style(self) -> str:
+        """Estilo LINK: Apenas texto"""
+        return f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {cw_theme.colors['primary']};
+                border: none;
+                padding: 0px;
+                font-weight: 500;
+                text-decoration: underline;
+            }}
+            QPushButton:hover {{
+                color: {cw_theme.colors['brand_hover']};
+            }}
+            QPushButton:pressed {{
+                color: {cw_theme.colors['brand_active']};
+            }}
+            QPushButton:disabled {{
+                color: {cw_theme.colors['text_disabled']};
+            }}
+        """
