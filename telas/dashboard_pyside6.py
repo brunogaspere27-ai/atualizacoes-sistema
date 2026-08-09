@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from services.dashboard_service import dashboard_service
-from telas.theme_aurora import aurora_theme_manager, AccentColor
+from ui.theme.cw_theme import cw_theme
 from utils.icons import get_pixmap
 from utils.components import KPICard, ModernCard, ModernButton, ButtonStyle
 from utils.charts import ChartCard, BarChart, DonutChart, MultiLineChart
@@ -46,8 +46,8 @@ class Dashboard(QWidget):
 
     # ================================================================ UI
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -65,8 +65,8 @@ class Dashboard(QWidget):
         self.content = QWidget()
         self.content.setStyleSheet(f"background: {colors['bg_primary']};")
         self.content_layout = QVBoxLayout()
-        self.content_layout.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        self.content_layout.setSpacing(tokens.SPACING_LG)
+        self.content_layout.setContentsMargins(tokens._2XL, tokens.XL, tokens._2XL, tokens._2XL)
+        self.content_layout.setSpacing(tokens.LG)
         self.content.setLayout(self.content_layout)
         self.scroll.setWidget(self.content)
 
@@ -83,20 +83,20 @@ class Dashboard(QWidget):
         self._create_activity_section()
 
     def _create_header(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         header = QHBoxLayout()
 
         titulo_box = QVBoxLayout()
         titulo_box.setSpacing(2)
         titulo = QLabel("Olá, Administrador!")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
         titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
         titulo_box.addWidget(titulo)
 
         subtitulo = QLabel("Aqui está o resumo geral da sua operação.")
-        subtitulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
+        subtitulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         subtitulo.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
         titulo_box.addWidget(subtitulo)
 
@@ -104,7 +104,7 @@ class Dashboard(QWidget):
         header.addStretch()
 
         lbl_periodo = QLabel("Período:")
-        lbl_periodo.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
+        lbl_periodo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         lbl_periodo.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
         header.addWidget(lbl_periodo)
 
@@ -112,46 +112,47 @@ class Dashboard(QWidget):
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
         self.combo_periodo.setCurrentText(self.tipo_periodo)
         self.combo_periodo.setMinimumHeight(36)
-        self.combo_periodo.setFixedWidth(130)
+        self.combo_periodo.setMinimumWidth(130)
         self.combo_periodo.currentTextChanged.connect(self._update_period)
         header.addWidget(self.combo_periodo)
 
         self.content_layout.addLayout(header)
 
     def _create_kpi_cards(self):
-        tokens = theme_manager.tokens
+        tokens = cw_theme.spacing
 
         cards_grid = QWidget()
         cards_grid.setStyleSheet("background: transparent;")
         cards_layout = QGridLayout()
         cards_layout.setContentsMargins(0, 0, 0, 0)
-        cards_layout.setSpacing(tokens.SPACING_MD)
+        cards_layout.setSpacing(tokens.MD)
+        cards_layout.setRowStretch(0, 0)  # Cards não devem esticar verticalmente
         for i in range(5):
             cards_layout.setColumnStretch(i, 1)
         cards_grid.setLayout(cards_layout)
 
-        self.card_receita = KPICard("Receita Bruta", "R$ 0,00", icon_name="money", accent=AccentColor.AURORA)
+        self.card_receita = KPICard("Receita Bruta", "R$ 0,00", icon_name="trending_up")
         cards_layout.addWidget(self.card_receita, 0, 0)
 
-        self.card_lucro = KPICard("Lucro Estimado", "R$ 0,00", icon_name="trending_up", accent=AccentColor.FOREST)
+        self.card_lucro = KPICard("Lucro Estimado", "R$ 0,00", icon_name="trending_up")
         cards_layout.addWidget(self.card_lucro, 0, 1)
 
-        self.card_fretes_realizados = KPICard("Fretes Realizados", "0", icon_name="truck", accent=AccentColor.OCEAN)
+        self.card_fretes_realizados = KPICard("Fretes Realizados", "0", icon_name="check")
         cards_layout.addWidget(self.card_fretes_realizados, 0, 2)
 
-        self.card_fretes_andamento = KPICard("Fretes em Andamento", "0", icon_name="operations", accent=AccentColor.EMBER)
+        self.card_fretes_andamento = KPICard("Fretes em Andamento", "0", icon_name="clock")
         cards_layout.addWidget(self.card_fretes_andamento, 0, 3)
 
-        self.card_clientes = KPICard("Clientes Ativos", "0", icon_name="employees", accent=AccentColor.AURORA)
+        self.card_clientes = KPICard("Clientes Ativos", "0", icon_name="groups")
         cards_layout.addWidget(self.card_clientes, 0, 4)
 
         self.content_layout.addWidget(cards_grid)
 
     def _create_charts(self):
-        tokens = theme_manager.tokens
+        tokens = cw_theme.spacing
 
         charts_layout = QHBoxLayout()
-        charts_layout.setSpacing(tokens.SPACING_MD)
+        charts_layout.setSpacing(tokens.MD)
 
         self._chart_card_comparativo = ChartCard("Receita x Despesa")
         self._line_chart = MultiLineChart()
@@ -171,10 +172,10 @@ class Dashboard(QWidget):
         self.content_layout.addLayout(charts_layout)
 
     def _create_summary_cards(self):
-        tokens = theme_manager.tokens
+        tokens = cw_theme.spacing
 
         row = QHBoxLayout()
-        row.setSpacing(tokens.SPACING_MD)
+        row.setSpacing(tokens.LG)
 
         self.card_contas_receber = self._make_summary_card(
             "Contas a Receber", "financeiro"
@@ -200,44 +201,45 @@ class Dashboard(QWidget):
 
     def _make_summary_card(self, titulo: str, kind: str) -> QFrame:
         """Cria um card resumo com placeholders internos preenchidos depois."""
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        radius = cw_theme.radius
 
         frame = QFrame()
         frame.setObjectName("summaryCard2")
         frame.setStyleSheet(f"""
         QFrame#summaryCard2 {{
             background: {colors['card_bg']}; border: 1px solid {colors['card_border']};
-            border-radius: {tokens.RADIUS_LG}px;
+            border-radius: {radius.LG}px;
         }}
         QFrame#summaryCard2:hover {{ border-color: {colors['border_strong']}; }}
         """)
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_LG, tokens.SPACING_MD, tokens.SPACING_LG, tokens.SPACING_LG)
+        layout.setContentsMargins(tokens.LG, tokens.MD, tokens.LG, tokens.LG)
         layout.setSpacing(6)
         frame.setLayout(layout)
 
         title_lbl = QLabel(titulo.upper())
-        title_lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
+        title_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         title_lbl.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent; letter-spacing: 1px;")
         layout.addWidget(title_lbl)
 
         value_lbl = QLabel("R$ 0,00")
-        value_lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+        value_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
         value_lbl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
         layout.addWidget(value_lbl)
         frame._value_label = value_lbl
 
         details_row = QHBoxLayout()
-        details_row.setSpacing(tokens.SPACING_MD)
+        details_row.setSpacing(tokens.MD)
 
         detail_a = QVBoxLayout()
         detail_a.setSpacing(0)
         label_a = QLabel("")
-        label_a.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS))
+        label_a.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
         label_a.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
         value_a = QLabel("")
-        value_a.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+        value_a.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         value_a.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
         detail_a.addWidget(label_a)
         detail_a.addWidget(value_a)
@@ -248,10 +250,10 @@ class Dashboard(QWidget):
         detail_b = QVBoxLayout()
         detail_b.setSpacing(0)
         label_b = QLabel("")
-        label_b.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS))
+        label_b.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
         label_b.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
         value_b = QLabel("")
-        value_b.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+        value_b.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         value_b.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
         detail_b.addWidget(label_b)
         detail_b.addWidget(value_b)
@@ -263,34 +265,34 @@ class Dashboard(QWidget):
         layout.addLayout(details_row)
 
         link = QLabel(f"Ver todas ›")
-        link.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
+        link.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         link.setStyleSheet(f"color: {colors['brand']}; background: transparent;")
         layout.addWidget(link)
 
         return frame
 
     def _create_activity_section(self):
-        tokens = theme_manager.tokens
+        tokens = cw_theme.spacing
 
         row = QHBoxLayout()
-        row.setSpacing(tokens.SPACING_MD)
+        row.setSpacing(tokens.LG)
 
-        atividades_card = ModernCard(title="Últimas Atividades", icon_name="history", padding=tokens.SPACING_LG)
+        atividades_card = ModernCard(title="Últimas Atividades", icon_name="clock", padding=tokens.LG)
         self.atividades_list = QWidget()
         self.atividades_list.setStyleSheet("background: transparent;")
         self.atividades_list_layout = QVBoxLayout()
         self.atividades_list_layout.setContentsMargins(0, 0, 0, 0)
-        self.atividades_list_layout.setSpacing(tokens.SPACING_SM)
+        self.atividades_list_layout.setSpacing(tokens.SM)
         self.atividades_list.setLayout(self.atividades_list_layout)
         atividades_card.add_widget(self.atividades_list)
         row.addWidget(atividades_card, stretch=1)
 
-        entregas_card = ModernCard(title="Próximas Entregas", icon_name="truck", padding=tokens.SPACING_LG)
+        entregas_card = ModernCard(title="Próximas Entregas", icon_name="truck", padding=tokens.LG)
         self.entregas_list = QWidget()
         self.entregas_list.setStyleSheet("background: transparent;")
         self.entregas_list_layout = QVBoxLayout()
         self.entregas_list_layout.setContentsMargins(0, 0, 0, 0)
-        self.entregas_list_layout.setSpacing(tokens.SPACING_SM)
+        self.entregas_list_layout.setSpacing(tokens.SM)
         self.entregas_list.setLayout(self.entregas_list_layout)
         entregas_card.add_widget(self.entregas_list)
         row.addWidget(entregas_card, stretch=1)
@@ -348,7 +350,7 @@ class Dashboard(QWidget):
         self._update_entregas()
 
     def _atualizar_grafico_comparativo(self):
-        colors = theme_manager.colors
+        colors = cw_theme.colors
         dados = self.grafico_comparativo or {}
         labels = dados.get("labels", [])
         receitas = dados.get("receitas", [])
@@ -402,8 +404,9 @@ class Dashboard(QWidget):
         frame._value_b.setText(str(dados.get("agendadas", 0)))
 
     def _update_atividades(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        radius = cw_theme.radius
 
         for i in reversed(range(self.atividades_list_layout.count())):
             child = self.atividades_list_layout.itemAt(i).widget()
@@ -413,15 +416,15 @@ class Dashboard(QWidget):
         if not self.atividades:
             placeholder = QLabel("Nenhuma atividade recente")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
+            placeholder.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
             placeholder.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
             self.atividades_list_layout.addWidget(placeholder)
             return
 
         badge_colors = {
-            "Fretes": ("sky", "sky_soft"),
-            "Coletas": ("emerald", "emerald_soft"),
-            "Manutenção": ("amber", "amber_soft"),
+            "Fretes": ("info", "info_soft"),
+            "Coletas": ("success", "success_soft"),
+            "Manutenção": ("warning", "warning_soft"),
         }
 
         for item in self.atividades:
@@ -429,24 +432,24 @@ class Dashboard(QWidget):
             frame.setStyleSheet(f"""
             QFrame {{
                 background: {colors['bg_tertiary']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px;
+                border-radius: {radius.MD}px;
             }}
             QFrame:hover {{ border-color: {colors['border_strong']}; }}
             """)
             il = QHBoxLayout()
-            il.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
-            il.setSpacing(tokens.SPACING_SM)
+            il.setContentsMargins(tokens.MD, tokens.SM, tokens.MD, tokens.SM)
+            il.setSpacing(tokens.SM)
             frame.setLayout(il)
 
             text_box = QVBoxLayout()
             text_box.setSpacing(2)
             titulo = QLabel(item.get("titulo", ""))
-            titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+            titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
             titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
             text_box.addWidget(titulo)
 
             detalhe = QLabel(item.get("detalhe", ""))
-            detalhe.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS))
+            detalhe.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
             detalhe.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
             text_box.addWidget(detalhe)
             il.addLayout(text_box, stretch=1)
@@ -454,18 +457,19 @@ class Dashboard(QWidget):
             tipo = item.get("tipo", "")
             key_bg, key_soft = badge_colors.get(tipo, ("brand", "brand_soft"))
             badge = QLabel(tipo)
-            badge.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
+            badge.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
             badge.setStyleSheet(f"""
             color: {colors[key_bg]}; background: {colors[key_soft]};
-            border-radius: {tokens.RADIUS_SM}px; padding: 2px 8px;
+            border-radius: {radius.SM}px; padding: 2px 8px;
             """)
             il.addWidget(badge)
 
             self.atividades_list_layout.addWidget(frame)
 
     def _update_entregas(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        radius = cw_theme.radius
 
         for i in reversed(range(self.entregas_list_layout.count())):
             child = self.entregas_list_layout.itemAt(i).widget()
@@ -475,7 +479,7 @@ class Dashboard(QWidget):
         if not self.entregas:
             placeholder = QLabel("Nenhuma entrega em andamento")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
+            placeholder.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
             placeholder.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
             self.entregas_list_layout.addWidget(placeholder)
             return
@@ -485,34 +489,34 @@ class Dashboard(QWidget):
             frame.setStyleSheet(f"""
             QFrame {{
                 background: {colors['bg_tertiary']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px;
+                border-radius: {radius.MD}px;
             }}
             QFrame:hover {{ border-color: {colors['border_strong']}; }}
             """)
             il = QHBoxLayout()
-            il.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
-            il.setSpacing(tokens.SPACING_SM)
+            il.setContentsMargins(tokens.MD, tokens.SM, tokens.MD, tokens.SM)
+            il.setSpacing(tokens.SM)
             frame.setLayout(il)
 
             text_box = QVBoxLayout()
             text_box.setSpacing(2)
             titulo = QLabel(f"{item.get('quando', '')} - {item.get('titulo', '')}")
-            titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+            titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
             titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
             text_box.addWidget(titulo)
 
             detalhe = QLabel(item.get("detalhe", ""))
-            detalhe.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS))
+            detalhe.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
             detalhe.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
             text_box.addWidget(detalhe)
             il.addLayout(text_box, stretch=1)
 
             status = item.get("status", "")
             badge = QLabel(status)
-            badge.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
+            badge.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
             badge.setStyleSheet(f"""
-            color: {colors['sky']}; background: {colors['sky_soft']};
-            border-radius: {tokens.RADIUS_SM}px; padding: 2px 8px;
+            color: {colors['info']}; background: {colors['info_soft']};
+            border-radius: {radius.SM}px; padding: 2px 8px;
             """)
             il.addWidget(badge)
 

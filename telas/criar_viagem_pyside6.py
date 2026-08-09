@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QSizePolicy, QAbstractItemView,
     QComboBox, QDialog,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QColor
 
 from services.viagem_service import viagem_service
@@ -28,8 +28,8 @@ from services.rascunho_viagem_service import (
     adicionar_historico_viagem,
     listar_historico_viagem,
 )
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWTable, CWBadge, BadgeVariant
 from utils.helpers import formatar_moeda, formatar_peso, parse_numero
 from utils.logger import get_logger
 
@@ -38,8 +38,11 @@ logger = get_logger(__name__)
 
 class TelaCriarViagem(QWidget):
     """Tela de criação de viagens com seleção de cliente e notas (PySide6)."""
+    
+    # Sinais para comunicação thread-safe
+    _notas_carregadas = Signal(list)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, cliente_pre_selecionado: tuple = None):
         super().__init__(parent)
 
         self.cliente_selecionado = None
@@ -52,15 +55,24 @@ class TelaCriarViagem(QWidget):
         self.notas_selecionadas_tree_ids: dict = {}
 
         self._resumo_labels: dict[str, QLabel] = {}
+        self._cliente_pre_selecionado = cliente_pre_selecionado  # (id, nome) tuple
+        
+        # Conectar sinal para thread-safe comunicação
+        self._notas_carregadas.connect(self._preencher_tabela_notas)
 
         self._setup_ui()
         self._carregar_caminhoes()
-        QTimer.singleShot(200, self._carregar_rascunho)
+        
+        # Se houver cliente pré-selecionado, carrega automaticamente
+        if self._cliente_pre_selecionado:
+            QTimer.singleShot(100, self._selecionar_cliente_com_delay)
+        else:
+            QTimer.singleShot(200, self._carregar_rascunho)
 
     # ------------------------------------------------------------------ UI
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -70,14 +82,14 @@ class TelaCriarViagem(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {c['bg_primary']}; border: none; }}")
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {c['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        cl.setSpacing(t.XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
@@ -86,201 +98,178 @@ class TelaCriarViagem(QWidget):
 
         # Notas: tabela + selecionadas
         row = QHBoxLayout()
-        row.setSpacing(tokens.SPACING_LG)
+        row.setSpacing(t.LG)
         row.addWidget(self._build_tabela_notas(), stretch=2)
-        row.addWidget(self._build_selecionadas(), stretch=1)
+        row.addWidget(self._build_resumo(), stretch=1)
         cl.addLayout(row)
 
-        # Resumo
-        cl.addWidget(self._build_resumo())
+        # Botões de ação
+        cl.addWidget(self._build_acoes())
+
+        cl.addStretch()
 
         # Criação da viagem
         cl.addWidget(self._build_criacao_viagem())
 
         # Validação
         self.label_validacao = QLabel("Selecione notas e um caminhão para validar a viagem.")
-        self.label_validacao.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_validacao.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        self.label_validacao.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_validacao.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         self.label_validacao.setWordWrap(True)
         cl.addWidget(self.label_validacao)
 
         # Histórico rápido
         self.label_historico = QLabel("Histórico rápido: ainda sem viagens criadas.")
-        self.label_historico.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_historico.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        self.label_historico.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_historico.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         self.label_historico.setWordWrap(True)
         cl.addWidget(self.label_historico)
 
-    def _build_busca_cliente(self) -> ModernCard:
-        tokens = theme_manager.tokens
-        colors = theme_manager.colors
-        card = ModernCard(padding=tokens.SPACING_XL)
+    def _build_busca_cliente(self) -> CWCard:
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        card = CWCard(padding=t.XL)
 
-        lbl = QLabel("👤  Selecione o Cliente")
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        lbl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        lbl = QLabel("Selecione o Cliente")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         card.add_widget(lbl)
 
         row = QHBoxLayout()
-        row.setSpacing(tokens.SPACING_MD)
+        row.setSpacing(t.MD)
 
         self.entrada_busca = QLineEdit()
         self.entrada_busca.setPlaceholderText("Digite o nome ou CNPJ do cliente...")
-        self.entrada_busca.setMinimumHeight(42)
-        self.entrada_busca.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD))
         self.entrada_busca.setStyleSheet(f"""
             QLineEdit {{
-                background-color: {colors['bg_tertiary']};
-                color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px;
-                padding: {tokens.SPACING_SM}px {tokens.SPACING_MD}px;
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_MD}px;
+                color: {c['text_primary']};
             }}
-            QLineEdit:focus {{ border: 1.5px solid {colors['sky']}; }}
+            QLineEdit:focus {{
+                border: 1px solid {c['border_focus']};
+            }}
         """)
         self.entrada_busca.returnPressed.connect(self._buscar_cliente)
         row.addWidget(self.entrada_busca, stretch=1)
 
-        btn_buscar = ModernButton("🔍 Buscar", ButtonStyle.PRIMARY)
+        btn_buscar = CWButton("Buscar", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_buscar.clicked.connect(self._buscar_cliente)
         row.addWidget(btn_buscar)
 
         card.add_layout(row)
 
         self.label_cliente = QLabel("Nenhum cliente selecionado")
-        self.label_cliente.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_cliente.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        self.label_cliente.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_cliente.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         card.add_widget(self.label_cliente)
 
         return card
 
-    def _build_tabela_notas(self) -> ModernCard:
-        tokens = theme_manager.tokens
-        colors = theme_manager.colors
-        card = ModernCard(padding=tokens.SPACING_XL)
+    def _build_tabela_notas(self) -> CWCard:
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        card = CWCard(padding=t.XL)
 
         # Título + botões
         row = QHBoxLayout()
-        titulo = QLabel("📦  Selecione as Notas")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        titulo = QLabel("Selecione as Notas")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         row.addWidget(titulo)
         row.addStretch()
 
-        btn_todas = ModernButton("✅ Todas", ButtonStyle.SUCCESS)
+        btn_todas = CWButton("Todas", ButtonVariant.SUCCESS, ButtonSize.SM)
         btn_todas.clicked.connect(self._selecionar_todas)
         row.addWidget(btn_todas)
 
-        btn_limpar = ModernButton("⏹ Limpar", ButtonStyle.SECONDARY)
+        btn_limpar = CWButton("Limpar", ButtonVariant.SECONDARY, ButtonSize.SM)
         btn_limpar.clicked.connect(self._limpar_selecao)
         row.addWidget(btn_limpar)
 
         card.add_layout(row)
 
-        # Tabela
-        colunas = [("Sel.", 55), ("Nota/CT-e", 180), ("Cidade", 200), ("Peso", 120), ("Data", 150), ("Status", 120)]
-        self.tabela_notas = QTableWidget(0, len(colunas))
-        self.tabela_notas.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela_notas.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela_notas.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela_notas.verticalHeader().setVisible(False)
+        # Tabela - usando CWTable
+        colunas = ["Sel.", "Nota/CT-c", "Cidade", "Peso", "Data", "Status"]
+        self.tabela_notas = CWTable(colunas)
         self.tabela_notas.setMinimumHeight(300)
 
         header = self.tabela_notas.horizontalHeader()
-        for i, (_, w) in enumerate(colunas):
+        col_widths = [55, 180, 200, 120, 150, 120]
+        for i, w in enumerate(col_widths):
             header.resizeSection(i, w)
         header.setStretchLastSection(True)
-
-        self.tabela_notas.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['sky_soft']}; color: {colors['text_primary']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px 10px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
 
         self.tabela_notas.cellClicked.connect(self._clicar_na_nota)
         card.add_widget(self.tabela_notas)
         return card
 
-    def _build_selecionadas(self) -> ModernCard:
-        tokens = theme_manager.tokens
-        colors = theme_manager.colors
-        card = ModernCard(padding=tokens.SPACING_XL)
+    def _build_selecionadas(self) -> CWCard:
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        card = CWCard(padding=t.XL)
 
-        lbl = QLabel("✓ Selecionadas")
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
-        lbl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        lbl = QLabel("Selecionadas")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
+        lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         card.add_widget(lbl)
 
         self.label_qtd_selecionadas = QLabel("0 notas marcadas")
-        self.label_qtd_selecionadas.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_qtd_selecionadas.setStyleSheet(f"color: {colors['sky']}; background: transparent;")
+        self.label_qtd_selecionadas.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_qtd_selecionadas.setStyleSheet(f"color: {c['primary']}; background: transparent;")
         card.add_widget(self.label_qtd_selecionadas)
 
-        colunas = [("Nota", 140), ("Peso", 90)]
-        self.tabela_selecionadas = QTableWidget(0, len(colunas))
-        self.tabela_selecionadas.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela_selecionadas.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela_selecionadas.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela_selecionadas.verticalHeader().setVisible(False)
+        colunas = ["Nota", "Peso"]
+        self.tabela_selecionadas = CWTable(colunas)
         self.tabela_selecionadas.setMinimumHeight(250)
 
         h = self.tabela_selecionadas.horizontalHeader()
-        for i, (_, w) in enumerate(colunas):
+        col_widths = [140, 90]
+        for i, w in enumerate(col_widths):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
-
-        self.tabela_selecionadas.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['sky_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
         card.add_widget(self.tabela_selecionadas)
 
-        btn_remover = ModernButton("🗑 Remover", ButtonStyle.DANGER)
+        btn_remover = CWButton("Remover", ButtonVariant.DANGER, ButtonSize.SM)
         btn_remover.clicked.connect(self._remover_nota_selecionada)
         card.add_widget(btn_remover)
 
         return card
 
     def _build_resumo(self) -> QFrame:
-        tokens = theme_manager.tokens
-        colors = theme_manager.colors
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {c['bg_secondary']}; border-radius: {r.LG}px; border: 1px solid {c['border_subtle']}; }}")
         layout = QHBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        layout.setSpacing(tokens.SPACING_LG)
+        layout.setContentsMargins(t.XL, t.MD, t.XL, t.MD)
+        layout.setSpacing(t.LG)
         frame.setLayout(layout)
 
         for titulo, chave, cor in [
-            ("QUANTIDADE", "qtd", colors["text_primary"]),
-            ("PESO TOTAL", "peso", colors["rose"]),
-            ("FRETE TOTAL", "frete", colors["emerald"]),
-            ("VOLUMES", "volumes", colors["sky"]),
+            ("QUANTIDADE", "qtd", c["text_primary"]),
+            ("PESO TOTAL", "peso", c["primary"]),
+            ("FRETE TOTAL", "frete", c["success"]),
+            ("VOLUMES", "volumes", c["info"]),
         ]:
             card_frame = QFrame()
-            card_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
+            card_frame.setStyleSheet(f"QFrame {{ background-color: {c['bg_primary']}; border-radius: {r.MD}px; border: none; }}")
             cl = QVBoxLayout()
-            cl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+            cl.setContentsMargins(t.MD, t.SM, t.MD, t.SM)
             card_frame.setLayout(cl)
 
-            t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            cl.addWidget(t)
+            t_lbl = QLabel(titulo)
+            t_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            t_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
+            cl.addWidget(t_lbl)
 
             v = QLabel("0")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+            v.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
             v.setStyleSheet(f"color: {cor}; background: transparent;")
             cl.addWidget(v)
 
@@ -290,67 +279,84 @@ class TelaCriarViagem(QWidget):
         return frame
 
     def _build_criacao_viagem(self) -> QFrame:
-        tokens = theme_manager.tokens
-        colors = theme_manager.colors
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {c['bg_secondary']}; border-radius: {r.LG}px; border: 1px solid {c['border_subtle']}; }}")
         layout = QHBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(t.XL, t.MD, t.XL, t.MD)
+        layout.setSpacing(t.MD)
         frame.setLayout(layout)
 
-        layout.addWidget(QLabel("CAMINHÃO:"))
+        lbl_caminhao = QLabel("CAMINHÃO:")
+        lbl_caminhao.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_caminhao.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+        layout.addWidget(lbl_caminhao)
+
         self.combo_caminhoes = QComboBox()
         self.combo_caminhoes.setMinimumHeight(42)
         self.combo_caminhoes.setMinimumWidth(250)
         self.combo_caminhoes.setStyleSheet(f"""
-            QComboBox {{ background-color: {colors['bg_tertiary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: {tokens.SPACING_SM}px {tokens.SPACING_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QComboBox:focus {{ border-color: {colors['sky']}; }}
+            QComboBox {{ background-color: {c['bg_tertiary']}; color: {c['text_primary']};
+                border: 1.5px solid {c['border_subtle']}; border-radius: {r.MD}px;
+                padding: {t.SM}px {t.MD}px; font-size: {cw_theme.typography.FONT_SIZE_MD}px; }}
+            QComboBox:focus {{ border-color: {c['border_focus']}; }}
             QComboBox::drop-down {{ border: none; }}
         """)
         self.combo_caminhoes.currentTextChanged.connect(lambda: self._atualizar_validacao())
         layout.addWidget(self.combo_caminhoes)
 
-        layout.addWidget(QLabel("MOTORISTA:"))
+        lbl_motorista = QLabel("MOTORISTA:")
+        lbl_motorista.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_motorista.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+        layout.addWidget(lbl_motorista)
+
         self.entrada_motorista = QLineEdit()
-        self.entrada_motorista.setPlaceholderText("Nome do motorista")
-        self.entrada_motorista.setMinimumHeight(42)
+        self.entrada_motorista.setPlaceholderText("Nome do motorista...")
         self.entrada_motorista.setStyleSheet(f"""
-            QLineEdit {{ background-color: {colors['bg_tertiary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: {tokens.SPACING_SM}px {tokens.SPACING_MD}px; }}
-            QLineEdit:focus {{ border-color: {colors['sky']}; }}
+            QLineEdit {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_MD}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {c['border_focus']};
+            }}
         """)
         layout.addWidget(self.entrada_motorista)
 
         layout.addStretch()
 
-        btn_salvar_rasc = ModernButton("💾 Rascunho", ButtonStyle.SECONDARY)
+        btn_salvar_rasc = CWButton("Rascunho", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_salvar_rasc.clicked.connect(self._salvar_rascunho_atual)
         layout.addWidget(btn_salvar_rasc)
 
-        btn_carregar = ModernButton("📂 Carregar", ButtonStyle.SECONDARY)
+        btn_carregar = CWButton("Carregar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_carregar.clicked.connect(self._carregar_rascunho)
         layout.addWidget(btn_carregar)
 
-        btn_limpar = ModernButton("🧹 Limpar", ButtonStyle.GHOST)
+        btn_limpar = CWButton("Limpar", ButtonVariant.GHOST, ButtonSize.MD)
         btn_limpar.clicked.connect(self._limpar_rascunho)
         layout.addWidget(btn_limpar)
 
-        btn_criar = ModernButton("🚚 CRIAR VIAGEM", ButtonStyle.SUCCESS)
+        btn_criar = CWButton("CRIAR VIAGEM", ButtonVariant.SUCCESS, ButtonSize.MD)
         btn_criar.clicked.connect(self._criar_viagem)
         layout.addWidget(btn_criar)
-
-        for lbl in frame.findChildren(QLabel):
-            lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
 
         return frame
 
     # ------------------------------------------------------------------ Lógica
+    def _selecionar_cliente_com_delay(self):
+        """Seleciona cliente pré-selecionado da busca global."""
+        if self._cliente_pre_selecionado:
+            cliente_id, cliente_nome = self._cliente_pre_selecionado
+            self._selecionar_cliente(cliente_id, cliente_nome)
+    
     def _carregar_caminhoes(self):
         self.caminhoes_map = {}
         self.caminhoes_catalogo = []
@@ -397,7 +403,7 @@ class TelaCriarViagem(QWidget):
         tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tabela.verticalHeader().setVisible(False)
-        tabela.setAlternatingRowColors(True)
+        tabela.setAlternatingRowColors(False)
 
         for i, c in enumerate(clientes):
             cid, nome, cnpj, cidade, uf = c
@@ -424,12 +430,17 @@ class TelaCriarViagem(QWidget):
         dlg.exec()
 
     def _selecionar_cliente(self, cliente_id, nome):
+        # Limpar estado anterior
         self.cliente_selecionado_id = cliente_id
         self.cliente_selecionado = nome
+        self.notas_selecionadas.clear()
+        self.notas_ids = {}
+        self.notas_catalogo = {}
+        
         colors = theme_manager.colors
         self.label_cliente.setText(f"Cliente selecionado: {nome} • {len(self.notas_selecionadas)} nota(s)")
         self.label_cliente.setStyleSheet(f"color: {colors['emerald']}; background: transparent;")
-        self.notas_ids = {}
+        
         self._carregar_notas_cliente()
 
     def _carregar_notas_cliente(self):
@@ -442,7 +453,8 @@ class TelaCriarViagem(QWidget):
                 apenas_disponiveis=True,
                 excluir_vinculadas=True,
             )
-            QTimer.singleShot(0, lambda: self._preencher_tabela_notas(notas))
+            # Usar Signal em vez de QTimer.singleShot para thread-safety
+            self._notas_carregadas.emit(notas)
 
         threading.Thread(target=tarefa, daemon=True).start()
 
@@ -470,6 +482,10 @@ class TelaCriarViagem(QWidget):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
                 self.tabela_notas.setItem(row, col, item)
                 self.notas_ids[row] = nota_id
+        
+        self._atualizar_resumo()
+        self._atualizar_lista_selecionadas()
+        self._atualizar_validacao()
 
         self._atualizar_resumo()
         self._atualizar_lista_selecionadas()

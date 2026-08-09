@@ -17,9 +17,8 @@ from PySide6.QtCore import Qt, Signal, QObject
 from PySide6.QtGui import QColor, QBrush, QFont
 
 from services.ranking_service import ranking_service
-from telas.theme_aurora import aurora_theme_manager, AccentColor
+from ui.theme.cw_theme import cw_theme
 from utils.components import KPICard, ModernButton, ButtonStyle
-from utils.components_aurora import AuroraProgressBar
 from utils.helpers import formatar_moeda
 from utils.logger import get_logger
 
@@ -85,8 +84,8 @@ class TelaRankingClientes(QWidget):
     # ------------------------------------------------------------------
 
     def _setup_ui(self):
-        colors = aurora_theme_manager.colors
-        tokens = aurora_theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
@@ -104,10 +103,10 @@ class TelaRankingClientes(QWidget):
         content.setStyleSheet(f"background-color: {colors['bg_primary']};")
         self._content_layout = QVBoxLayout(content)
         self._content_layout.setContentsMargins(
-            tokens.SPACING_2XL, tokens.SPACING_2XL,
-            tokens.SPACING_2XL, tokens.SPACING_2XL,
+            tokens._2XL, tokens._2XL,
+            tokens._2XL, tokens._2XL,
         )
-        self._content_layout.setSpacing(tokens.SPACING_LG)
+        self._content_layout.setSpacing(tokens.LG)
         scroll.setWidget(content)
 
         self._criar_filtros()
@@ -115,28 +114,29 @@ class TelaRankingClientes(QWidget):
         self._criar_tabela()
 
     def _criar_filtros(self):
-        colors = aurora_theme_manager.colors
-        tokens = aurora_theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        radius = cw_theme.radius
 
         frame = QFrame()
         frame.setStyleSheet(f"""
         QFrame {{
             background-color: {colors['card_bg']};
             border: 1px solid {colors['card_border']};
-            border-radius: {tokens.RADIUS_LG}px;
+            border-radius: {radius.LG}px;
         }}
         """)
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(tokens.SPACING_LG, tokens.SPACING_MD, tokens.SPACING_LG, tokens.SPACING_MD)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(tokens.LG, tokens.MD, tokens.LG, tokens.MD)
+        layout.setSpacing(tokens.MD)
 
         # Combo período
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
         self.combo_periodo.setCurrentText(self.tipo_periodo)
         self.combo_periodo.setMinimumHeight(40)
-        self.combo_periodo.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_MD))
+        self.combo_periodo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         layout.addWidget(self.combo_periodo)
 
         # Combo mês
@@ -144,7 +144,7 @@ class TelaRankingClientes(QWidget):
         self.combo_mes.addItems([f"{i:02d}" for i in range(1, 13)])
         self.combo_mes.setCurrentText(self.mes)
         self.combo_mes.setMinimumHeight(40)
-        self.combo_mes.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_MD))
+        self.combo_mes.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         layout.addWidget(self.combo_mes)
 
         # Input ano
@@ -152,13 +152,13 @@ class TelaRankingClientes(QWidget):
         self.entry_ano.setPlaceholderText("Ano")
         self.entry_ano.setMinimumHeight(40)
         self.entry_ano.setMaximumWidth(100)
-        self.entry_ano.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_MD))
+        self.entry_ano.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         layout.addWidget(self.entry_ano)
 
         layout.addStretch()
 
         titulo = QLabel("Ranking de clientes por frete")
-        titulo.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
         titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
         layout.insertWidget(0, titulo)
 
@@ -175,65 +175,66 @@ class TelaRankingClientes(QWidget):
         self._content_layout.addWidget(frame)
 
     def _criar_kpi_cards(self):
-        tokens = aurora_theme_manager.tokens
+        tokens = cw_theme.spacing
 
         cards_widget = QWidget()
         cards_widget.setStyleSheet("background: transparent;")
         grid = QGridLayout(cards_widget)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(tokens.SPACING_MD)
+        grid.setSpacing(tokens.MD)
         for col in range(4):
             grid.setColumnStretch(col, 1)
 
         self.card_clientes = KPICard(
-            "CLIENTES", "0", "Clientes no período", "employees", AccentColor.AURORA
+            "CLIENTES", "0", "Clientes no período", "employees"
         )
         grid.addWidget(self.card_clientes, 0, 0)
 
         self.card_notas = KPICard(
-            "NOTAS", "0", "Total de notas", "package", AccentColor.OCEAN
+            "NOTAS", "0", "Total de notas", "package"
         )
         grid.addWidget(self.card_notas, 0, 1)
 
         self.card_frete = KPICard(
-            "FRETE GERADO", "R$ 0,00", "Frete total do período", "money", AccentColor.FOREST
+            "FRETE GERADO", "R$ 0,00", "Frete total do período", "money"
         )
         grid.addWidget(self.card_frete, 0, 2)
 
         self.card_peso = KPICard(
-            "PESO TOTAL", "0,00 kg", "Peso transportado", "box", AccentColor.EMBER
+            "PESO TOTAL", "0,00 kg", "Peso transportado", "box"
         )
         grid.addWidget(self.card_peso, 0, 3)
 
         self._content_layout.addWidget(cards_widget)
 
     def _criar_tabela(self):
-        colors = aurora_theme_manager.colors
-        tokens = aurora_theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        radius = cw_theme.radius
 
         container = QFrame()
         container.setStyleSheet(f"""
         QFrame {{
             background-color: {colors['card_bg']};
             border: 1px solid {colors['card_border']};
-            border-radius: {tokens.RADIUS_LG}px;
+            border-radius: {radius.LG}px;
         }}
         """)
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(tokens.SPACING_LG, tokens.SPACING_LG, tokens.SPACING_LG, tokens.SPACING_LG)
-        container_layout.setSpacing(tokens.SPACING_MD)
+        container_layout.setContentsMargins(tokens.LG, tokens.LG, tokens.LG, tokens.LG)
+        container_layout.setSpacing(tokens.MD)
 
         # Cabeçalho do container da tabela
         topo = QHBoxLayout()
         self.lbl_titulo_tabela = QLabel("Ranking de Clientes")
-        self.lbl_titulo_tabela.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+        self.lbl_titulo_tabela.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
         self.lbl_titulo_tabela.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
         topo.addWidget(self.lbl_titulo_tabela)
 
         topo.addStretch()
 
         lbl_ordem = QLabel("Mais área útil, mais posições e leitura por impacto")
-        lbl_ordem.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_SM))
+        lbl_ordem.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         lbl_ordem.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
         topo.addWidget(lbl_ordem)
         container_layout.addLayout(topo)
@@ -244,7 +245,7 @@ class TelaRankingClientes(QWidget):
         self.tabela.setHorizontalHeaderLabels(colunas)
         self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
+        self.tabela.setAlternatingRowColors(False)
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.setShowGrid(True)
         self.tabela.setMinimumHeight(640)
@@ -295,7 +296,7 @@ class TelaRankingClientes(QWidget):
         self.tabela.setRowCount(1)
         item = QTableWidgetItem("Carregando…")
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        colors = aurora_theme_manager.colors
+        colors = cw_theme.colors
         item.setForeground(QBrush(QColor(colors["text_tertiary"])))
         self.tabela.setItem(0, 0, item)
         self.tabela.setSpan(0, 0, 1, self.tabela.columnCount())
@@ -339,8 +340,8 @@ class TelaRankingClientes(QWidget):
     # ------------------------------------------------------------------
 
     def _atualizar_tabela(self):
-        colors = aurora_theme_manager.colors
-        tokens = aurora_theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         # Atualiza título da tabela de acordo com o período
         if self.tipo_periodo == "Mês":
@@ -363,9 +364,9 @@ class TelaRankingClientes(QWidget):
             self.tabela.setSpan(0, 0, 1, self.tabela.columnCount())
             return
 
-        fonte_normal = aurora_theme_manager.get_font(tokens.FONT_SIZE_MD)
-        fonte_bold = aurora_theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True)
-        cor_frete = QColor(colors["emerald"])
+        fonte_normal = cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD)
+        fonte_bold = cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True)
+        cor_frete = QColor(colors["success"])
         cor_padrao = QColor(colors["text_primary"])
         maior_frete = max((float(item.get("frete", 0) or 0) for item in self.dados), default=0) or 1
 
@@ -406,14 +407,28 @@ class TelaRankingClientes(QWidget):
             impacto_layout.setSpacing(6)
 
             destaque = QLabel(f"{impacto}% do líder")
-            destaque.setFont(aurora_theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+            destaque.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
             destaque.setStyleSheet(f"color: {colors['brand']}; background: transparent;")
             impacto_layout.addWidget(destaque)
 
-            barra = AuroraProgressBar(AccentColor.AURORA)
+            # Simple progress bar using QFrame
+            from PySide6.QtWidgets import QProgressBar
+            barra = QProgressBar()
             barra.setRange(0, 100)
             barra.setValue(impacto)
             barra.setTextVisible(False)
+            barra.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {colors['bg_tertiary']};
+                    border: none;
+                    border-radius: 4px;
+                    height: 8px;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {colors['brand']};
+                    border-radius: 4px;
+                }}
+            """)
             impacto_layout.addWidget(barra)
 
             self.tabela.setCellWidget(row, 6, impacto_widget)

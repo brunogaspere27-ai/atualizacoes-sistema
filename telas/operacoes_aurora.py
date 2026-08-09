@@ -155,7 +155,7 @@ class OperacoesAurora(QWidget):
 
             input_field = QLineEdit()
             input_field.setPlaceholderText(placeholder)
-            input_field.setFixedHeight(44)
+            input_field.setMinimumHeight(44)
             input_field.setStyleSheet(f"""
             QLineEdit {{
                 background: {c['bg_tertiary']};
@@ -179,7 +179,7 @@ class OperacoesAurora(QWidget):
 
         # Botão salvar
         btn_salvar = AuroraButton("Salvar Operação", ButtonStyle.AURORA, "save")
-        btn_salvar.setFixedHeight(48)
+        btn_salvar.setMinimumHeight(48)
         btn_salvar.clicked.connect(self._salvar_operacao)
         card.add_widget(btn_salvar)
 
@@ -271,7 +271,7 @@ class OperacoesAurora(QWidget):
             "Data", "KM Inicial", "KM Final", "Litros",
             "Valor/L", "Pedágio", "Outros", "Frete"
         ])
-        self.historico_table.setFixedHeight(300)
+        self.historico_table.setMinimumHeight(300)
 
         card.add_widget(self.historico_table)
 

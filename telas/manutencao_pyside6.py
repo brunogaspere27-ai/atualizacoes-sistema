@@ -10,15 +10,15 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
+    QTableWidgetItem, QHeaderView, QComboBox,
     QFrame, QMessageBox, QAbstractItemView, QDialog,
     QScrollArea, QFormLayout, QPlainTextEdit,
 )
 from PySide6.QtCore import Qt, QTimer
 
 from services.frota_service import frota_service
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
 from utils.helpers import formatar_moeda, parse_numero
 from utils.logger import get_logger
 
@@ -72,27 +72,24 @@ class TelaManutencao(QWidget):
         self.combo_mes = QComboBox()
         self.combo_mes.addItems([f"{i:02d}" for i in range(1, 13)])
         self.combo_mes.setCurrentIndex(datetime.now().month - 1)
-        self.combo_mes.setMinimumHeight(40)
+        self.combo_mes.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
         self.combo_mes.setMinimumWidth(80)
         self.combo_mes.currentTextChanged.connect(lambda: self._carregar_manutencoes())
         fr.addWidget(self.combo_mes)
 
-        self.entry_ano = QLineEdit(datetime.now().strftime("%Y"))
-        self.entry_ano.setFixedWidth(80)
-        self.entry_ano.setMinimumHeight(40)
+        self.entry_ano = ModernInput(datetime.now().strftime("%Y"))
+        self.entry_ano.setMinimumWidth(80)
         self.entry_ano.textChanged.connect(lambda: self._debounce_carregar())
         fr.addWidget(self.entry_ano)
 
-        self.entry_busca = QLineEdit()
-        self.entry_busca.setPlaceholderText("Buscar veículo, oficina ou tipo...")
-        self.entry_busca.setMinimumHeight(40)
+        self.entry_busca = ModernInput("Buscar veículo, oficina ou tipo...")
         self.entry_busca.setMinimumWidth(220)
         self.entry_busca.textChanged.connect(lambda: self._debounce_carregar())
         fr.addWidget(self.entry_busca)
 
         fr.addStretch()
 
-        btn_novo = ModernButton("+ Nova Manutenção", ButtonStyle.PRIMARY)
+        btn_novo = ModernButton("Nova Manutenção", ButtonStyle.PRIMARY, icon_name="plus")
         btn_novo.clicked.connect(self._abrir_modal)
         fr.addWidget(btn_novo)
 
@@ -110,7 +107,7 @@ class TelaManutencao(QWidget):
         self._resumo = {}
         for titulo, chave in [("Manutenções", "qtd"), ("Gasto total", "gasto"), ("Pendentes", "pendentes"), ("Pagas", "pagas")]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
             cardl = QVBoxLayout()
             cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
             card.setLayout(cardl)
@@ -131,31 +128,16 @@ class TelaManutencao(QWidget):
         colunas = [
             ("ID", 45), ("Data", 100), ("Veículo", 170), ("KM", 90),
             ("Tipo", 110), ("Oficina", 150), ("Valor", 110),
-            ("Próx. Revisão", 110), ("Status", 90), ("Descrição", 220),
         ]
-        self.tabela = QTableWidget(0, len(colunas))
+        self.tabela = ModernTable()
+        self.tabela.setColumnCount(len(colunas))
         self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
         self.tabela.setMinimumHeight(350)
 
         h = self.tabela.horizontalHeader()
         for i, (_, w) in enumerate(colunas):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
-
-        self.tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['amber_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
 
         self.tabela.cellDoubleClicked.connect(self._editar_manutencao)
         card.add_widget(self.tabela)
@@ -373,7 +355,7 @@ class TelaManutencao(QWidget):
             self._carregar_manutencoes()
             QMessageBox.information(dlg, "Sucesso", "Manutenção salva com sucesso!")
 
-        btn_salvar = ModernButton("Salvar Manutenção", ButtonStyle.SUCCESS)
+        btn_salvar = ModernButton("Salvar Manutenção", ButtonStyle.SUCCESS, icon_name="save")
         btn_salvar.clicked.connect(salvar)
         layout.addWidget(btn_salvar)
 

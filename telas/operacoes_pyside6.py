@@ -21,8 +21,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 
 from services.operacoes_service import operacoes_service
-from telas.theme_aurora import aurora_theme_manager as theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput
 from utils.helpers import formatar_moeda, parse_numero
 
 
@@ -46,8 +46,8 @@ class TelaOperacoes(QWidget):
     # ------------------------------------------------------------------ #
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -60,26 +60,23 @@ class TelaOperacoes(QWidget):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet(f"""
         QScrollArea {{
-            background-color: {colors['bg_primary']};
+            background-color: {c['bg_primary']};
             border: none;
         }}
         """)
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {c['bg_primary']};")
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(
-            tokens.SPACING_2XL, tokens.SPACING_2XL,
-            tokens.SPACING_2XL, tokens.SPACING_2XL
-        )
-        content_layout.setSpacing(tokens.SPACING_XL)
+        content_layout.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        content_layout.setSpacing(t.XL)
         content.setLayout(content_layout)
         scroll.setWidget(content)
 
         # -- Linha central: formulário (esquerda) + resumo (direita) --------
         row_layout = QHBoxLayout()
-        row_layout.setSpacing(tokens.SPACING_LG)
+        row_layout.setSpacing(t.LG)
         row_layout.addWidget(self._build_form(), stretch=2)
         row_layout.addWidget(self._build_resumo(), stretch=1)
         content_layout.addLayout(row_layout)
@@ -91,18 +88,18 @@ class TelaOperacoes(QWidget):
     #  Formulário                                                           #
     # ------------------------------------------------------------------ #
 
-    def _build_form(self) -> ModernCard:
-        tokens = theme_manager.tokens
+    def _build_form(self) -> CWCard:
+        t = cw_theme.spacing
 
-        card = ModernCard(padding=tokens.SPACING_2XL)
+        card = CWCard(padding=t._2XL)
 
         # --- Seção 1: Dados da Transferência ------------------------------
         card.add_widget(self._secao_label("DADOS DA TRANSFERÊNCIA"))
 
         grid1 = QGridLayout()
         grid1.setContentsMargins(0, 0, 0, 0)
-        grid1.setHorizontalSpacing(tokens.SPACING_LG)
-        grid1.setVerticalSpacing(tokens.SPACING_MD)
+        grid1.setHorizontalSpacing(t.LG)
+        grid1.setVerticalSpacing(t.MD)
         grid1.setColumnStretch(0, 1)
         grid1.setColumnStretch(1, 1)
 
@@ -113,92 +110,77 @@ class TelaOperacoes(QWidget):
 
         card.add_layout(grid1)
 
-        # --- Seção 2: Valores da Carga ------------------------------------
-        card.add_widget(self._secao_label("VALORES DA CARGA DE SÃO PAULO"))
+        # --- Seção 2: Valores Financeiros ---------------------------------
+        card.add_spacing(t.XL)
+        card.add_widget(self._secao_label("VALORES FINANCEIROS"))
 
         grid2 = QGridLayout()
         grid2.setContentsMargins(0, 0, 0, 0)
-        grid2.setHorizontalSpacing(tokens.SPACING_LG)
-        grid2.setVerticalSpacing(tokens.SPACING_MD)
+        grid2.setHorizontalSpacing(t.LG)
+        grid2.setVerticalSpacing(t.MD)
         grid2.setColumnStretch(0, 1)
         grid2.setColumnStretch(1, 1)
 
-        grid2.addWidget(self._campo("valor_notas", "Valor total das notas da carga SP"), 0, 0)
-        grid2.addWidget(self._campo("frete_carreta", "Frete pago à carreta"), 0, 1)
-        grid2.addWidget(self._campo("pedagio_carreta", "Pedágio pago à carreta"), 1, 0)
-        grid2.addWidget(self._campo("outros_custos", "Outros custos"), 1, 1)
+        grid2.addWidget(self._campo("valor_frete", "Valor do frete (R$)"), 0, 0)
+        grid2.addWidget(self._campo("valor_combustivel", "Combustível (R$)"), 0, 1)
+        grid2.addWidget(self._campo("valor_pedagio", "Pedágio (R$)"), 1, 0)
+        grid2.addWidget(self._campo("valor_outros", "Outros (R$)"), 1, 1)
 
         card.add_layout(grid2)
 
-        # --- Botões -------------------------------------------------------
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(tokens.SPACING_MD)
+        # --- Botão de ação ------------------------------------------------
+        card.add_spacing(t.XL)
+        self._btn_salvar = CWButton("Salvar Operação", ButtonVariant.PRIMARY, ButtonSize.MD)
+        self._btn_salvar.clicked.connect(self._salvar_operacao)
+        card.add_widget(self._btn_salvar)
 
-        btn_salvar = ModernButton("💾  SALVAR TRANSFERÊNCIA", ButtonStyle.SUCCESS)
-        btn_salvar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        btn_salvar.clicked.connect(self._salvar)
-        btn_row.addWidget(btn_salvar)
-
-        btn_limpar = ModernButton("🧹  LIMPAR", ButtonStyle.SECONDARY)
-        btn_limpar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        btn_limpar.clicked.connect(self._limpar)
-        btn_row.addWidget(btn_limpar)
-
-        card.add_layout(btn_row)
-
-        # Preenche a data actual após criar todos os campos
+        # Preenche a data atual após criar todos os campos
         self.campos["data_operacao"].setText(datetime.now().strftime("%d/%m/%Y"))
 
         return card
 
     def _secao_label(self, texto: str) -> QLabel:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         lbl = QLabel(texto)
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         lbl.setStyleSheet(
-            f"color: {colors['violet']}; background: transparent; "
-            f"letter-spacing: 1px; padding-top: {tokens.SPACING_MD}px;"
+            f"color: {c['primary']}; background: transparent; "
+            f"letter-spacing: 1px; padding-top: {t.MD}px;"
         )
         return lbl
 
     def _campo(self, nome: str, label_texto: str) -> QWidget:
-        """Cria um par label + QLineEdit e o regista em self.campos."""
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        """Cria um par label + CWInput e o registra em self.campos."""
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(tokens.SPACING_XS)
+        vbox.setSpacing(t.XS)
         container.setLayout(vbox)
 
         lbl = QLabel(label_texto)
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         vbox.addWidget(lbl)
 
         entry = QLineEdit()
-        entry.setMinimumHeight(42)
-        entry.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD))
         entry.setStyleSheet(f"""
-        QLineEdit {{
-            background-color: {colors['bg_tertiary']};
-            color: {colors['text_primary']};
-            border: 1.5px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_MD}px;
-            padding: {tokens.SPACING_SM}px {tokens.SPACING_MD}px;
-        }}
-        QLineEdit:hover {{
-            border-color: {colors['border_default']};
-        }}
-        QLineEdit:focus {{
-            border: 1.5px solid {colors['violet']};
-            background-color: {colors['bg_secondary']};
-        }}
+            QLineEdit {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_MD}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {c['border_focus']};
+            }}
         """)
-        entry.textChanged.connect(self._atualizar_resumo)
         vbox.addWidget(entry)
 
         self.campos[nome] = entry
@@ -208,25 +190,25 @@ class TelaOperacoes(QWidget):
     #  Painel de Resumo                                                     #
     # ------------------------------------------------------------------ #
 
-    def _build_resumo(self) -> ModernCard:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+    def _build_resumo(self) -> CWCard:
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = CWCard(padding=t.XL)
 
-        titulo = QLabel("📊  RESUMO")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        titulo = QLabel("RESUMO")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         card.add_widget(titulo)
 
         # Cards de valor (título → cor, chave interna)
         itens = [
-            ("Valor das Notas SP",         "valor_notas",    colors["text_primary"]),
-            ("Frete Pago à Carreta",        "frete_carreta",  colors["rose"]),
-            ("Pedágio Pago",                "pedagio_carreta",colors["amber"]),
-            ("Outros Custos",               "outros_custos",  colors["text_secondary"]),
-            ("Custo Total Transferência",   "custo_total",    colors["error"]),
-            ("Valor Líquido da Carga",      "liquido",        colors["emerald"]),
+            ("Valor das Notas SP",         "valor_notas",    c["text_primary"]),
+            ("Frete Pago à Carreta",        "frete_carreta",  c["primary"]),
+            ("Pedágio Pago",                "pedagio_carreta",c["warning"]),
+            ("Outros Custos",               "outros_custos",  c["text_secondary"]),
+            ("Custo Total Transferência",   "custo_total",    c["error"]),
+            ("Valor Líquido da Carga",      "liquido",        c["success"]),
         ]
 
         for titulo_item, chave, cor in itens:
@@ -234,7 +216,7 @@ class TelaOperacoes(QWidget):
 
         card.add_widget(self._separador())
 
-        btn = ModernButton("🔄  ATUALIZAR CÁLCULO", ButtonStyle.SECONDARY)
+        btn = CWButton("ATUALIZAR CÁLCULO", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn.clicked.connect(self._atualizar_resumo)
         card.add_widget(btn)
 
@@ -242,125 +224,47 @@ class TelaOperacoes(QWidget):
 
     def _mini_card(self, titulo: str, chave: str, cor: str) -> QFrame:
         """Card de linha exibindo um único valor monetário."""
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         frame = QFrame()
-        frame.setObjectName("miniCard")
         frame.setStyleSheet(f"""
-        QFrame#miniCard {{
-            background-color: {colors['bg_secondary']};
-            border: 1px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_MD}px;
-        }}
+            QFrame {{
+                background-color: {c['bg_elevated']};
+                border: 1px solid {c['border_subtle']};
+                border-radius: {r.MD}px;
+                padding: {t.SM}px;
+            }}
         """)
 
-        vbox = QVBoxLayout()
-        vbox.setContentsMargins(
-            tokens.SPACING_MD, tokens.SPACING_SM,
-            tokens.SPACING_MD, tokens.SPACING_SM
-        )
-        vbox.setSpacing(2)
-        frame.setLayout(vbox)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(t.SM, t.SM, t.SM, t.SM)
+        layout.setSpacing(t.SM)
+        frame.setLayout(layout)
 
         lbl_titulo = QLabel(titulo)
-        lbl_titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl_titulo.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-        vbox.addWidget(lbl_titulo)
+        lbl_titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
+        lbl_titulo.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+        layout.addWidget(lbl_titulo)
+
+        layout.addStretch()
 
         lbl_valor = QLabel("R$ 0,00")
-        lbl_valor.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
+        lbl_valor.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         lbl_valor.setStyleSheet(f"color: {cor}; background: transparent;")
-        vbox.addWidget(lbl_valor)
+        layout.addWidget(lbl_valor)
 
         self._resumo_labels[chave] = lbl_valor
         return frame
 
     def _separador(self) -> QFrame:
-        colors = theme_manager.colors
+        c = cw_theme.colors
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setFixedHeight(1)
-        line.setStyleSheet(f"background-color: {colors['border_subtle']}; border: none;")
+        line.setMinimumHeight(1)
+        line.setStyleSheet(f"background-color: {c['border_subtle']}; border: none;")
         return line
-
-    # ------------------------------------------------------------------ #
-    #  Tabela de Histórico                                                  #
-    # ------------------------------------------------------------------ #
-
-    def _build_historico(self) -> ModernCard:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
-
-        card = ModernCard(padding=tokens.SPACING_XL)
-
-        titulo = QLabel("📋  ÚLTIMAS TRANSFERÊNCIAS SP → CASCAVEL")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-        card.add_widget(titulo)
-
-        colunas = [
-            ("ID",         55),
-            ("Data",       100),
-            ("Caminhão",   180),
-            ("Placa",      100),
-            ("Motorista",  150),
-            ("Notas SP",   120),
-            ("Frete",      120),
-            ("Pedágio",    120),
-            ("Outros",     110),
-            ("Custo",      120),
-            ("Líquido",    130),
-        ]
-
-        self.tabela = QTableWidget(0, len(colunas))
-        self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
-        self.tabela.setMinimumHeight(220)
-        self.tabela.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-
-        header = self.tabela.horizontalHeader()
-        for i, (_, largura) in enumerate(colunas):
-            header.resizeSection(i, largura)
-        header.setStretchLastSection(True)
-
-        self.tabela.setStyleSheet(f"""
-        QTableWidget {{
-            background-color: {colors['bg_secondary']};
-            alternate-background-color: {colors['table_row_odd']};
-            gridline-color: {colors['border_subtle']};
-            border: 1px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_MD}px;
-            outline: none;
-            font-size: {tokens.FONT_SIZE_MD}px;
-        }}
-        QTableWidget::item {{
-            padding: 8px 12px;
-            border: none;
-            color: {colors['text_primary']};
-        }}
-        QTableWidget::item:selected {{
-            background-color: {colors['violet_soft']};
-            color: {colors['text_primary']};
-        }}
-        QHeaderView::section {{
-            background-color: {colors['table_header_bg']};
-            color: {colors['table_header_text']};
-            padding: 10px 12px;
-            border: none;
-            border-bottom: 2px solid {colors['border_default']};
-            font-weight: 700;
-            font-size: {tokens.FONT_SIZE_SM}px;
-        }}
-        """)
-
-        card.add_widget(self.tabela)
-        return card
 
     # ------------------------------------------------------------------ #
     #  Lógica de negócio                                                    #

@@ -11,6 +11,7 @@ import customtkinter as ctk
 from services.viagem_service import viagem_service
 from utils.loading_overlay import show_loading
 from services.rascunho_viagem_service import (
+    _caminho_json,
     atualizar_marcacao_nota,
     salvar_rascunho_viagem,
     carregar_rascunho_viagem,

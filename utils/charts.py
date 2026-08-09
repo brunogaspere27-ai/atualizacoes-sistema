@@ -78,7 +78,7 @@ class ChartCard(QFrame):
         for p in self.PERIODS:
             btn = QPushButton(p)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setFixedHeight(26)
+            btn.setMinimumHeight(26)
             btn.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
             self._style_period_btn(btn, p == self._active_period)
             btn.clicked.connect(lambda _, b=btn, period=p: self._set_period(period))

@@ -525,7 +525,7 @@ class Section(QFrame):
 
             # Divisor
             div = QFrame()
-            div.setFixedHeight(1)
+            div.setMinimumHeight(1)
             div.setStyleSheet(f"background: {BORDER};")
             root.addWidget(div)
 
@@ -683,7 +683,7 @@ class DashboardPremium(QWidget):
 
         # Linha divisora abaixo do header
         div = QFrame()
-        div.setFixedHeight(1)
+        div.setMinimumHeight(1)
         div.setStyleSheet(f"background: {BORDER};")
         self._canvas_layout.addWidget(div)
 

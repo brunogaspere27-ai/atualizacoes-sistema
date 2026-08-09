@@ -11,15 +11,15 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
+    QTableWidgetItem, QHeaderView, QComboBox,
     QFrame, QMessageBox, QAbstractItemView, QScrollArea,
     QFileDialog,
 )
 from PySide6.QtCore import Qt, QTimer
 
 from services.auditoria_service import auditoria_service
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -72,7 +72,7 @@ class TelaAuditoria(QWidget):
         self._cards = {}
         for titulo, chave in [("Logins hoje", "logins"), ("Tentativas falhas", "falhas"), ("Alterações hoje", "alteracoes")]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
             cardl = QVBoxLayout()
             cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
             card.setLayout(cardl)
@@ -96,31 +96,25 @@ class TelaAuditoria(QWidget):
         fr.addWidget(self._lbl_filtro("Ação:"))
         self.combo_acao = QComboBox()
         self.combo_acao.addItems(["Todas"])
-        self.combo_acao.setMinimumHeight(38)
+        self.combo_acao.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
         self.combo_acao.setMinimumWidth(160)
         fr.addWidget(self.combo_acao)
 
         fr.addWidget(self._lbl_filtro("Módulo:"))
         self.combo_modulo = QComboBox()
         self.combo_modulo.addItems(["Todos", "auth", "usuarios", "viagens", "financeiro", "sistema"])
-        self.combo_modulo.setMinimumHeight(38)
+        self.combo_modulo.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
         self.combo_modulo.setMinimumWidth(120)
         fr.addWidget(self.combo_modulo)
 
         fr.addWidget(self._lbl_filtro("De:"))
-        self.entry_data_inicio = QLineEdit()
-        self.entry_data_inicio.setPlaceholderText("YYYY-MM-DD")
-        self.entry_data_inicio.setFixedWidth(110)
-        self.entry_data_inicio.setMinimumHeight(38)
-        self._aplicar_estilo_entry(self.entry_data_inicio)
+        self.entry_data_inicio = ModernInput("YYYY-MM-DD")
+        self.entry_data_inicio.setMinimumWidth(110)
         fr.addWidget(self.entry_data_inicio)
 
         fr.addWidget(self._lbl_filtro("Até:"))
-        self.entry_data_fim = QLineEdit()
-        self.entry_data_fim.setPlaceholderText("YYYY-MM-DD")
-        self.entry_data_fim.setFixedWidth(110)
-        self.entry_data_fim.setMinimumHeight(38)
-        self._aplicar_estilo_entry(self.entry_data_fim)
+        self.entry_data_fim = ModernInput("YYYY-MM-DD")
+        self.entry_data_fim.setMinimumWidth(110)
         fr.addWidget(self.entry_data_fim)
 
         fr.addStretch()
@@ -142,29 +136,15 @@ class TelaAuditoria(QWidget):
             ("ID", 50), ("Data/Hora", 150), ("Usuário", 140), ("Ação", 150),
             ("Módulo", 100), ("Registro Afetado", 140), ("Detalhes", 250),
         ]
-        self.tabela = QTableWidget(0, len(colunas))
+        self.tabela = ModernTable()
+        self.tabela.setColumnCount(len(colunas))
         self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
         self.tabela.setMinimumHeight(350)
 
         h = self.tabela.horizontalHeader()
         for i, (_, w) in enumerate(colunas):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
-
-        self.tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['violet_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
 
         card.add_widget(self.tabela)
 

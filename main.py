@@ -19,6 +19,18 @@ from __future__ import annotations
 import sys
 
 
+class App:
+    """Proxy compatível para a janela PySide6, carregado apenas ao instanciar.
+
+    Mantém ``from main import App`` funcional para integrações antigas sem
+    exigir a inicialização das bibliotecas visuais durante importações leves.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        from main_pyside6 import App as PySideApp
+        return PySideApp(*args, **kwargs)
+
+
 def _run_pyside6() -> None:
     """Importa e executa a aplicação PySide6 (importação tardia para não poluir o namespace)."""
     from main_pyside6 import main as _pyside_main

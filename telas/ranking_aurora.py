@@ -130,7 +130,7 @@ class RankingAurora(QWidget):
         self.tabela_ranking.setHorizontalHeaderLabels([
             "Posição", "Cliente", "Viagens", "Receita", "Carga", "Margem"
         ])
-        self.tabela_ranking.setFixedHeight(400)
+        self.tabela_ranking.setMinimumHeight(400)
 
         table_card.add_widget(self.tabela_ranking)
         content_layout.addWidget(table_card)
@@ -155,7 +155,7 @@ class RankingAurora(QWidget):
 
         # Botão exportar
         self.btn_exportar = AuroraButton("Exportar CSV", ButtonStyle.OCEAN, "download")
-        self.btn_exportar.setFixedHeight(44)
+        self.btn_exportar.setMinimumHeight(44)
         self.btn_exportar.clicked.connect(self._exportar_csv)
         hl.addWidget(self.btn_exportar)
 
@@ -177,7 +177,7 @@ class RankingAurora(QWidget):
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Este Mês", "Mês Anterior", "Este Ano"])
         self.combo_periodo.setCurrentText(self.tipo_periodo)
-        self.combo_periodo.setFixedHeight(40)
+        self.combo_periodo.setMinimumHeight(40)
         self.combo_periodo.setStyleSheet(f"""
         QComboBox {{
             background: {c['bg_tertiary']};
@@ -196,7 +196,7 @@ class RankingAurora(QWidget):
 
         # Botão atualizar
         btn_atualizar = AuroraButton("Atualizar", ButtonStyle.AURORA, "refresh")
-        btn_atualizar.setFixedHeight(40)
+        btn_atualizar.setMinimumHeight(40)
         btn_atualizar.clicked.connect(self.carregar_ranking)
         filter_row.addWidget(btn_atualizar)
 

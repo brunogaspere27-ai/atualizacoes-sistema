@@ -6,6 +6,7 @@ Ponto de entrada da aplicação com arquitetura preservada.
 Migração de CustomTkinter para PySide6 mantendo 100% da funcionalidade.
 """
 
+print("[FILE_LOAD] main_pyside6.py started loading", flush=True)
 import os
 import sys
 import shutil
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QPixmap, QIcon, QFont
+from PySide6.QtGui import QPixmap, QIcon, QFont, QKeySequence, QShortcut
 
 try:
     from PIL import Image  # opcional (usado por PyInstaller/legacy)
@@ -41,13 +42,15 @@ from utils.logger import get_logger
 from utils.preparar_distribuicao import preparar_base_para_distribuicao
 from utils.env_check import verificar_configuracao_env
 
-from telas.theme_aurora import aurora_theme_manager, AccentColor
-from utils.icons import get_icon, get_pixmap
-from utils.components_aurora import AuroraSidebar, AuroraTopBar, AuroraButton, ButtonStyle, SeparatorLine
+# Importar novos componentes CW
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWSidebar, CWHeader, CWButton, ButtonVariant, ButtonSize
+from utils.command_palette import command_registry
+from services.search_service import search_service
 
 # Importar telas Aurora
 from telas.login_aurora import LoginAurora
-from telas.dashboard_aurora import DashboardAurora
+from telas.dashboard_cw import DashboardCW
 from telas.operacoes_pyside6 import TelaOperacoes
 from telas.notas_pyside6 import TelaNotas
 from telas.ranking_pyside6 import TelaRankingClientes
@@ -101,10 +104,9 @@ class App(QMainWindow):
         self.config = settings.configuracoes
         _log_step("App.__init__: settings.reload() ok")
 
-        # Configurar tema Aurora
-        self.cores = aurora_theme_manager.colors
-        aurora_theme_manager.apply_to_app(QApplication.instance())
-        _log_step("App.__init__: tema Aurora aplicado")
+        # Configurar tema CW
+        self.cores = cw_theme.colors
+        _log_step("App.__init__: tema CW aplicado")
 
         # Estado da aplicação
         self.ultima_sync_texto = "Ainda não sincronizado"
@@ -173,24 +175,20 @@ class App(QMainWindow):
     def _setup_window(self):
         """Configura a janela principal."""
         self.setWindowTitle("CW TRANSPORTADORA V8 — Sistema de Gestão Logística")
-        self.setMinimumSize(1200, 720)
-        self.resize(1550, 900)
-        
-        # Aplicar stylesheet do tema Aurora
-        self.setStyleSheet(aurora_theme_manager.get_stylesheet())
-        
+        self.setMinimumSize(1400, 800)
+        self.resize(1600, 950)
+
+        # Aplicar stylesheet do tema CW
+        self.setStyleSheet(f"""
+        QMainWindow {{
+            background-color: {cw_theme.colors['bg_primary']};
+        }}
+        """)
+
         # Ícone da aplicação
         logo_path = str(settings.resource_path("assets/logo_cw.jpg"))
         if os.path.exists(logo_path):
             self.setWindowIcon(QIcon(logo_path))
-        
-        # Fundo da área de conteúdo
-        colors = aurora_theme_manager.colors
-        self.setStyleSheet(self.styleSheet() + f"""
-        QMainWindow {{
-            background-color: {colors['bg_primary']};
-        }}
-        """)
     
     def _init_components(self):
         """Inicializa os componentes da UI."""
@@ -198,11 +196,22 @@ class App(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # Layout principal (sidebar + right panel)
+        # Layout principal
         self.main_layout = QHBoxLayout()
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
         self.central_widget.setLayout(self.main_layout)
+
+        # Stacked widget principal para alternar entre login e interface principal
+        self.main_stacked_widget = QStackedWidget()
+        self.main_layout.addWidget(self.main_stacked_widget)
+
+        # Container para interface principal (sidebar + right panel)
+        self.main_interface_container = QWidget()
+        self.main_interface_layout = QHBoxLayout()
+        self.main_interface_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_interface_layout.setSpacing(0)
+        self.main_interface_container.setLayout(self.main_interface_layout)
 
         # Sidebar (será criada após login)
         self.sidebar = None
@@ -210,10 +219,9 @@ class App(QMainWindow):
         # Right panel: topbar + content
         self.right_panel = QWidget()
         self.right_panel.setObjectName("rightPanel")
-        colors = aurora_theme_manager.colors
         self.right_panel.setStyleSheet(f"""
         QWidget#rightPanel {{
-            background-color: {colors['bg_primary']};
+            background-color: {cw_theme.colors['bg_primary']};
         }}
         """)
         self.right_layout = QVBoxLayout()
@@ -229,7 +237,7 @@ class App(QMainWindow):
         self.content_area.setObjectName("contentArea")
         self.content_area.setStyleSheet(f"""
         QWidget#contentArea {{
-            background-color: {colors['bg_primary']};
+            background-color: {cw_theme.colors['bg_primary']};
         }}
         """)
         self.content_layout = QVBoxLayout()
@@ -241,11 +249,14 @@ class App(QMainWindow):
         self.stacked_widget = QStackedWidget()
         self.content_layout.addWidget(self.stacked_widget)
 
-        # Adicionar right panel ao layout principal
-        self.main_layout.addWidget(self.right_panel, 1)
+        # Adicionar right panel ao container da interface principal
+        self.main_interface_layout.addWidget(self.right_panel, 1)
 
         # Tela de login (inicialmente)
         self.login_widget = None
+
+        # Adicionar container da interface principal ao stacked widget (índice 0)
+        self.main_stacked_widget.addWidget(self.main_interface_container)
 
         # Referências para telas
         self.telas = {}
@@ -349,15 +360,7 @@ class App(QMainWindow):
         )
     
     def _show_login(self):
-        """Mostra a tela de login imediatamente."""
-        # Remover content area e topbar do right panel
-        if self.content_area.parent() is self.right_panel:
-            self.right_layout.removeWidget(self.content_area)
-            self.content_area.setParent(None)
-        if self.topbar and self.topbar.parent() is self.right_panel:
-            self.right_layout.removeWidget(self.topbar)
-            self.topbar.setParent(None)
-
+        """Mostra a tela de login imediatamente como overlay fullscreen."""
         # Se já existe login, não duplicar
         if self.login_widget is not None:
             return
@@ -365,7 +368,18 @@ class App(QMainWindow):
         self.login_widget = LoginAurora()
         self.login_widget.login_sucesso.connect(self._on_login_success)
 
-        self.main_layout.addWidget(self.login_widget)
+        # Configurar para ocupar toda a janela
+        from PySide6.QtWidgets import QSizePolicy
+        self.login_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
+        # Adicionar login ao stacked widget principal (índice 1)
+        self.main_stacked_widget.addWidget(self.login_widget)
+
+        # Mostrar login (índice 1, interface principal é índice 0)
+        self.main_stacked_widget.setCurrentIndex(1)
 
         # Fechar splash se ainda estiver visível (compat)
         self._close_splash()
@@ -399,12 +413,6 @@ class App(QMainWindow):
     
     def _on_login_success(self, usuario_dados: Dict[str, Any]):
         """Callback quando login é bem-sucedido."""
-        # Remover tela de login
-        if self.login_widget:
-            self.main_layout.removeWidget(self.login_widget)
-            self.login_widget.deleteLater()
-            self.login_widget = None
-        
         # Verificar se precisa alterar senha
         if usuario_dados.get("deve_alterar_senha"):
             # TODO: Implementar modal de alteração de senha
@@ -424,6 +432,9 @@ class App(QMainWindow):
         self.right_layout.addWidget(self.content_area, 1)
         self.content_area.show()
 
+        # Switch para interface principal (índice 0)
+        self.main_stacked_widget.setCurrentIndex(0)
+
         # Carregar dashboard
         QTimer.singleShot(0, self._load_dashboard)
 
@@ -438,76 +449,77 @@ class App(QMainWindow):
         QTimer.singleShot(1500, self.verificar_atualizacao_inicio)
     
     def _create_sidebar(self):
-        """Cria a sidebar de navegação e TopBar Aurora."""
-        # --- TopBar Aurora ---
-        self.topbar = AuroraTopBar()
+        """Cria a sidebar de navegação CW com novo Design System."""
+        # Garante que a busca esteja pronta mesmo se o login ocorrer antes
+        # da conclusão do bootstrap em segundo plano.
+        command_registry.build_default_commands(self._on_navigation, self)
+        command_registry.set_search_provider(self._global_search_commands)
+
+        # --- Header CW ---
+        self.topbar = CWHeader()
         usuario = auth_service.usuario_atual or {}
-        usuario_id = usuario.get("id")
         nome_usuario = usuario.get("nome_completo", "Usuário")
-        avatar_letter = nome_usuario[0] if nome_usuario else "U"
-        self.topbar.set_user_info(nome_usuario, avatar_letter, usuario_id=usuario_id)
+        self.topbar.set_user(nome_usuario)
         self.topbar.profile_requested.connect(lambda: self._on_navigation("minha_conta"))
         self.topbar.settings_requested.connect(lambda: self._on_navigation("configuracoes"))
-        self.topbar.password_requested.connect(lambda: self._on_navigation("minha_conta"))
-        self.topbar.logout_requested.connect(self.fazer_logout)
+        self.topbar.search_requested.connect(self._open_global_search)
         self.right_layout.addWidget(self.topbar)
 
-        # --- Sidebar Aurora ---
-        self.sidebar = AuroraSidebar()
-        self.sidebar.navigation_requested.connect(self._on_navigation)
+        # --- Sidebar CW ---
+        self.sidebar = CWSidebar()
+        self.sidebar.item_clicked.connect(self._on_navigation)
 
-        # User card
-        nivel = usuario.get("nivel", "operador")
-        nivel_label = "Mestre" if nivel == "mestre" else "Operador"
-        self.sidebar.add_user_card(nome_usuario, nivel_label, avatar_letter, usuario_id=usuario_id)
+        # Menu sections
+        self.sidebar.add_section("Principal", [
+            {'id': 'dashboard', 'label': 'Dashboard', 'icon': 'home'}
+        ])
 
-        # Menu items
-        self.sidebar.add_section("Principal")
-        self.sidebar.add_menu_item("dashboard", "Dashboard", "home", AccentColor.AURORA)
+        self.sidebar.add_section("Operacional", [
+            {'id': 'operacoes', 'label': 'Nova Operação', 'icon': 'operations'},
+            {'id': 'notas', 'label': 'Notas', 'icon': 'notes'},
+            {'id': 'criar_viagem', 'label': 'Criar Viagem', 'icon': 'truck'},
+            {'id': 'historico', 'label': 'Viagens', 'icon': 'trips'},
+            {'id': 'ranking_clientes', 'label': 'Ranking', 'icon': 'ranking'},
+        ])
 
-        self.sidebar.add_section("Operacional")
-        self.sidebar.add_menu_item("operacoes", "Nova Operação", "operations", AccentColor.AURORA)
-        self.sidebar.add_menu_item("notas", "Notas", "notes", AccentColor.AURORA)
-        self.sidebar.add_menu_item("criar_viagem", "Criar Viagem", "truck", AccentColor.OCEAN)
-        self.sidebar.add_menu_item("historico", "Viagens", "trips", AccentColor.OCEAN)
-        self.sidebar.add_menu_item("ranking_clientes", "Ranking", "ranking", AccentColor.EMBER)
+        self.sidebar.add_section("Frota", [
+            {'id': 'combustivel', 'label': 'Combustível', 'icon': 'fuel'},
+            {'id': 'manutencao', 'label': 'Manutenção', 'icon': 'maintenance'},
+        ])
 
-        self.sidebar.add_section("Frota")
-        self.sidebar.add_menu_item("combustivel", "Combustível", "fuel", AccentColor.FOREST)
-        self.sidebar.add_menu_item("manutencao", "Manutenção", "maintenance", AccentColor.EMBER)
+        self.sidebar.add_section("Financeiro", [
+            {'id': 'contas', 'label': 'Contas', 'icon': 'accounts'},
+            {'id': 'relatorios', 'label': 'Relatórios', 'icon': 'reports'},
+        ])
 
-        self.sidebar.add_section("Financeiro")
-        self.sidebar.add_menu_item("contas", "Contas", "accounts", AccentColor.CRIMSON)
-        self.sidebar.add_menu_item("relatorios", "Relatórios", "reports", AccentColor.COSMOS)
+        self.sidebar.add_section("RH", [
+            {'id': 'funcionarios', 'label': 'Funcionários', 'icon': 'employees'},
+        ])
 
-        self.sidebar.add_section("RH")
-        self.sidebar.add_menu_item("funcionarios", "Funcionários", "employees", AccentColor.OCEAN)
-
-        self.sidebar.add_section("Sistema")
-        self.sidebar.add_menu_item("configuracoes", "Configurações", "settings", AccentColor.AURORA)
+        self.sidebar.add_section("Sistema", [
+            {'id': 'configuracoes', 'label': 'Configurações', 'icon': 'settings'},
+        ])
 
         if auth_service.eh_mestre:
-            self.sidebar.add_section("Administração")
-            self.sidebar.add_menu_item("usuarios", "Usuários", "admin", AccentColor.AURORA)
-            self.sidebar.add_menu_item("auditoria", "Auditoria", "audit", AccentColor.EMBER)
-            self.sidebar.add_menu_item("historico_versoes", "Versões", "history", AccentColor.COSMOS)
+            self.sidebar.add_section("Administração", [
+                {'id': 'usuarios', 'label': 'Usuários', 'icon': 'admin'},
+                {'id': 'auditoria', 'label': 'Auditoria', 'icon': 'audit'},
+                {'id': 'historico_versoes', 'label': 'Versões', 'icon': 'history'},
+            ])
 
-        # Bottom: sync + logout
-        separator = SeparatorLine("horizontal")
-        self.sidebar.add_bottom_widget(separator)
-
-        self.btn_sync = AuroraButton("Sincronizar", ButtonStyle.OCEAN, "sync", parent=self.sidebar)
-        self.btn_sync.clicked.connect(lambda: self.sincronizar_nuvem(mostrar_mensagem=True))
-        self.sidebar.add_bottom_widget(self.btn_sync)
-
-        btn_logout = AuroraButton("Sair", ButtonStyle.GHOST, "logout", parent=self.sidebar)
-        btn_logout.clicked.connect(self.fazer_logout)
-        self.sidebar.add_bottom_widget(btn_logout)
+        # Adicionar botões de sync e logout ao bottom do sidebar
+        sync_btn = CWButton("Sincronizar", ButtonVariant.SECONDARY, ButtonSize.MD)
+        sync_btn.clicked.connect(lambda: self.sincronizar_nuvem(mostrar_mensagem=True))
+        self.sidebar.add_bottom_widget(sync_btn)
+        
+        logout_btn = CWButton("Sair", ButtonVariant.GHOST, ButtonSize.MD)
+        logout_btn.clicked.connect(self.fazer_logout)
+        self.sidebar.add_bottom_widget(logout_btn)
 
         # Insert sidebar at the beginning of main_layout
         self.main_layout.insertWidget(0, self.sidebar)
-        self.sidebar.set_active_item("dashboard")
-        self._update_breadcrumb("dashboard")
+        self.sidebar.set_active_item('dashboard')
+        self._update_breadcrumb('dashboard')
     
     def _create_header(self):
         """Deprecated: cada tela agora possui seu próprio cabeçalho."""
@@ -518,6 +530,45 @@ class App(QMainWindow):
         self.sidebar.set_active_item(tela)
         self._load_tela(tela)
         self._update_breadcrumb(tela)
+
+    def _on_navigation_with_cliente(self, tela: str, cliente_data: tuple):
+        """Manipula navegação para tela criar_viagem com cliente pré-selecionado."""
+        self.sidebar.set_active_item(tela)
+        self._load_tela(tela, cliente_data=cliente_data)
+        self._update_breadcrumb(tela)
+
+    def _open_global_search(self, query: str = ""):
+        """Abre a busca global a partir da barra superior ou do atalho Ctrl+K."""
+        command_registry.open(self, query)
+
+    def _global_search_commands(self, query: str):
+        """Converte resultados locais em ações navegáveis da paleta global."""
+        from utils.command_palette import Command
+        try:
+            results = search_service.search(query)
+            commands = []
+            for result in results:
+                # Para clientes, passar dados para pré-seleção na tela criar_viagem
+                if result.categoria == "Clientes" and result.tela == "criar_viagem":
+                    # Usar closure com captura do valor específico
+                    def make_action(cliente_data):
+                        return lambda: self._on_navigation_with_cliente("criar_viagem", cliente_data)
+                    action = make_action(result.cliente_data)
+                else:
+                    action = lambda screen=result.tela: self._on_navigation(screen)
+                
+                commands.append(Command(
+                    id=f"record:{result.categoria}:{result.registro_id}",
+                    label=result.titulo,
+                    description=result.descricao,
+                    icon=result.icon,
+                    category=result.categoria,
+                    action=action,
+                ))
+            return commands
+        except Exception as e:
+            print(f"Erro na busca global: {e}")
+            return []
 
     def _update_breadcrumb(self, tela: str):
         """Atualiza o breadcrumb da TopBar."""
@@ -544,7 +595,7 @@ class App(QMainWindow):
         section, page = section_map.get(tela, ("", tela.replace("_", " ").title()))
         self.topbar.set_breadcrumb(section, page)
 
-    def _load_tela(self, tela: str):
+    def _load_tela(self, tela: str, cliente_data: tuple = None):
         """Carrega uma tela específica (com placeholder polido para telas não migradas)."""
         self.tela_atual = tela
 
@@ -555,7 +606,7 @@ class App(QMainWindow):
             "notas": self._load_notas,
             "ranking_clientes": self._load_ranking_clientes,
             "historico_versoes": self._load_historico_versoes,
-            "criar_viagem": self._load_criar_viagem,
+            "criar_viagem": lambda: self._load_criar_viagem(cliente_data),
             "historico": self._load_historico,
             "combustivel": self._load_combustivel,
             "manutencao": self._load_manutencao,
@@ -579,59 +630,84 @@ class App(QMainWindow):
             titulo, subtitulo, icone = self.titulos_telas.get(
                 tela, (tela.upper(), "Tela em desenvolvimento", "settings")
             )
-            accent_por_tela = {
-                "minha_conta": AccentColor.AURORA,
-                "publicar_versao": AccentColor.FOREST,
-                "admin_atualizacoes": AccentColor.AURORA,
-            }.get(tela, AccentColor.AURORA)
 
-            placeholder = PlaceholderScreen(
-                title=titulo,
-                subtitle=subtitulo,
-                icon_name=icone,
-                accent=accent_por_tela,
-            )
+            # Criar placeholder simples com tema CW
+            placeholder = QWidget()
+            placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
+            pl = QVBoxLayout()
+            pl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
+            pl.setSpacing(cw_theme.spacing.LG)
+            placeholder.setLayout(pl)
+
+            title_label = QLabel(titulo)
+            title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+            title_label.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pl.addWidget(title_label)
+
+            subtitle_label = QLabel(subtitulo)
+            subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+            subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
+            subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            subtitle_label.setWordWrap(True)
+            pl.addWidget(subtitle_label)
+
             self.telas[tela] = placeholder
             self.stacked_widget.addWidget(placeholder)
 
         self.stacked_widget.setCurrentWidget(self.telas[tela])
     
     def _load_dashboard(self):
-        """Carrega o dashboard Aurora."""
+        """Carrega o dashboard com Design System CW."""
         if "dashboard" not in self.telas:
             try:
-                self.telas["dashboard"] = DashboardAurora()
+                self.telas["dashboard"] = DashboardCW()
             except Exception as erro:
-                logger.error(f"Falha ao carregar dashboard Aurora: {erro}")
-                from utils.components_aurora import PlaceholderScreen
-                self.telas["dashboard"] = PlaceholderScreen(
-                    title="PAINEL PRINCIPAL",
-                    subtitle=f"N\u00e3o foi poss\u00edvel carregar o dashboard.\n{erro}",
-                    icon_name="warning",
-                    accent=AccentColor.CRIMSON,
-                )
+                logger.error(f"Falha ao carregar dashboard CW: {erro}")
+                from ui.components import CWCard
+                from PySide6.QtWidgets import QLabel
+                placeholder = CWCard(title="Erro")
+                error_label = QLabel(f"Não foi possível carregar o dashboard.\n{erro}")
+                placeholder.add_widget(error_label)
+                self.telas["dashboard"] = placeholder
             self.stacked_widget.addWidget(self.telas["dashboard"])
 
         self.stacked_widget.setCurrentWidget(self.telas["dashboard"])
         self.tela_atual = "dashboard"
 
-    def _carregar_tela_generica(self, chave: str, classe):
+    def _carregar_tela_generica(self, chave: str, classe, cliente_data: tuple = None):
         """Carrega uma tela PySide6 de forma genérica com tratamento de erro."""
         if chave not in self.telas:
             try:
-                self.telas[chave] = classe()
+                # Passar cliente_data se disponível (para tela criar_viagem)
+                if cliente_data and chave == "criar_viagem":
+                    self.telas[chave] = classe(cliente_pre_selecionado=cliente_data)
+                else:
+                    self.telas[chave] = classe()
             except Exception as erro:
                 logger.error(f"Falha ao carregar tela '{chave}': {erro}")
-                from utils.components_aurora import PlaceholderScreen
-                titulo, subtitulo, icone = self.titulos_telas.get(
-                    chave, (chave.upper(), "Erro ao carregar", "warning")
-                )
-                self.telas[chave] = PlaceholderScreen(
-                    title=titulo,
-                    subtitle=f"Não foi possível carregar esta tela.\n{erro}",
-                    icon_name="warning",
-                    accent=AccentColor.CRIMSON,
-                )
+                # Criar placeholder de erro com tema CW
+                error_placeholder = QWidget()
+                error_placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
+                epl = QVBoxLayout()
+                epl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
+                epl.setSpacing(cw_theme.spacing.LG)
+                error_placeholder.setLayout(epl)
+
+                title_label = QLabel(f"Erro ao carregar {chave}")
+                title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+                title_label.setStyleSheet(f"color: {cw_theme.colors['error']}; background: transparent;")
+                title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                epl.addWidget(title_label)
+
+                subtitle_label = QLabel(f"Não foi possível carregar esta tela.\n{erro}")
+                subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+                subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
+                subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                subtitle_label.setWordWrap(True)
+                epl.addWidget(subtitle_label)
+
+                self.telas[chave] = error_placeholder
             self.stacked_widget.addWidget(self.telas[chave])
         self.stacked_widget.setCurrentWidget(self.telas[chave])
         self.tela_atual = chave
@@ -648,9 +724,9 @@ class App(QMainWindow):
     def _load_historico_versoes(self):
         self._carregar_tela_generica("historico_versoes", TelaHistoricoVersoes)
 
-    def _load_criar_viagem(self):
+    def _load_criar_viagem(self, cliente_data: tuple = None):
         from telas.criar_viagem_pyside6 import TelaCriarViagem
-        self._carregar_tela_generica("criar_viagem", TelaCriarViagem)
+        self._carregar_tela_generica("criar_viagem", TelaCriarViagem, cliente_data=cliente_data)
 
     def _load_historico(self):
         from telas.historico_pyside6 import TelaHistorico
@@ -703,9 +779,9 @@ class App(QMainWindow):
             )
         auth_service.logout()
 
-        # Limpar UI principal
+        # Limpar sidebar e topbar
         if self.sidebar:
-            self.main_layout.removeWidget(self.sidebar)
+            self.main_interface_layout.removeWidget(self.sidebar)
             self.sidebar.deleteLater()
             self.sidebar = None
 
@@ -726,8 +802,8 @@ class App(QMainWindow):
 
         self.btn_sync = None
 
-        # Mostrar login novamente
-        self._show_login()
+        # Switch para tela de login (índice 1)
+        self.main_stacked_widget.setCurrentIndex(1)
     
     def backup_automatico(self):
         """Executa backup automático do banco de dados."""
@@ -939,8 +1015,10 @@ class App(QMainWindow):
     
     def _setup_shortcuts(self):
         """Configura atalhos de teclado."""
-        # TODO: Implementar atalhos com QShortcut
-        pass
+        # A referência é mantida na janela para evitar que o Qt descarte o atalho.
+        self._shortcut_busca_global = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._shortcut_busca_global.activated.connect(self._open_global_search)
+        command_registry.build_default_commands(self._on_navigation, self)
     
     def closeEvent(self, event):
         """Manipula o evento de fechamento da janela."""
@@ -963,38 +1041,69 @@ class App(QMainWindow):
 
 def main():
     """Função principal para iniciar a aplicação."""
+    print("[DEBUG] main(): ENTROU na função")
     _log_step("main(): início")
 
     # Habilitar high-DPI se disponível
+    print("[DEBUG] main(): configurando DPI...")
     try:
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
-    except Exception:
-        pass
+        print("[DEBUG] main(): DPI configurado")
+    except Exception as e:
+        print(f"[DEBUG] DPI config error: {e}")
 
     # Criar aplicação Qt
+    print("[DEBUG] main(): criando QApplication...")
     _log_step("main(): criando QApplication...")
-    app = QApplication(sys.argv)
-    app.setApplicationName("CW Transportadora")
-    app.setOrganizationName("CW Transportadora")
-    _log_step("main(): QApplication pronto")
+    try:
+        app = QApplication(sys.argv)
+        app.setApplicationName("CW Transportadora")
+        app.setOrganizationName("CW Transportadora")
+        _log_step("main(): QApplication pronto")
+        print("[DEBUG] main(): QApplication pronto")
+    except Exception as e:
+        print(f"[ERROR] main(): Erro ao criar QApplication: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
     # Fonte padrão consistente (Segoe UI no Windows, fallback automático)
-    font = QFont("Segoe UI", 10)
-    font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
-    app.setFont(font)
+    print("[DEBUG] main(): configurando fonte...")
+    try:
+        font = QFont("Segoe UI", 10)
+        font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+        app.setFont(font)
+        print("[DEBUG] main(): fonte configurada")
+    except Exception as e:
+        print(f"[ERROR] main(): Erro ao configurar fonte: {e}")
 
     # Ícone global
-    logo_path = str(settings.resource_path("assets/logo_cw.jpg"))
-    if os.path.exists(logo_path):
-        app.setWindowIcon(QIcon(logo_path))
+    print("[DEBUG] main(): configurando ícone...")
+    try:
+        logo_path = str(settings.resource_path("assets/logo_cw.jpg"))
+        if os.path.exists(logo_path):
+            app.setWindowIcon(QIcon(logo_path))
+        print("[DEBUG] main(): ícone configurado")
+    except Exception as e:
+        print(f"[ERROR] main(): Erro ao configurar ícone: {e}")
 
     # Criar e mostrar janela principal
+    print("[DEBUG] main(): instanciando App()...")
     _log_step("main(): instanciando App()...")
-    window = App()
-    _log_step("main(): App() pronto")
+    try:
+        window = App()
+        _log_step("main(): App() pronto")
+        print("[DEBUG] main(): App() pronto")
+        print("[DEBUG] main(): App instance criada com sucesso")
+    except Exception as e:
+        print(f"[ERROR] main(): Erro ao criar App: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
     # Log da tela primária para diagnóstico
+    print("[DEBUG] main(): verificando tela...")
     try:
         screen = app.primaryScreen()
         if screen is not None:
@@ -1003,19 +1112,29 @@ def main():
                 f"main(): tela primária = {geo.width()}x{geo.height()} "
                 f"@ ({geo.x()},{geo.y()}) DPR={screen.devicePixelRatio()}"
             )
+        print("[DEBUG] main(): tela verificada")
     except Exception as exc:
         _log_step(f"main(): falha ao consultar tela: {exc}")
+        print(f"[ERROR] main(): Erro ao consultar tela: {exc}")
 
     # Estratégia bulletproof: abrir maximizada + garantir foco.
     # showMaximized() ocupa a tela inteira — impossível não ver.
     _log_step("main(): chamando showMaximized()")
+    print("[DEBUG] main(): chamando showMaximized()...")
 
     # Forçar StaysOnTop temporário (removido depois de 3s) para
     # vencer a política de foco do Windows 11/25H2 quando lançado via py.exe
-    window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-    window.showMaximized()
-    window.raise_()
-    window.activateWindow()
+    print("[DEBUG] main(): configurando window flags...")
+    try:
+        window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        window.showMaximized()
+        window.raise_()
+        window.activateWindow()
+        print("[DEBUG] main(): window mostrada")
+    except Exception as e:
+        print(f"[ERROR] main(): Erro ao mostrar window: {e}")
+        import traceback
+        traceback.print_exc()
 
     def _remover_stays_on_top():
         try:
@@ -1025,9 +1144,11 @@ def main():
         except Exception as exc:
             _log_step(f"main(): falha ao remover stays-on-top: {exc}")
 
+    print("[DEBUG] main(): agendando timer...")
     QTimer.singleShot(3000, _remover_stays_on_top)
 
     # Log da geometria efetiva após show
+    print("[DEBUG] main(): verificando geometria...")
     try:
         g = window.geometry()
         _log_step(
@@ -1035,14 +1156,65 @@ def main():
             f"visible={window.isVisible()} minimized={window.isMinimized()} "
             f"maximized={window.isMaximized()}"
         )
+        print("[DEBUG] main(): geometria verificada")
     except Exception:
-        pass
+        print("[ERROR] main(): Erro ao verificar geometria")
 
     _log_step("main(): entrando em app.exec()")
 
     # Executar loop de eventos
-    sys.exit(app.exec())
+    print("[DEBUG] main(): chamando app.exec()...")
+    try:
+        sys.exit(app.exec())
+    except Exception as e:
+        print(f"[ERROR] main(): Erro no app.exec(): {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    import traceback
+    
+    print("[START] Iniciando CW Transportadora...", flush=True)
+    print(f"[DEBUG] Python version: {sys.version}", flush=True)
+    print(f"[DEBUG] sys.executable: {sys.executable}", flush=True)
+    print(f"[DEBUG] sys.argv: {sys.argv}", flush=True)
+    
+    try:
+        print("[DEBUG] Starting imports...", flush=True)
+        sys.stdout.flush()
+        
+        print("[DEBUG] Importing config.settings...", flush=True)
+        from config.settings import settings
+        print("[DEBUG] config.settings OK", flush=True)
+        
+        print("[DEBUG] Importing PySide6...", flush=True)
+        from PySide6.QtWidgets import QApplication
+        print("[DEBUG] PySide6 OK", flush=True)
+        
+        print("[DEBUG] Importing services...", flush=True)
+        from services.sync_service import sync_service
+        print("[DEBUG] services OK", flush=True)
+        
+        print("[DEBUG] Importing ui.theme.cw_theme...", flush=True)
+        from ui.theme.cw_theme import cw_theme
+        print("[DEBUG] ui.theme.cw_theme OK", flush=True)
+        
+        print("[DEBUG] Importing ui.components...", flush=True)
+        from ui.components import CWSidebar, CWHeader, CWButton
+        print("[DEBUG] ui.components OK", flush=True)
+        
+        print("[DEBUG] Calling main() directly...", flush=True)
+        sys.stdout.flush()
+        main()
+        print("[DEBUG] main() returned (should not reach here)", flush=True)
+    except SystemExit as e:
+        print(f"[DEBUG] SystemExit caught with code: {e.code}", flush=True)
+        sys.stdout.flush()
+        sys.exit(e.code)
+    except Exception as e:
+        print(f"[ERROR] Erro fatal no __main__: {e}", flush=True)
+        traceback.print_exc()
+        sys.exit(1)

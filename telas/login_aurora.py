@@ -57,14 +57,16 @@ class LoginAurora(QWidget):
         c = aurora_theme_manager.colors
         t = aurora_theme_manager.tokens
 
-        self.setWindowTitle("CW Transportadora — Login")
-        self.resize(1280, 780)
-        self.setMinimumSize(1120, 680)
+        # Configurar size policy para expandir e preencher toda a janela
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
 
-        # Background sólido premium
+        # Background preto fosco corporativo
         self.setStyleSheet(f"""
         QWidget {{
-            background-color: {c['bg_primary']};
+            background-color: #0B0B0D;
         }}
         """)
 
@@ -74,18 +76,11 @@ class LoginAurora(QWidget):
         root.setSpacing(0)
         self.setLayout(root)
 
-        # Container centralizado
-        center_container = QWidget()
-        center_layout = QVBoxLayout(center_container)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(0)
-        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Card de login premium
+        # Card de login premium - centralizado diretamente no layout
         self._login_card = _PremiumLoginCard()
-        center_layout.addWidget(self._login_card, 0, Qt.AlignmentFlag.AlignCenter)
-
-        root.addWidget(center_container, 1)
+        root.addStretch(1)
+        root.addWidget(self._login_card, 0, Qt.AlignmentFlag.AlignCenter)
+        root.addStretch(1)
 
         # ── Conexões ──
         self._login_card.login_requested.connect(self._on_login_clicked)
@@ -138,7 +133,7 @@ class LoginAurora(QWidget):
 
 
 class _PremiumLoginCard(QFrame):
-    """Card de login premium centralizado com design moderno."""
+    """Card de login premium corporativo."""
 
     login_requested = Signal(str, str, bool)
     forgot_password_clicked = Signal()
@@ -149,72 +144,84 @@ class _PremiumLoginCard(QFrame):
         t = aurora_theme_manager.tokens
         self._password_visible = False
 
-        # Card moderno com sombra suave
-        self.setFixedSize(520, 620)
+        # Card flutuante com glassmorphism moderno
         self.setStyleSheet(f"""
         QFrame {{
-            background-color: {c['bg_secondary']};
-            border: 1px solid {c['border_default']};
+            background: {c['bg_glass']};
+            border: 1px solid {c['border_subtle']};
             border-radius: {t.RADIUS_2XL}px;
+        }}
+        QFrame:hover {{
+            border-color: {c['border_default']};
+        }}
+        QLabel {{
+            border: none;
+            background: transparent;
         }}
         """)
 
-        # Adicionar sombra suave
-        shadow = QGraphicsDropShadowEffect()
+        # Sombra suave premium para efeito de flutuação
+        shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(50)
-        shadow.setColor(QColor(0, 0, 0, 0.4))
         shadow.setOffset(0, 12)
+        shadow.setColor(QColor(0, 0, 0, 40))
         self.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(t.SPACING_4XL, t.SPACING_4XL, t.SPACING_4XL, t.SPACING_4XL)
-        layout.setSpacing(t.SPACING_LG)
+        layout.setContentsMargins(48, 48, 48, 48)
+        layout.setSpacing(32)
         self.setLayout(layout)
 
-        # Logo da CW (centralizado)
+        # Logo centralizada - sem tamanho fixo para evitar clipping
         logo_container = QWidget()
         logo_layout = QVBoxLayout(logo_container)
         logo_layout.setContentsMargins(0, 0, 0, 0)
         logo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         logo_lbl = QLabel()
-        logo_pixmap = load_official_logo_pixmap(160, 72)
+        logo_pixmap = load_official_logo_pixmap(180, 81)
         if logo_pixmap is not None:
             logo_lbl.setPixmap(logo_pixmap)
+            logo_lbl.setScaledContents(True)
         logo_lbl.setStyleSheet("background: transparent;")
         logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_layout.addWidget(logo_lbl)
 
         layout.addWidget(logo_container, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # Nome da empresa (centralizado, melhor contraste)
-        company_lbl = QLabel("CW Transportadora")
-        company_lbl.setFont(QFont(t.FONT_FAMILY_QT, t.FONT_SIZE_3XL, QFont.Weight.Bold))
-        company_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+        # Nome da empresa
+        company_lbl = QLabel("CW TRANSPORTADORA")
+        company_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        company_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent; letter-spacing: 2px;")
         company_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(company_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # Subtítulo (melhor contraste e espaçamento)
-        subtitle_lbl = QLabel("Sistema Inteligente de Gestão Logística")
+        # Subtítulo
+        subtitle_lbl = QLabel("Sistema de Gestão Logística")
         subtitle_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD))
-        subtitle_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+        subtitle_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 1px;")
         subtitle_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
-        layout.addSpacing(t.SPACING_2XL)
+        layout.addSpacing(t.SPACING_XL)
 
         # Campo Usuário
         username_lbl = QLabel("Usuário")
         username_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
         username_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        layout.addWidget(username_lbl)
+        username_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(username_lbl, 0, Qt.AlignmentFlag.AlignCenter)
+
+        layout.addSpacing(t.SPACING_SM)
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Digite seu usuário")
-        self.username_input.setFixedHeight(52)
+        self.username_input.setMinimumWidth(380)
+        self.username_input.setMinimumHeight(48)
+        self.username_input.setMaximumWidth(500)
         self.username_input.setStyleSheet(f"""
         QLineEdit {{
-            background-color: {c['bg_primary']};
+            background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
             border: 1px solid {c['border_default']};
             border-radius: {t.RADIUS_LG}px;
@@ -222,36 +229,39 @@ class _PremiumLoginCard(QFrame):
             font-size: {t.FONT_SIZE_MD}px;
         }}
         QLineEdit:hover {{
+            background-color: {c['bg_overlay']};
             border-color: {c['border_strong']};
-            background-color: {c['bg_tertiary']};
         }}
         QLineEdit:focus {{
+            background-color: {c['bg_surface']};
             border: 2px solid {c['aurora']};
-            background-color: {c['bg_tertiary']};
         }}
         """)
-        layout.addWidget(self.username_input)
+        layout.addWidget(self.username_input, 0, Qt.AlignmentFlag.AlignCenter)
 
         layout.addSpacing(t.SPACING_LG)
 
-        # Campo Senha com botão mostrar
+        # Campo Senha
         password_lbl = QLabel("Senha")
         password_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
         password_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        layout.addWidget(password_lbl)
+        password_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(password_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
-        password_container = QWidget()
-        password_layout = QHBoxLayout(password_container)
-        password_layout.setContentsMargins(0, 0, 0, 0)
-        password_layout.setSpacing(t.SPACING_SM)
+        layout.addSpacing(t.SPACING_SM)
+
+        password_input_row = QHBoxLayout()
+        password_input_row.setContentsMargins(0, 0, 0, 0)
+        password_input_row.setSpacing(t.SPACING_SM)
 
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Digite sua senha")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_input.setFixedHeight(52)
+        self.password_input.setMinimumHeight(48)
+        self.password_input.setMaximumWidth(500)
         self.password_input.setStyleSheet(f"""
         QLineEdit {{
-            background-color: {c['bg_primary']};
+            background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
             border: 1px solid {c['border_default']};
             border-radius: {t.RADIUS_LG}px;
@@ -259,131 +269,104 @@ class _PremiumLoginCard(QFrame):
             font-size: {t.FONT_SIZE_MD}px;
         }}
         QLineEdit:hover {{
+            background-color: {c['bg_overlay']};
             border-color: {c['border_strong']};
-            background-color: {c['bg_tertiary']};
         }}
         QLineEdit:focus {{
+            background-color: {c['bg_surface']};
             border: 2px solid {c['aurora']};
-            background-color: {c['bg_tertiary']};
         }}
         """)
-        password_layout.addWidget(self.password_input, 1)
+        password_input_row.addWidget(self.password_input, 1)
 
-        # Botão mostrar senha
+        # Botão mostrar senha minimal
         self.toggle_password_btn = QPushButton()
-        self.toggle_password_btn.setFixedSize(52, 52)
+        self.toggle_password_btn.setFixedSize(48, 48)
         self.toggle_password_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.toggle_password_btn.setIcon(get_icon("eye", QSize(22, 22), c["text_secondary"]))
-        self.toggle_password_btn.setIconSize(QSize(22, 22))
-        self.toggle_password_btn.setStyleSheet(f"""
-        QPushButton {{
-            background: transparent;
+        self.toggle_password_btn.setIcon(get_icon("eye", QSize(20, 20), "#9A9A9A"))
+        self.toggle_password_btn.setIconSize(QSize(20, 20))
+        self.toggle_password_btn.setStyleSheet("""
+        QPushButton {
+            background: #1D1D22;
             border: none;
-            border-radius: {t.RADIUS_MD}px;
-            padding-right: 8px;
-        }}
-        QPushButton:hover {{
-            background: {c['bg_tertiary']};
-        }}
+            border-radius: 12px;
+        }
+        QPushButton:hover {
+            background: #222228;
+        }
         """)
         self.toggle_password_btn.clicked.connect(self._toggle_password_visibility)
-        password_layout.addWidget(self.toggle_password_btn)
+        password_input_row.addWidget(self.toggle_password_btn)
 
-        layout.addWidget(password_container)
+        # Wrapper widget para o password_input_row
+        password_wrapper = QWidget()
+        password_wrapper.setLayout(password_input_row)
+        password_wrapper.setMinimumWidth(380)
+        password_wrapper.setMaximumWidth(500)
 
-        layout.addSpacing(t.SPACING_MD)
+        layout.addWidget(password_wrapper, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # Checkbox "Lembrar de mim"
-        self.remember_checkbox = QCheckBox("Lembrar de mim")
-        self.remember_checkbox.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
-        self.remember_checkbox.setStyleSheet(f"""
-        QCheckBox {{
-            color: {c['text_secondary']};
-            spacing: 8px;
-            background-color: transparent;
-        }}
-        QCheckBox::indicator {{
-            width: 18px;
-            height: 18px;
-            border: 2px solid {c['border_default']};
-            border-radius: 4px;
-            background-color: {c['bg_primary']};
-        }}
-        QCheckBox::indicator:hover {{
-            border-color: {c['aurora']};
-        }}
-        QCheckBox::indicator:checked {{
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {c['aurora_start']}, stop:1 {c['aurora_end']});
-            border-color: {c['aurora']};
-        }}
-        """)
-        layout.addWidget(self.remember_checkbox)
+        layout.addSpacing(28)
 
-        layout.addSpacing(t.SPACING_LG)
-
-        # Botão Entrar moderno
-        self.login_btn = QPushButton("Entrar")
-        self.login_btn.setFixedHeight(56)
+        # Botão Entrar
+        self.login_btn = QPushButton("ENTRAR")
+        self.login_btn.setMinimumWidth(380)
+        self.login_btn.setMinimumHeight(52)
         self.login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.login_btn.setFont(QFont(t.FONT_FAMILY_QT, t.FONT_SIZE_LG, QFont.Weight.Bold))
-        self.login_btn.setStyleSheet(f"""
-        QPushButton {{
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {c['aurora_start']}, stop:1 {c['aurora_end']});
+        self.login_btn.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        self.login_btn.setStyleSheet("""
+        QPushButton {
+            background: #E53935;
             color: #FFFFFF;
             border: none;
-            border-radius: {t.RADIUS_2XL}px;
-            font-weight: 600;
-        }}
-        QPushButton:hover {{
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {c['aurora_hover']}, stop:1 {c['aurora_end']});
-        }}
-        QPushButton:pressed {{
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {c['aurora_active']}, stop:1 {c['aurora']});
-        }}
-        QPushButton:disabled {{
-            background: {c['bg_tertiary']};
-            color: {c['text_disabled']};
-        }}
+            border-radius: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        QPushButton:hover {
+            background: #FF4D4D;
+        }
+        QPushButton:pressed {
+            background: #C62828;
+        }
+        QPushButton:disabled {
+            background: #2C2C31;
+            color: #6A6A6A;
+        }
         """)
+
         self.login_btn.clicked.connect(self._on_login)
-        layout.addWidget(self.login_btn)
+        layout.addWidget(self.login_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Error message
         self.error_lbl = QLabel()
-        self.error_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
-        self.error_lbl.setStyleSheet(f"""
-        QLabel {{
-            color: {c['error']};
-            background: {c['error_soft']};
-            border: 1px solid {c['error']};
-            border-radius: {t.RADIUS_MD}px;
-            padding: 10px 14px;
-        }}
+        self.error_lbl.setFont(QFont("Segoe UI", 13))
+        self.error_lbl.setStyleSheet("""
+        QLabel {
+            color: #FF5252;
+            background: transparent;
+            padding: 8px 0px;
+        }
         """)
         self.error_lbl.setWordWrap(True)
         self.error_lbl.setVisible(False)
-        layout.addWidget(self.error_lbl)
-
-        layout.addStretch()
+        self.error_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.error_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
     def _toggle_password_visibility(self):
         """Alterna visibilidade da senha."""
         self._password_visible = not self._password_visible
         if self._password_visible:
             self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.toggle_password_btn.setIcon(get_icon("eye-off", QSize(20, 20), aurora_theme_manager.colors["text_secondary"]))
+            self.toggle_password_btn.setIcon(get_icon("eye-off", QSize(20, 20), "#9A9A9A"))
         else:
             self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            self.toggle_password_btn.setIcon(get_icon("eye", QSize(20, 20), aurora_theme_manager.colors["text_secondary"]))
+            self.toggle_password_btn.setIcon(get_icon("eye", QSize(20, 20), "#9A9A9A"))
 
     def _on_login(self):
         username = self.username_input.text().strip()
         password = self.password_input.text()
-        remember = self.remember_checkbox.isChecked()
+        remember = False  # Minimal design - no remember option
         if username and password:
             self.login_requested.emit(username, password, remember)
 

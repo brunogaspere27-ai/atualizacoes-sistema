@@ -98,8 +98,34 @@ class ModernButton(QPushButton):
             self.setIcon(get_icon(self._icon_name, QSize(16, 16)))
             self.setIconSize(QSize(16, 16))
 
+        if self._style == ButtonStyle.PRIMARY:
+            self.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {c['aurora_start']}, stop:1 {c['aurora_end']});
+                color: #FFFFFF;
+                border: none;
+                border-radius: {t.RADIUS_LG}px;
+                padding: {py}px {px}px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {c['aurora_hover']}, stop:1 {c['aurora_end']});
+            }}
+            QPushButton:pressed {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {c['aurora_active']}, stop:1 {c['aurora_start']});
+            }}
+            QPushButton:disabled {{
+                background: {c['bg_tertiary']};
+                color: {c['text_disabled']};
+            }}
+            """)
+            return
+
         style_map = {
-            ButtonStyle.PRIMARY: (c["brand"], c["brand_hover"], c["brand_active"], "#FFF", "none"),
             ButtonStyle.SECONDARY: (c["bg_tertiary"], c["bg_overlay"], c["bg_elevated"], c["text_primary"],
                                     f"1px solid {c['border_default']}"),
             ButtonStyle.SUCCESS: (c["success"], "#2EA043", "#258136", "#FFF", "none"),
@@ -111,7 +137,7 @@ class ModernButton(QPushButton):
         self.setStyleSheet(f"""
         QPushButton {{
             background-color: {bg}; color: {fg}; border: {border};
-            border-radius: {t.RADIUS_MD}px; padding: {py}px {px}px;
+            border-radius: {t.RADIUS_LG}px; padding: {py}px {px}px;
             font-weight: 600; letter-spacing: 0.2px;
         }}
         QPushButton:hover {{ background-color: {hover}; }}
@@ -134,11 +160,22 @@ class ModernCard(QFrame):
         self.setObjectName("mCard")
         self.setStyleSheet(f"""
         QFrame#mCard {{
-            background-color: {c['card_bg']}; border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_LG}px;
+            background-color: {c['card_bg']};
+            border: 1px solid {c['card_border']};
+            border-radius: {t.RADIUS_XL}px;
+            border-top: 2px solid {c['aurora']};
         }}
-        QFrame#mCard:hover {{ border-color: {c['border_strong']}; }}
+        QFrame#mCard:hover {{
+            border-color: {c['border_strong']};
+            background-color: {c['card_hover']};
+        }}
         """)
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(24)
+        shadow.setXOffset(0)
+        shadow.setYOffset(4)
+        shadow.setColor(QColor(0, 0, 0, 28))
+        self.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(pad, pad, pad, pad)
@@ -164,6 +201,169 @@ class ModernCard(QFrame):
 
     def add_widget(self, w: QWidget): self.layout().addWidget(w)
     def add_layout(self, l): self.layout().addLayout(l)
+
+
+# ===================================================================== ModernInput
+class ModernInput(QLineEdit):
+    """Input padronizado com estilo consistente em toda a aplicação."""
+
+    def __init__(self, placeholder: str = "", label: str = "", parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._placeholder = placeholder
+        self._label = label
+        self._has_error = False
+        self._apply_style()
+
+    def _apply_style(self):
+        c = theme_manager.colors
+        t = theme_manager.tokens
+        border = c["error"] if self._has_error else c["border_subtle"]
+        focus_border = c["error"] if self._has_error else c["brand"]
+        self.setPlaceholderText(self._placeholder)
+        self.setMinimumHeight(44)
+        self.setFont(theme_manager.get_font(t.FONT_SIZE_MD))
+        self.setStyleSheet(f"""
+        QLineEdit {{
+            background-color: {c['bg_tertiary']};
+            color: {c['text_primary']};
+            border: 1.5px solid {border};
+            border-radius: {t.RADIUS_LG}px;
+            padding: {t.SPACING_SM}px {t.SPACING_MD}px;
+            font-size: {t.FONT_SIZE_MD}px;
+        }}
+        QLineEdit:focus {{
+            border-color: {focus_border};
+            background-color: {c['bg_elevated']};
+        }}
+        QLineEdit:hover {{ border-color: {c['border_default']}; }}
+        QLineEdit:disabled {{
+            background-color: {c['bg_secondary']};
+            color: {c['text_disabled']};
+            border-color: {c['border_subtle']};
+        }}
+        """)
+
+    def set_error(self, has_error: bool):
+        self._has_error = has_error
+        self._apply_style()
+
+
+# ===================================================================== ModernTable
+class ModernTable(QTableWidget):
+    """Tabela com estilo consistente do tema Aurora."""
+
+    def __init__(self, parent=None, columns: int = 0):
+        super().__init__(parent)
+        if columns > 0:
+            self.setColumnCount(columns)
+        c = theme_manager.colors
+        t = theme_manager.tokens
+
+        self.setStyleSheet(f"""
+        QTableWidget {{
+            background-color: {c['bg_secondary']};
+            alternate-background-color: {c['bg_primary']};
+            gridline-color: {c['border_subtle']};
+            border: 1px solid {c['border_subtle']};
+            border-radius: {t.RADIUS_MD}px;
+            font-size: {t.FONT_SIZE_MD}px;
+            selection-background-color: {c['brand']};
+            selection-color: #FFFFFF;
+        }}
+        QTableWidget::item {{
+            padding: 8px 12px;
+            border: none;
+            color: {c['text_primary']};
+        }}
+        QTableWidget::item:selected {{
+            background-color: {c['brand_soft']};
+            color: {c['text_primary']};
+        }}
+        QTableWidget::item:hover {{ background-color: {c['bg_overlay']}; }}
+        QHeaderView::section {{
+            background-color: {c['bg_elevated']};
+            color: {c['text_primary']};
+            padding: 10px 12px;
+            border: none;
+            border-bottom: 2px solid {c['border_default']};
+            font-weight: 700;
+            font-size: {t.FONT_SIZE_SM}px;
+        }}
+        QHeaderView::section:hover {{ background-color: {c['bg_overlay']}; }}
+        QScrollBar:vertical {{
+            background-color: {c['bg_secondary']};
+            width: 10px;
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:vertical {{
+            background-color: {c['border_default']};
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:vertical:hover {{ background-color: {c['text_tertiary']}; }}
+        """)
+
+        self.setAlternatingRowColors(True)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.verticalHeader().setVisible(False)
+
+
+# ===================================================================== ModernComboBox
+class ModernComboBox(QComboBox):
+    """ComboBox padronizado com estilo consistente em toda a aplicação."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        c = theme_manager.colors
+        t = theme_manager.tokens
+
+        self.setMinimumHeight(42)
+        self.setStyleSheet(f"""
+        QComboBox {{
+            background-color: {c['bg_tertiary']};
+            color: {c['text_primary']};
+            border: 1.5px solid {c['border_subtle']};
+            border-radius: {t.RADIUS_MD}px;
+            padding: {t.SPACING_SM}px {t.SPACING_MD}px;
+            font-size: {t.FONT_SIZE_MD}px;
+        }}
+        QComboBox:hover {{ border-color: {c['border_default']}; }}
+        QComboBox:focus {{
+            border-color: {c['brand']};
+            background-color: {c['bg_elevated']};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 30px;
+        }}
+        QComboBox::down-arrow {{
+            image: none;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid {c['text_secondary']};
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {c['bg_elevated']};
+            color: {c['text_primary']};
+            border: 1px solid {c['border_subtle']};
+            border-radius: {t.RADIUS_MD}px;
+            selection-background-color: {c['brand_soft']};
+            selection-color: {c['text_primary']};
+            padding: 4px;
+        }}
+        QComboBox QAbstractItemView::item {{
+            padding: 8px 12px;
+            border-radius: {t.RADIUS_SM}px;
+        }}
+        QComboBox QAbstractItemView::item:hover {{ background-color: {c['bg_overlay']}; }}
+        QComboBox:disabled {{
+            background-color: {c['bg_secondary']};
+            color: {c['text_disabled']};
+            border-color: {c['border_subtle']};
+        }}
+        """)
 
 
 # ===================================================================== ModernSidebar
@@ -203,7 +403,7 @@ class ModernSidebar(QFrame):
 
         # Header: logo oficial (circular como no login)
         self._header = QFrame()
-        self._header.setFixedHeight(72)
+        self._header.setMinimumHeight(72)
         self._header.setStyleSheet(f"""
         QFrame {{ background: transparent; border-bottom: 1px solid {c['sidebar_border']}; }}
         """)
@@ -357,7 +557,7 @@ class ModernSidebar(QFrame):
         accent = theme_manager.get_accent(accent_color)
 
         row = QFrame()
-        row.setFixedHeight(36)
+        row.setMinimumHeight(36)
         row.setStyleSheet("QFrame { background: transparent; border: none; }")
         rl = QHBoxLayout()
         rl.setContentsMargins(0, 0, 0, 0)
@@ -487,7 +687,7 @@ class TopBar(QFrame):
         super().__init__(parent)
         c = theme_manager.colors
         t = theme_manager.tokens
-        self.setFixedHeight(48)
+        self.setMinimumHeight(48)
         self.setStyleSheet(f"""
         QFrame {{
             background-color: {c['bg_secondary']};
@@ -577,7 +777,7 @@ class TopBar(QFrame):
         for text, icon, sig in menu_items:
             btn = QPushButton(f"  {text}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setFixedHeight(36)
+            btn.setMinimumHeight(36)
             btn.setIcon(get_icon(icon, QSize(16, 16), c["text_secondary"]))
             btn.setIconSize(QSize(16, 16))
             btn.setStyleSheet(f"""
@@ -725,7 +925,7 @@ class KPICard(QFrame):
         accent = theme_manager.get_accent(self._accent)
 
         self.setObjectName("kpiCard")
-        self.setFixedHeight(120)
+        self.setMinimumHeight(120)
 
         # Background clean sem gradiente
         self.setStyleSheet(f"""
@@ -821,7 +1021,7 @@ class KPICard(QFrame):
 
         # Sparkline real (pontos conectados)
         sparkline = QFrame()
-        sparkline.setFixedHeight(24)
+        sparkline.setMinimumHeight(24)
         sparkline.setStyleSheet("background: transparent;")
         sparkline_layout = QHBoxLayout(sparkline)
         sparkline_layout.setContentsMargins(0, 0, 0, 0)
@@ -852,114 +1052,7 @@ class KPICard(QFrame):
 
     def set_trend(self, trend: str, positive: Optional[bool] = None):
         """Atualiza o texto de tendência (ex.: '12,5% vs mês anterior')."""
-        # Para manter compatibilidade
         pass
-
-
-# ===================================================================== ModernTable (Premium Style)
-class ModernTable(QFrame):
-    """Tabela moderna estilo produtos comerciais com hover, cabeçalho elegante e paginação."""
-
-    def __init__(self, columns: List[str], parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self._columns = columns
-        self._setup()
-
-    def _setup(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
-
-        self.setObjectName("modernTable")
-        self.setStyleSheet(f"""
-        QFrame#modernTable {{
-            background: {c['card_bg']}; border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_XL}px;
-        }}
-        """)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        self.setLayout(layout)
-
-        # Tabela
-        self._table = QTableWidget()
-        self._table.setColumnCount(len(self._columns))
-        self._table.setHorizontalHeaderLabels(self._columns)
-        self._table.setAlternatingRowColors(True)
-        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._table.verticalHeader().setVisible(False)
-        self._table.setSortingEnabled(True)
-        self._table.setStyleSheet(f"""
-        QTableWidget {{
-            background-color: {c['bg_secondary']};
-            alternate-background-color: {c['table_row_odd']};
-            gridline-color: {c['border_subtle']};
-            border: none;
-            border-radius: {t.RADIUS_XL}px;
-            selection-background-color: {c['brand_soft']};
-            selection-color: {c['text_primary']};
-            outline: none;
-            font-size: {t.FONT_SIZE_MD}px;
-            color: {c['text_primary']};
-        }}
-        QTableWidget::item {{
-            padding: 12px 16px;
-            border-bottom: 1px solid {c['border_subtle']};
-        }}
-        QTableWidget::item:hover {{
-            background-color: {c['table_row_hover']};
-        }}
-        QHeaderView::section {{
-            background-color: {c['table_header_bg']};
-            color: {c['table_header_text']};
-            padding: 14px 16px;
-            border: none;
-            border-bottom: 2px solid {c['border_default']};
-            border-right: 1px solid {c['border_subtle']};
-            font-weight: 700;
-            font-size: {t.FONT_SIZE_SM}px;
-            letter-spacing: 0.5px;
-        }}
-        QHeaderView::section:first {{
-            border-top-left-radius: {t.RADIUS_XL}px;
-        }}
-        QHeaderView::section:last {{
-            border-right: none;
-            border-top-right-radius: {t.RADIUS_XL}px;
-        }}
-        """)
-
-        # Header styling
-        hdr = self._table.horizontalHeader()
-        hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        hdr.setStretchLastSection(False)
-        hdr.setFixedHeight(48)
-
-        layout.addWidget(self._table)
-
-    def add_row(self, data: List[str]):
-        """Adiciona uma linha à tabela."""
-        row = self._table.rowCount()
-        self._table.insertRow(row)
-
-        for col, value in enumerate(data):
-            item = QTableWidgetItem(str(value))
-            item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self._table.setItem(row, col, item)
-
-    def clear_rows(self):
-        """Limpa todas as linhas."""
-        self._table.setRowCount(0)
-
-    def set_data(self, data: List[List[str]]):
-        """Define todos os dados da tabela."""
-        self.clear_rows()
-        for row_data in data:
-            self.add_row(row_data)
 
 
 # ===================================================================== Badge (Premium Style)
@@ -1092,7 +1185,7 @@ class ProgressBar(QFrame):
         t = theme_manager.tokens
         bar_color = self._color or c["brand"]
 
-        self.setFixedHeight(8)
+        self.setMinimumHeight(8)
         self.setStyleSheet(f"""
         QFrame {{
             background-color: {c['bg_tertiary']};
@@ -1222,13 +1315,13 @@ class SeparatorLine(QFrame):
         c = theme_manager.colors
         b = c["border_subtle"]
         if orientation == "horizontal":
-            self.setFixedHeight(1)
+            self.setMinimumHeight(1)
             self.setStyleSheet(f"""
             QFrame {{ background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
                 stop:0 transparent, stop:0.15 {b}, stop:0.85 {b}, stop:1 transparent); border: none; }}
             """)
         else:
-            self.setFixedWidth(1)
+            self.setMinimumWidth(1)
             self.setStyleSheet(f"""
             QFrame {{ background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
                 stop:0 transparent, stop:0.15 {b}, stop:0.85 {b}, stop:1 transparent); border: none; }}

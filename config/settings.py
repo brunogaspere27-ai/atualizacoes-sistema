@@ -198,6 +198,7 @@ class Settings:
             "REVISAO_OBRIGATORIA": os.getenv("REVISAO_OBRIGATORIA", "10000"),
             "PASTA_RELATORIOS": os.getenv("PASTA_RELATORIOS", "relatorios_gerados"),
             "INTERVALO_SYNC_SEGUNDOS": os.getenv("INTERVALO_SYNC_SEGUNDOS", "60"),
+            "SYNC_TIMEOUT_SEGUNDOS": os.getenv("SYNC_TIMEOUT_SEGUNDOS", "10"),
             "DIAGNOSTICO_PERFORMANCE": os.getenv("DIAGNOSTICO_PERFORMANCE", "").strip(),
             "CW_DIAGNOSTICO_PERFORMANCE": os.getenv("CW_DIAGNOSTICO_PERFORMANCE", "").strip(),
         }
@@ -294,6 +295,13 @@ class Settings:
     @property
     def intervalo_sync_ms(self) -> int:
         return self.intervalo_sync_segundos * 1000
+
+    @property
+    def sync_timeout_seconds(self) -> int:
+        try:
+            return max(3, min(60, int(self._env_vars["SYNC_TIMEOUT_SEGUNDOS"])))
+        except (ValueError, TypeError):
+            return 10
 
     @property
     def diagnostico_performance(self) -> bool:

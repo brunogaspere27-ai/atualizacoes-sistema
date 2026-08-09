@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from services.update_service import update_service
-from telas.theme_pyside6 import theme_manager
+from ui.theme.cw_theme import cw_theme
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -136,7 +136,7 @@ class TelaHistoricoVersoes(QWidget):
         btn_row.setSpacing(tokens.SPACING_MD)
 
         self._btn_verificar = QPushButton("Verificar Atualizações")
-        self._btn_verificar.setFixedHeight(40)
+        self._btn_verificar.setMinimumHeight(40)
         self._btn_verificar.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_verificar.setStyleSheet(f"""
         QPushButton {{

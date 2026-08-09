@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QPainter, QColor, QFont
 
 from services.notas_service import notas_service
-from telas.theme_aurora import aurora_theme_manager as theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ButtonSize, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWCard, CWTable, CWBadge, CWButton, ButtonVariant, ButtonSize
 from utils.helpers import formatar_moeda, formatar_peso
 from utils.logger import get_logger
 
@@ -47,85 +47,75 @@ class ManifestoCard(QFrame):
         self._setup_ui()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
-        self.setFixedHeight(100)
+        self.setMinimumHeight(100)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # Base style moderno
+        # Base style limpo e moderno - CW Design System
         self.setStyleSheet(f"""
         QFrame {{
-            background-color: {colors['bg_surface']};
-            border: 1px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_XL}px;
+            background-color: {c['bg_elevated']};
+            border: 1px solid {c['border_subtle']};
+            border-radius: {r.LG}px;
         }}
         QFrame:hover {{
-            border-color: {colors['border_default']};
-            background-color: {colors['card_hover']};
+            border-color: {c['border_default']};
+            background-color: {c['bg_tertiary']};
         }}
         QFrame[selected="true"] {{
-            border-color: {colors['aurora']};
-            background-color: {colors['aurora_soft']};
+            border-color: {c['border_default']};
+            background-color: {c['bg_tertiary']};
         }}
         """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_LG, tokens.SPACING_LG, tokens.SPACING_LG, tokens.SPACING_LG)
-        layout.setSpacing(tokens.SPACING_SM)
+        layout.setContentsMargins(t.LG, t.LG, t.LG, t.LG)
+        layout.setSpacing(t.SM)
         self.setLayout(layout)
 
         # Header: nome + status
         header = QHBoxLayout()
-        header.setSpacing(tokens.SPACING_SM)
+        header.setSpacing(t.SM)
 
         # Nome do manifesto
         nome = self._manifesto_data.get('nome_arquivo', 'Manifesto')
         nome_label = QLabel(nome)
-        nome_label.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
-        nome_label.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        nome_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
+        nome_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         nome_label.setWordWrap(True)
         header.addWidget(nome_label, 1)
 
-        # Status badge elegante
+        # Status badge elegante - usando CWBadge
         status = self._manifesto_data.get('status', 'Importado')
-        status_colors = {
-            'Importado': (colors['success'], colors['success_soft']),
-            'Em uso': (colors['warning'], colors['warning_soft']),
-            'Concluído': (colors['info'], colors['info_soft']),
-        }
-        status_bg, status_fg = status_colors.get(status, (colors['text_secondary'], colors['bg_tertiary']))
+        status_variant = {
+            'Importado': BadgeVariant.SUCCESS,
+            'Em uso': BadgeVariant.WARNING,
+            'Concluído': BadgeVariant.INFO,
+        }.get(status, BadgeVariant.DEFAULT)
 
-        status_badge = QLabel(status)
-        status_badge.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
-        status_badge.setStyleSheet(f"""
-        QLabel {{
-            background-color: {status_bg}20;
-            color: {status_bg};
-            border: 1px solid {status_bg}40;
-            border-radius: {tokens.RADIUS_SM}px;
-            padding: 4px 10px;
-        }}
-        """)
+        status_badge = CWBadge(status, status_variant)
         header.addWidget(status_badge)
 
         layout.addLayout(header)
 
         # Info row: quantidade de notas + data
         info_row = QHBoxLayout()
-        info_row.setSpacing(tokens.SPACING_MD)
+        info_row.setSpacing(t.MD)
 
         notas_count = self._manifesto_data.get('total_notas', 0)
         notas_label = QLabel(f"{notas_count} nota(s)")
-        notas_label.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        notas_label.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        notas_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        notas_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         info_row.addWidget(notas_label)
 
         data = self._manifesto_data.get('data_importacao', '')
         if data:
             data_label = QLabel(f"• {data}")
-            data_label.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-            data_label.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+            data_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+            data_label.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
             info_row.addWidget(data_label)
 
         info_row.addStretch()
@@ -133,18 +123,18 @@ class ManifestoCard(QFrame):
 
         # Footer: peso + frete resumidos
         footer = QHBoxLayout()
-        footer.setSpacing(tokens.SPACING_MD)
+        footer.setSpacing(t.MD)
 
         peso = self._manifesto_data.get('peso_total', 0)
-        peso_label = QLabel(f"⚖ {formatar_peso(peso)}")
-        peso_label.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        peso_label.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        peso_label = QLabel(formatar_peso(peso))
+        peso_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        peso_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         footer.addWidget(peso_label)
 
         frete = self._manifesto_data.get('frete_total', 0)
-        frete_label = QLabel(f"💰 {formatar_moeda(frete)}")
-        frete_label.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        frete_label.setStyleSheet(f"color: {colors['success']}; background: transparent;")
+        frete_label = QLabel(formatar_moeda(frete))
+        frete_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        frete_label.setStyleSheet(f"color: {c['success']}; background: transparent;")
         footer.addWidget(frete_label)
 
         footer.addStretch()
@@ -155,29 +145,29 @@ class ManifestoCard(QFrame):
         super().mousePressEvent(event)
 
     def set_selected(self, selected: bool):
-        """Define estado selecionado com destaque vermelho."""
+        """Define estado selecionado com destaque neutro."""
         self._selected = selected
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        r = cw_theme.radius
 
         if selected:
             self.setStyleSheet(f"""
             QFrame {{
-                background-color: {colors['error_soft']};
-                border: 2px solid {colors['error']};
-                border-radius: {tokens.RADIUS_LG}px;
+                background-color: {c['bg_tertiary']};
+                border: 2px solid {c['border_default']};
+                border-radius: {r.LG}px;
             }}
             """)
         else:
             self.setStyleSheet(f"""
             QFrame {{
-                background-color: {colors['card_bg']};
-                border: 1px solid {colors['card_border']};
-                border-radius: {tokens.RADIUS_LG}px;
+                background-color: {c['bg_elevated']};
+                border: 1px solid {c['border_subtle']};
+                border-radius: {r.LG}px;
             }}
             QFrame:hover {{
-                border-color: {colors['border_strong']};
-                background-color: {colors['card_hover']};
+                border-color: {c['border_default']};
+                background-color: {c['bg_tertiary']};
             }}
             """)
 
@@ -241,23 +231,20 @@ class TelaNotas(QWidget):
     # ------------------------------------------------------------------
 
     def _setup_ui(self) -> None:
-        colors  = theme_manager.colors
-        tokens  = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
-        self.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        self.setStyleSheet(f"background-color: {c['bg_primary']};")
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(
-            tokens.SPACING_2XL, tokens.SPACING_2XL,
-            tokens.SPACING_2XL, tokens.SPACING_2XL,
-        )
-        root.setSpacing(tokens.SPACING_LG)
+        root.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        root.setSpacing(t.LG)
 
         # ── Resumo / totais ─────────────────────────────────────────
         self._lbl_resumo = QLabel("Selecione um manifesto para visualizar as notas.")
-        self._lbl_resumo.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
+        self._lbl_resumo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
         self._lbl_resumo.setStyleSheet(
-            f"color: {colors['text_secondary']}; background-color: transparent;"
+            f"color: {c['text_secondary']}; background-color: transparent;"
         )
         self._lbl_resumo.setWordWrap(True)
         root.addWidget(self._lbl_resumo)
@@ -267,7 +254,7 @@ class TelaNotas(QWidget):
         splitter.setHandleWidth(6)
         splitter.setStyleSheet(f"""
         QSplitter::handle {{
-            background-color: {colors['border_subtle']};
+            background-color: {c['border_subtle']};
         }}
         """)
 
@@ -282,8 +269,8 @@ class TelaNotas(QWidget):
     # ── Painel esquerdo – Manifestos (Cards CRM style) ─────────────────────
 
     def _criar_painel_manifestos(self) -> QWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         container = QWidget()
         container.setMinimumWidth(320)
@@ -292,25 +279,25 @@ class TelaNotas(QWidget):
 
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setSpacing(t.MD)
 
         # Header com título
         header = QHBoxLayout()
-        header.setSpacing(tokens.SPACING_SM)
+        header.setSpacing(t.SM)
 
         title = QLabel("Manifestos")
-        title.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        title.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        title.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        title.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         header.addWidget(title)
 
         header.addStretch()
 
-        # Botões de ação
-        self._btn_importar = ModernButton("＋ Importar", ButtonStyle.SUCCESS, size=ButtonSize.SM)
+        # Botões de ação - usando CWButton
+        self._btn_importar = CWButton("Importar", ButtonVariant.SUCCESS, ButtonSize.SM)
         self._btn_importar.clicked.connect(self._importar_manifesto)
         header.addWidget(self._btn_importar)
 
-        self._btn_apagar = ModernButton("Apagar", ButtonStyle.DANGER, size=ButtonSize.SM)
+        self._btn_apagar = CWButton("Apagar", ButtonVariant.DANGER, ButtonSize.SM)
         self._btn_apagar.clicked.connect(self._apagar_manifesto)
         header.addWidget(self._btn_apagar)
 
@@ -324,8 +311,8 @@ class TelaNotas(QWidget):
         scroll.setStyleSheet(f"""
         QScrollArea {{ background: transparent; border: none; }}
         QScrollBar:vertical {{ background: transparent; width: 6px; margin: 4px 1px; }}
-        QScrollBar::handle:vertical {{ background: {colors['border_default']}; border-radius: 3px; min-height: 30px; }}
-        QScrollBar::handle:vertical:hover {{ background: {colors['border_strong']}; }}
+        QScrollBar::handle:vertical {{ background: {c['border_default']}; border-radius: 3px; min-height: 30px; }}
+        QScrollBar::handle:vertical:hover {{ background: {c['border_strong']}; }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
         QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ height: 0px; }}
         """)
@@ -335,7 +322,7 @@ class TelaNotas(QWidget):
         self._cards_container.setStyleSheet("background: transparent;")
         self._cards_layout = QVBoxLayout()
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
-        self._cards_layout.setSpacing(tokens.SPACING_MD)
+        self._cards_layout.setSpacing(t.MD)
         self._cards_container.setLayout(self._cards_layout)
 
         scroll.setWidget(self._cards_container)
@@ -346,62 +333,25 @@ class TelaNotas(QWidget):
     # ── Painel direito – Notas ───────────────────────────────────────────
 
     def _criar_painel_notas(self) -> QWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
-        card = ModernCard("📄 Notas do Manifesto Selecionado", parent=self)
+        card = CWCard(title="Notas do Manifesto Selecionado", parent=self)
 
-        # Tabela de notas
-        self._tabela_notas = QTableWidget(0, len(_COLUNAS_NOTAS))
-        self._tabela_notas.setHorizontalHeaderLabels(_COLUNAS_NOTAS)
-        self._tabela_notas.setAlternatingRowColors(True)
-        self._tabela_notas.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._tabela_notas.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._tabela_notas.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._tabela_notas.verticalHeader().setVisible(False)
+        # Tabela de notas - usando CWTable
+        self._tabela_notas = CWTable(_COLUNAS_NOTAS)
         self._tabela_notas.setSortingEnabled(True)
         self._tabela_notas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
+        # Ajustar larguras das colunas para reduzir truncamento
         hdr = self._tabela_notas.horizontalHeader()
-        # CT-e: stretch; demais: ajuste ao conteúdo ou dimensão mínima fixa
         hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         hdr.setStretchLastSection(False)
-        # Larguras iniciais
-        larguras = [160, 220, 220, 130, 130, 110, 110, 110]
-        for col, w in enumerate(larguras):
-            self._tabela_notas.setColumnWidth(col, w)
-
-        self._tabela_notas.setStyleSheet(f"""
-        QTableWidget {{
-            background-color: {colors['bg_secondary']};
-            alternate-background-color: {colors['table_row_odd']};
-            gridline-color: {colors['border_subtle']};
-            border: 1px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_LG}px;
-            selection-background-color: {colors['table_row_selected']};
-            selection-color: {colors['text_primary']};
-            outline: none;
-            font-size: {tokens.FONT_SIZE_MD}px;
-            color: {colors['text_primary']};
-        }}
-        QTableWidget::item {{
-            padding: 8px 12px;
-            border-bottom: 1px solid {colors['border_subtle']};
-        }}
-        QTableWidget::item:hover {{
-            background-color: {colors['table_row_hover']};
-        }}
-        QHeaderView::section {{
-            background-color: {colors['table_header_bg']};
-            color: {colors['table_header_text']};
-            padding: 10px 12px;
-            border: none;
-            border-bottom: 2px solid {colors['border_default']};
-            border-right: 1px solid {colors['border_subtle']};
-            font-weight: 700;
-            font-size: {tokens.FONT_SIZE_SM}px;
-        }}
-        """)
+        # Larguras iniciais otimizadas
+        col_widths = [140, 250, 220, 120, 120, 100, 100, 100]
+        for i, width in enumerate(col_widths):
+            if i < len(_COLUNAS_NOTAS):
+                self._tabela_notas.setColumnWidth(i, width)
 
         card.add_widget(self._tabela_notas)
         return card
@@ -489,7 +439,7 @@ class TelaNotas(QWidget):
         total_frete = 0.0
         total_peso  = 0.0
 
-        colors = theme_manager.colors
+        c = cw_theme.colors
 
         for linha in dados:
             (
@@ -535,10 +485,10 @@ class TelaNotas(QWidget):
             # Status com cor
             status_item = _item(status or "-", Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
             cor_status = {
-                "Disponível": colors.get("success", "#22C55E"),
-                "Em viagem":  colors.get("warning", "#F59E0B"),
-                "Entregue":   colors.get("info",    "#3B82F6"),
-            }.get(status, colors.get("text_tertiary", "#94A3B8"))
+                "Disponível": c.get("success", "#22C55E"),
+                "Em viagem":  c.get("warning", "#F59E0B"),
+                "Entregue":   c.get("info",    "#3B82F6"),
+            }.get(status, c.get("text_tertiary", "#6F7883"))
             status_item.setForeground(
                 __import__("PySide6.QtGui", fromlist=["QColor"]).QColor(cor_status)
             )
@@ -594,7 +544,7 @@ class TelaNotas(QWidget):
 
     def _ao_importar_concluido(self, resultado: dict) -> None:
         self._btn_importar.setEnabled(True)
-        self._btn_importar.setText("＋ Importar Manifesto")
+        self._btn_importar.setText("Importar")
 
         QMessageBox.information(
             self,
@@ -610,7 +560,7 @@ class TelaNotas(QWidget):
 
     def _ao_importar_erro(self, mensagem: str) -> None:
         self._btn_importar.setEnabled(True)
-        self._btn_importar.setText("＋ Importar Manifesto")
+        self._btn_importar.setText("Importar")
 
         QMessageBox.critical(self, "Erro ao Importar Manifesto", mensagem)
 

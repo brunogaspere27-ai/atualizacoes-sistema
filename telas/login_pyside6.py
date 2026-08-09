@@ -30,7 +30,7 @@ from services.auth_service import (
     CredenciaisInvalidasError,
 )
 from services.auditoria_service import auditoria_service, ACAO_LOGIN, ACAO_LOGIN_FALHOU
-from telas.theme_pyside6 import theme_manager
+from ui.theme.cw_theme import cw_theme
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -88,17 +88,18 @@ class TelaLogin(QWidget):
 
     # ---------------------------------------------------------------- Setup
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         # Fundo do widget inteiro com gradiente suave
         self.setObjectName("loginPage")
         self.setStyleSheet(f"""
         QWidget#loginPage {{
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {colors['bg_primary']},
-                stop:0.5 {colors['bg_secondary']},
-                stop:1 {colors['bg_primary']});
+                stop:0 {c['bg_primary']},
+                stop:0.5 {c['bg_secondary']},
+                stop:1 {c['bg_primary']});
         }}
         """)
 
@@ -124,25 +125,26 @@ class TelaLogin(QWidget):
         root.addLayout(outer)
 
     def _build_card(self) -> QFrame:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         card = QFrame()
         card.setObjectName("loginCard")
-        card.setFixedWidth(420)
+        card.setMinimumWidth(420)
         card.setStyleSheet(f"""
         QFrame#loginCard {{
-            background-color: {colors['bg_elevated']};
-            border: 1px solid {colors['border_subtle']};
-            border-radius: {tokens.RADIUS_LG}px;
+            background-color: {c['bg_elevated']};
+            border: 1px solid {c['border_subtle']};
+            border-radius: {r.LG}px;
         }}
         """)
 
         # Sombra sutil
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(tokens.SHADOW_LG_BLUR)
+        shadow.setBlurRadius(20)
         shadow.setXOffset(0)
-        shadow.setYOffset(tokens.SHADOW_LG_Y)
+        shadow.setYOffset(4)
         shadow.setColor(QColor(0, 0, 0, 120))
         card.setGraphicsEffect(shadow)
 
@@ -158,7 +160,7 @@ class TelaLogin(QWidget):
         logo_circle.setFixedSize(64, 64)
         logo_circle.setStyleSheet(f"""
         QFrame {{
-            background: {colors['brand']};
+            background: {c['primary']};
             border-radius: 32px;
         }}
         """)
@@ -176,7 +178,7 @@ class TelaLogin(QWidget):
             logo_label.setText("CW")
             logo_label.setStyleSheet(f"""
             QLabel {{
-                background: {colors['brand']};
+                background: {c['primary']};
                 color: white;
                 border-radius: 32px;
                 font-size: 20px;
@@ -193,8 +195,8 @@ class TelaLogin(QWidget):
         titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titulo.setStyleSheet(f"""
         QLabel {{
-            color: {colors['text_primary']};
-            font-size: {tokens.FONT_SIZE_3XL}px;
+            color: {c['text_primary']};
+            font-size: {cw_theme.typography.FONT_SIZE_3XL}px;
             font-weight: 700;
             background: transparent;
             padding-top: 4px;
@@ -206,8 +208,8 @@ class TelaLogin(QWidget):
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitulo.setStyleSheet(f"""
         QLabel {{
-            color: {colors['text_tertiary']};
-            font-size: {tokens.FONT_SIZE_SM}px;
+            color: {c['text_tertiary']};
+            font-size: {cw_theme.typography.FONT_SIZE_SM}px;
             background: transparent;
             letter-spacing: 1.5px;
             padding-bottom: 8px;
@@ -220,12 +222,12 @@ class TelaLogin(QWidget):
         self.label_erro.setWordWrap(True)
         self.label_erro.setStyleSheet(f"""
         QLabel {{
-            background-color: {colors['error_soft']};
-            color: {colors['error']};
-            border: 1px solid {colors['error']};
-            border-radius: {tokens.RADIUS_MD}px;
+            background-color: {c['error_soft']};
+            color: {c['error']};
+            border: 1px solid {c['error']};
+            border-radius: {r.MD}px;
             padding: 10px 14px;
-            font-size: {tokens.FONT_SIZE_MD}px;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px;
         }}
         """)
         self.label_erro.hide()
@@ -244,21 +246,21 @@ class TelaLogin(QWidget):
         self.check_lembrar = QCheckBox("Manter-me conectado")
         self.check_lembrar.setStyleSheet(f"""
         QCheckBox {{
-            color: {colors['text_secondary']};
+            color: {c['text_secondary']};
             background: transparent;
-            font-size: {tokens.FONT_SIZE_MD}px;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px;
             padding: 4px 2px;
         }}
         QCheckBox::indicator {{
             width: 18px;
             height: 18px;
-            border-radius: {tokens.RADIUS_XS}px;
-            border: 1.5px solid {colors['border_default']};
-            background-color: {colors['bg_tertiary']};
+            border-radius: {r.XS}px;
+            border: 1.5px solid {c['border_default']};
+            background-color: {c['bg_tertiary']};
         }}
         QCheckBox::indicator:checked {{
-            background-color: {colors['brand']};
-            border-color: {colors['brand']};
+            background-color: {c['primary']};
+            border-color: {c['primary']};
         }}
         """)
         layout.addWidget(self.check_lembrar)

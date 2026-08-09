@@ -1,6 +1,7 @@
 """
 Tela Relatórios Gerenciais - CW Transportadora - PySide6
 Central de relatórios com abas: Resumo, Clientes, Viagens, Custos, Contas.
+Design System CW - Dark Mode Premium
 """
 
 from __future__ import annotations
@@ -20,8 +21,8 @@ from PySide6.QtCore import Qt, QTimer
 
 from services.relatorios_service import relatorios_service
 from config.settings import settings
-from telas.theme_aurora import aurora_theme_manager as theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWTable
 from utils.helpers import formatar_moeda, formatar_peso
 from utils.logger import get_logger
 
@@ -40,8 +41,9 @@ class TelaRelatorios(QWidget):
         self._carregar_relatorio()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -51,27 +53,58 @@ class TelaRelatorios(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background-color: {c['bg_primary']}; border: none; }}
+            QScrollBar:vertical {{ background: transparent; width: 8px; margin: 4px 2px; }}
+            QScrollBar::handle:vertical {{ background: {c['border_subtle']}; border-radius: 4px; min-height: 40px; }}
+            QScrollBar::handle:vertical:hover {{ background: {c['border_default']}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; height: 0px; }}
+        """)
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {c['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        cl.setSpacing(t.XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
         # Filtros
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        filtros = CWCard("Filtros", padding=t.LG)
         fr = QHBoxLayout()
-        fr.setSpacing(tokens.SPACING_MD)
+        fr.setSpacing(t.MD)
 
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
         self.combo_periodo.setCurrentText(self.tipo_periodo)
         self.combo_periodo.setMinimumHeight(40)
         self.combo_periodo.setMinimumWidth(110)
+        self.combo_periodo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: {t.SM}px {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QComboBox:hover {{ border-color: {c['border_strong']}; }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {c['text_secondary']};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                selection-background-color: {c['primary_soft']};
+                selection-color: {c['primary']};
+            }}
+        """)
         self.combo_periodo.currentTextChanged.connect(lambda: self._carregar_relatorio())
         fr.addWidget(self.combo_periodo)
 
@@ -80,62 +113,81 @@ class TelaRelatorios(QWidget):
         self.combo_mes.setCurrentText(self.mes)
         self.combo_mes.setMinimumHeight(40)
         self.combo_mes.setMinimumWidth(80)
+        self.combo_mes.setStyleSheet(self.combo_periodo.styleSheet())
         self.combo_mes.currentTextChanged.connect(lambda: self._carregar_relatorio())
         fr.addWidget(self.combo_mes)
 
         self.entry_ano = QLineEdit(self.ano)
         self.entry_ano.setFixedWidth(80)
         self.entry_ano.setMinimumHeight(40)
+        self.entry_ano.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_ano.textChanged.connect(lambda: self._carregar_relatorio())
         fr.addWidget(self.entry_ano)
 
-        btn_atualizar = ModernButton("Atualizar", ButtonStyle.SECONDARY)
+        btn_atualizar = CWButton("Atualizar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_atualizar.clicked.connect(self._carregar_relatorio)
         fr.addWidget(btn_atualizar)
 
         fr.addStretch()
 
-        btn_pdf = ModernButton("📄 Gerar PDF", ButtonStyle.PRIMARY)
+        btn_pdf = CWButton("Gerar PDF", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_pdf.clicked.connect(self._gerar_pdf)
         fr.addWidget(btn_pdf)
 
         filtros.add_layout(fr)
         cl.addWidget(filtros)
 
-        # Cards resumo
-        resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
-        rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_MD)
-        resumo_frame.setLayout(rl)
+        # Cards resumo - KPI style
+        resumo_layout = QHBoxLayout()
+        resumo_layout.setSpacing(t.MD)
 
         self._cards = {}
         nomes = ["Receitas", "Despesas", "Lucro", "Valor Notas", "Frete Notas", "Frete Viagens", "A Receber", "A Pagar"]
         for nome in nomes:
-            card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
-            cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_SM, tokens.SPACING_SM, tokens.SPACING_SM, tokens.SPACING_SM)
-            card.setLayout(cardl)
-            t = QLabel(nome)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            cardl.addWidget(t)
-            v = QLabel("R$ 0,00")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-            v.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-            cardl.addWidget(v)
-            self._cards[nome] = v
-            rl.addWidget(card)
-        cl.addWidget(resumo_frame)
+            kpi_card = QFrame()
+            kpi_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['bg_elevated']};
+                    border: 1px solid {c['border_subtle']};
+                    border-radius: {r.LG}px;
+                }}
+            """)
+            kpi_layout = QVBoxLayout()
+            kpi_layout.setContentsMargins(t.MD, t.SM, t.MD, t.SM)
+            kpi_layout.setSpacing(t.XS)
+            kpi_card.setLayout(kpi_layout)
+
+            t_label = QLabel(nome)
+            t_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+            t_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+            kpi_layout.addWidget(t_label)
+
+            v_label = QLabel("R$ 0,00")
+            v_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+            v_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+            kpi_layout.addWidget(v_label)
+
+            self._cards[nome] = v_label
+            resumo_layout.addWidget(kpi_card)
+
+        cl.addLayout(resumo_layout)
 
         # Abas
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ border: 1px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_LG}px; background: {colors['bg_secondary']}; }}
-            QTabBar::tab {{ background: {colors['bg_tertiary']}; color: {colors['text_secondary']}; padding: 10px 20px; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-right: 2px; font-weight: 600; }}
-            QTabBar::tab:selected {{ background: {colors['bg_secondary']}; color: {colors['text_primary']}; }}
+            QTabWidget::pane {{ border: 1px solid {c['border_subtle']}; border-radius: {r.LG}px; background: {c['bg_secondary']}; }}
+            QTabBar::tab {{ background: {c['bg_tertiary']}; color: {c['text_secondary']}; padding: 10px 20px; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-right: 2px; font-weight: 600; }}
+            QTabBar::tab:selected {{ background: {c['bg_secondary']}; color: {c['text_primary']}; }}
         """)
 
         self.tabela_resumo = self._criar_tabela_abas(["Indicador", "Valor"], [360, 200])
@@ -152,32 +204,14 @@ class TelaRelatorios(QWidget):
 
         cl.addWidget(self.tabs)
 
-    def _criar_tabela_abas(self, colunas: list, larguras: list) -> QTableWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
-        tabela = QTableWidget(0, len(colunas))
-        tabela.setHorizontalHeaderLabels(colunas)
-        tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        tabela.setAlternatingRowColors(True)
-        tabela.verticalHeader().setVisible(False)
+    def _criar_tabela_abas(self, colunas: list, larguras: list) -> CWTable:
+        tabela = CWTable(colunas)
         tabela.setMinimumHeight(350)
 
         h = tabela.horizontalHeader()
         for i, w in enumerate(larguras):
-            tabela.setColumnWidth(i, w)
+            h.resizeSection(i, w)
         h.setStretchLastSection(True)
-
-        tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: none;
-                font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['violet_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
         return tabela
 
     def _wrap_table(self, tabela: QTableWidget) -> QWidget:

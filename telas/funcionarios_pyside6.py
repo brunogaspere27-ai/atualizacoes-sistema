@@ -1,6 +1,7 @@
 """
 Tela Funcionários - CW Transportadora - PySide6
 Cadastro, folha de pagamento e controle de horas extras.
+Design System CW - Dark Mode Premium
 """
 
 from __future__ import annotations
@@ -10,15 +11,15 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
+    QTableWidgetItem, QHeaderView, QComboBox,
     QFrame, QMessageBox, QAbstractItemView, QDialog,
     QScrollArea, QFormLayout, QStackedWidget,
 )
 from PySide6.QtCore import Qt, QTimer
 
 from services.funcionarios_service import funcionarios_service
-from telas.theme_aurora import aurora_theme_manager as theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
 from utils.helpers import formatar_moeda, parse_numero
 from utils.logger import get_logger
 
@@ -33,8 +34,8 @@ class TelaFuncionarios(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -42,7 +43,7 @@ class TelaFuncionarios(QWidget):
         self.setLayout(root)
 
         self.stack = QStackedWidget()
-        self.stack.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        self.stack.setStyleSheet(f"background-color: {c['bg_primary']};")
         root.addWidget(self.stack)
 
         # Página 0: Funcionários
@@ -53,36 +54,47 @@ class TelaFuncionarios(QWidget):
         self.stack.setCurrentIndex(0)
 
     def _build_pagina_funcionarios(self) -> QWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         w = QWidget()
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        cl.setSpacing(t.XL)
         w.setLayout(cl)
 
         # Botões
         botoes = QHBoxLayout()
         botoes.addStretch()
-        btn_folha = ModernButton("Ver Folha do Mês", ButtonStyle.SUCCESS)
+        btn_folha = CWButton("Ver Folha do Mês", ButtonVariant.SUCCESS, ButtonSize.MD)
         btn_folha.clicked.connect(lambda: self.stack.setCurrentIndex(1))
         botoes.addWidget(btn_folha)
-        btn_novo = ModernButton("+ Criar Funcionário", ButtonStyle.PRIMARY)
+        btn_novo = CWButton("+ Criar Funcionário", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_novo.clicked.connect(lambda: self._abrir_modal_funcionario())
         botoes.addWidget(btn_novo)
         cl.addLayout(botoes)
 
         # Busca
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        filtros = CWCard("Busca", padding=t.LG)
         fr = QHBoxLayout()
         self.entry_busca = QLineEdit()
         self.entry_busca.setPlaceholderText("Buscar funcionário...")
         self.entry_busca.setMinimumHeight(40)
         self.entry_busca.setMinimumWidth(300)
+        self.entry_busca.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_busca.textChanged.connect(lambda: self._carregar_funcionarios())
         fr.addWidget(self.entry_busca)
-        btn_atualizar = ModernButton("Atualizar", ButtonStyle.SECONDARY)
+        btn_atualizar = CWButton("Atualizar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_atualizar.clicked.connect(self._carregar_funcionarios)
         fr.addWidget(btn_atualizar)
         fr.addStretch()
@@ -90,34 +102,28 @@ class TelaFuncionarios(QWidget):
         cl.addWidget(filtros)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = CWCard("Funcionários", padding=t.XL)
         colunas = [
-            ("ID", 50), ("Funcionário", 230), ("Cargo", 160), ("Telefone", 130),
-            ("Admissão", 110), ("Salário", 120), ("Vale Refeição", 120), ("Status", 90),
+            "ID", "Funcionário", "Cargo", "Telefone",
+            "Admissão", "Salário", "Vale Refeição", "Status"
         ]
-        self.tabela = QTableWidget(0, len(colunas))
-        self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
+        widths = [50, 230, 160, 130, 110, 120, 120, 90]
+        self.tabela = CWTable(colunas)
         self.tabela.setMinimumHeight(350)
 
         h = self.tabela.horizontalHeader()
-        for i, (_, w_val) in enumerate(colunas):
+        for i, w_val in enumerate(widths):
             h.resizeSection(i, w_val)
         h.setStretchLastSection(True)
-
-        self.tabela.setStyleSheet(self._tabela_style())
         self.tabela.cellDoubleClicked.connect(lambda: self._editar_selecionado())
         card.add_widget(self.tabela)
 
         br = QHBoxLayout()
         br.addStretch()
-        btn_editar = ModernButton("Editar Cadastro", ButtonStyle.PRIMARY)
+        btn_editar = CWButton("Editar Cadastro", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_editar.clicked.connect(self._editar_selecionado)
         br.addWidget(btn_editar)
-        btn_excluir = ModernButton("Excluir", ButtonStyle.DANGER)
+        btn_excluir = CWButton("Excluir", ButtonVariant.DANGER, ButtonSize.MD)
         btn_excluir.clicked.connect(self._excluir_funcionario)
         br.addWidget(btn_excluir)
         card.add_layout(br)
@@ -127,58 +133,104 @@ class TelaFuncionarios(QWidget):
         return w
 
     def _build_pagina_folha(self) -> QWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         w = QWidget()
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        cl.setSpacing(t.XL)
         w.setLayout(cl)
 
         # Topo com voltar
         topo = QHBoxLayout()
-        btn_voltar = ModernButton("← Voltar", ButtonStyle.SECONDARY)
+        btn_voltar = CWButton("Voltar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_voltar.clicked.connect(lambda: self.stack.setCurrentIndex(0))
         topo.addWidget(btn_voltar)
         titulo = QLabel("Folha do Mês")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         topo.addWidget(titulo)
         topo.addStretch()
         cl.addLayout(topo)
 
         # Filtros
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        filtros = CWCard("Filtros", padding=t.LG)
         fr = QHBoxLayout()
-        fr.setSpacing(tokens.SPACING_MD)
+        fr.setSpacing(t.MD)
 
         self.combo_mes = QComboBox()
         self.combo_mes.addItems([f"{i:02d}" for i in range(1, 13)])
         self.combo_mes.setCurrentIndex(datetime.now().month - 1)
         self.combo_mes.setMinimumHeight(40)
         self.combo_mes.setMinimumWidth(80)
+        self.combo_mes.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: {t.SM}px {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QComboBox:hover {{ border-color: {c['border_strong']}; }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {c['text_secondary']};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                selection-background-color: {c['primary_soft']};
+                selection-color: {c['primary']};
+            }}
+        """)
         self.combo_mes.currentTextChanged.connect(lambda: self._carregar_folha_mes())
         fr.addWidget(self.combo_mes)
 
         self.entry_ano = QLineEdit(datetime.now().strftime("%Y"))
-        self.entry_ano.setFixedWidth(80)
+        self.entry_ano.setMinimumWidth(80)
         self.entry_ano.setMinimumHeight(40)
+        self.entry_ano.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_ano.textChanged.connect(lambda: self._carregar_folha_mes())
         fr.addWidget(self.entry_ano)
 
         self.entry_busca_folha = QLineEdit()
         self.entry_busca_folha.setPlaceholderText("Buscar na folha...")
-        self.entry_busca_folha.setMinimumHeight(40)
         self.entry_busca_folha.setMinimumWidth(220)
+        self.entry_busca_folha.setMinimumHeight(40)
+        self.entry_busca_folha.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {cw_theme.radius.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_busca_folha.textChanged.connect(lambda: self._carregar_folha_mes())
         fr.addWidget(self.entry_busca_folha)
 
-        btn_gerar = ModernButton("Gerar / Atualizar Folha", ButtonStyle.SUCCESS)
+        btn_gerar = CWButton("Gerar / Atualizar Folha", ButtonVariant.SUCCESS, ButtonSize.MD)
         btn_gerar.clicked.connect(self._gerar_folha_todos)
         fr.addWidget(btn_gerar)
 
-        btn_atualizar = ModernButton("Atualizar", ButtonStyle.SECONDARY)
+        btn_atualizar = CWButton("Atualizar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_atualizar.clicked.connect(self._carregar_folha_mes)
         fr.addWidget(btn_atualizar)
 
@@ -186,63 +238,64 @@ class TelaFuncionarios(QWidget):
         filtros.add_layout(fr)
         cl.addWidget(filtros)
 
-        # Resumo
-        resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
-        rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_LG)
-        resumo_frame.setLayout(rl)
+        # Resumo - KPI style
+        resumo_layout = QHBoxLayout()
+        resumo_layout.setSpacing(t.LG)
 
         self._resumo = {}
         for titulo, chave in [("Funcionários", "func"), ("Horas extras", "horas"), ("Total hora extra", "valor_hora"), ("Total folha", "total")]:
-            card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
-            cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
-            card.setLayout(cardl)
-            t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            cardl.addWidget(t)
-            v = QLabel("0")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
-            v.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-            cardl.addWidget(v)
-            self._resumo[chave] = v
-            rl.addWidget(card)
-        cl.addWidget(resumo_frame)
+            kpi_card = QFrame()
+            kpi_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['bg_elevated']};
+                    border: 1px solid {c['border_subtle']};
+                    border-radius: {cw_theme.radius.LG}px;
+                }}
+            """)
+            kpi_layout = QVBoxLayout()
+            kpi_layout.setContentsMargins(t.LG, t.MD, t.LG, t.MD)
+            kpi_layout.setSpacing(t.XS)
+            kpi_card.setLayout(kpi_layout)
+
+            t_label = QLabel(titulo)
+            t_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+            t_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+            kpi_layout.addWidget(t_label)
+
+            v_label = QLabel("0")
+            v_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+            v_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+            kpi_layout.addWidget(v_label)
+
+            self._resumo[chave] = v_label
+            resumo_layout.addWidget(kpi_card)
+
+        cl.addLayout(resumo_layout)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = CWCard("Folha de Pagamento", padding=t.XL)
         colunas = [
-            ("ID", 50), ("Funcionário", 210), ("Cargo", 150), ("Salário", 110),
-            ("Vale", 100), ("Horas", 80), ("Valor Hora", 100), ("Total H.Extra", 120),
-            ("Outros", 100), ("Total", 120), ("Status", 80),
+            "ID", "Funcionário", "Cargo", "Salário",
+            "Vale", "Horas", "Valor Hora", "Total H.Extra",
         ]
-        self.tabela_folha = QTableWidget(0, len(colunas))
-        self.tabela_folha.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela_folha.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela_folha.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela_folha.setAlternatingRowColors(True)
-        self.tabela_folha.verticalHeader().setVisible(False)
+        widths = [50, 210, 150, 110, 100, 80, 100, 120]
+        self.tabela_folha = CWTable(colunas)
         self.tabela_folha.setMinimumHeight(350)
 
         h = self.tabela_folha.horizontalHeader()
-        for i, (_, w_val) in enumerate(colunas):
+        for i, w_val in enumerate(widths):
             h.resizeSection(i, w_val)
         h.setStretchLastSection(True)
 
-        self.tabela_folha.setStyleSheet(self._tabela_style())
         self.tabela_folha.cellDoubleClicked.connect(lambda: self._abrir_modal_hora_extra())
         card.add_widget(self.tabela_folha)
 
         br = QHBoxLayout()
         br.addStretch()
-        btn_hora = ModernButton("Lançar Hora Extra", ButtonStyle.PRIMARY)
+        btn_hora = CWButton("Lançar Hora Extra", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_hora.clicked.connect(self._abrir_modal_hora_extra)
         br.addWidget(btn_hora)
-        btn_remover = ModernButton("Remover da Folha", ButtonStyle.DANGER)
+        btn_remover = CWButton("Remover da Folha", ButtonVariant.DANGER, ButtonSize.MD)
         btn_remover.clicked.connect(self._remover_da_folha)
         br.addWidget(btn_remover)
         card.add_layout(br)
@@ -250,20 +303,6 @@ class TelaFuncionarios(QWidget):
 
         self._carregar_folha_mes()
         return w
-
-    def _tabela_style(self) -> str:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
-        return f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['sky_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """
 
     def _carregar_funcionarios(self):
         self.tabela.setRowCount(0)

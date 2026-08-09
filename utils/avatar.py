@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QLabel, QWidget
 from PySide6.QtCore import Qt, QSize, Signal, QObject
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QFont
 
-from telas.theme_aurora import aurora_theme_manager as theme_manager
+from ui.theme.cw_theme import cw_theme
 from services.perfil_service import perfil_service
 
 
@@ -64,7 +64,7 @@ def fazer_pixmap_iniciais(nome: str, tamanho: int) -> QPixmap:
 
     # Texto das iniciais
     font_size = max(8, tamanho // 3)
-    font = QFont(theme_manager.tokens.FONT_FAMILY_QT, font_size)
+    font = QFont(cw_theme.typography.FONT_FAMILY_QT, font_size)
     font.setBold(True)
     painter.setFont(font)
     painter.setPen(QColor("#FFFFFF"))
@@ -91,7 +91,7 @@ class AvatarWidget(QLabel):
 
         self.setFixedSize(tamanho, tamanho)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        c = theme_manager.colors
+        c = cw_theme.colors
         self.setStyleSheet(f"""
         QLabel {{
             background: transparent;

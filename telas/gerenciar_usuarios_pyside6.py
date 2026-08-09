@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
+    QTableWidgetItem, QHeaderView, QComboBox,
     QFrame, QMessageBox, QAbstractItemView, QDialog,
     QScrollArea, QFormLayout, QCheckBox, QGridLayout,
 )
@@ -23,8 +23,8 @@ from services.auditoria_service import (
     ACAO_PERMISSAO_ALTERADA, ACAO_SENHA_REDEFINIDA,
     ACAO_NIVEL_ALTERADO,
 )
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -83,29 +83,15 @@ class TelaGerenciarUsuarios(QWidget):
             ("ID", 50), ("Nome Completo", 220), ("Usuário", 130), ("Nível", 110),
             ("Status", 90), ("Último Login", 150), ("Criado em", 150),
         ]
-        self.tabela = QTableWidget(0, len(colunas))
+        self.tabela = ModernTable()
+        self.tabela.setColumnCount(len(colunas))
         self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
-        self.tabela.setMinimumHeight(400)
+        self.tabela.setMinimumHeight(350)
 
         h = self.tabela.horizontalHeader()
         for i, (_, w) in enumerate(colunas):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
-
-        self.tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['violet_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
 
         self.tabela.cellDoubleClicked.connect(self._editar_selecionado)
         card.add_widget(self.tabela)

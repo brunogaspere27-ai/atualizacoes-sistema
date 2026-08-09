@@ -268,7 +268,7 @@ class _SaaSLoginPanel(QFrame):
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Digite seu usuário")
-        self.username_input.setFixedHeight(48)
+        self.username_input.setMinimumHeight(48)
         card_layout.addWidget(self.username_input)
 
         card_layout.addSpacing(t.SPACING_MD)
@@ -282,7 +282,7 @@ class _SaaSLoginPanel(QFrame):
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Digite sua senha")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_input.setFixedHeight(48)
+        self.password_input.setMinimumHeight(48)
         card_layout.addWidget(self.password_input)
 
         # Lembrar senha
@@ -314,7 +314,7 @@ class _SaaSLoginPanel(QFrame):
 
         # Login button
         self.login_btn = QPushButton("Entrar")
-        self.login_btn.setFixedHeight(52)
+        self.login_btn.setMinimumHeight(52)
         self.login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.login_btn.setFont(QFont(t.FONT_FAMILY_QT, t.FONT_SIZE_LG, QFont.Weight.Bold))
         self.login_btn.setProperty("class", "primary")

@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import requests
 
 from config.settings import settings
-from services.github_release_service import GitHubChannel
+from services.github_release_service import GitHubChannel, github_release_service
 from utils.logger import get_logger
 from utils.retry import retry
 
@@ -137,30 +137,58 @@ class GitHubUpdateService:
         except Exception:
             return 0
     
-    @retry(max_attempts=3, delay=2, exceptions=(requests.RequestException,))
+    @retry(max_attempts=2, delay=2, exceptions=(requests.RequestException,))
     def _fetch_release_json(self) -> Optional[Dict[str, Any]]:
-        """Busca o arquivo release.json via URL raw do GitHub."""
+        """
+        Busca o arquivo release.json via URL raw do GitHub.
+        
+        Tratamento robusto de erros:
+        - 404: Arquivo não existe (não é erro crítico)
+        - 403: Acesso negado (token inválido ou privado)
+        - Timeout: Internet indisponível
+        - Outros: Erros de rede
+        """
         try:
             url = self._get_raw_url("release.json")
             
-            logger.info(f"Buscando release.json: {url}")
+            logger.debug(f"Buscando release.json: {url}")
             
             response = requests.get(url, headers=self._get_headers(), timeout=self.timeout_seconds)
             
+            # Tratamento específico para 404 - arquivo não existe
             if response.status_code == 404:
-                logger.info("release.json não encontrado no repositório")
+                logger.info("release.json não encontrado no repositório (não há atualizações disponíveis)")
+                return None
+            
+            # Tratamento para 403 - acesso negado
+            if response.status_code == 403:
+                logger.warning("Acesso negado ao repositório GitHub (verifique token/credenciais)")
+                return None
+            
+            # Tratamento para timeout
+            if response.status_code == 408 or response.status_code == 504:
+                logger.warning("Timeout ao buscar release.json (verifique conexão)")
                 return None
             
             response.raise_for_status()
             
             release_data = response.json()
-            logger.info(f"release.json obtido: versão {release_data.get('versao', 'unknown')}")
+            logger.info(f"✓ release.json obtido: versão {release_data.get('versao', 'unknown')}")
             
             return release_data
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Erro ao buscar release.json: {e}")
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Timeout ao buscar release.json: {e}")
             return None
+            
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"Sem conexão com internet: {e}")
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Erro ao buscar release.json: {e}")
+            return None
+            
         except Exception as e:
             logger.error(f"Erro ao processar release.json: {e}")
             return None
@@ -168,6 +196,11 @@ class GitHubUpdateService:
     def check_for_updates(self, channel: Optional[GitHubChannel] = None) -> Dict[str, Any]:
         """
         Verifica se existe uma nova versão disponível no GitHub.
+        
+        Tratamento robusto de erros:
+        - Se release.json não existir (404), não é erro crítico
+        - Se não houver conexão, retorna sem erro
+        - Sistema continua funcionando normalmente
         
         Returns:
             Dict: has_update, current_version, latest_version, download_url,
@@ -203,8 +236,10 @@ class GitHubUpdateService:
             # Buscar release.json
             release_data = self._fetch_release_json()
             
+            # Se release_data é None, significa que não há atualizações disponíveis
+            # (arquivo não existe, sem conexão, etc.) - não é erro crítico
             if not release_data:
-                result["error"] = "Não foi possível obter informações de release"
+                logger.info("Não há informações de atualização disponíveis")
                 self._status = UpdateStatus.IDLE
                 return result
             

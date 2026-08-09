@@ -9,7 +9,7 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QTableWidget, QTableWidgetItem, QHeaderView,
+    QTableWidgetItem, QHeaderView,
     QFrame, QMessageBox, QAbstractItemView, QSizePolicy,
     QDialog,
 )
@@ -17,8 +17,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from services.historico_service import historico_service
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
 from utils.helpers import formatar_moeda
 
 
@@ -71,7 +71,7 @@ class TelaHistorico(QWidget):
             ("PESO TOTAL", "peso", colors["rose"]),
         ]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
             cardl = QVBoxLayout()
             cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
             card.setLayout(cardl)
@@ -106,12 +106,9 @@ class TelaHistorico(QWidget):
             ("Placa", 120), ("Motorista", 160), ("Status", 110),
             ("Notas", 70), ("Peso", 120), ("Frete", 120),
         ]
-        self.tabela = QTableWidget(0, len(colunas))
+        self.tabela = ModernTable()
+        self.tabela.setColumnCount(len(colunas))
         self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
         self.tabela.setMinimumHeight(400)
 
         h = self.tabela.horizontalHeader()
@@ -119,27 +116,16 @@ class TelaHistorico(QWidget):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
 
-        self.tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 8px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['sky_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px 10px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
-
         self.tabela.cellDoubleClicked.connect(self._clique_acao_viagem)
         card.add_widget(self.tabela)
 
         # Botões de ação
         acao_row = QHBoxLayout()
         acao_row.addStretch()
-        btn_notas = ModernButton("👁 Ver Notas", ButtonStyle.PRIMARY)
+        btn_notas = ModernButton("Ver Notas", ButtonStyle.PRIMARY, icon_name="eye")
         btn_notas.clicked.connect(self._abrir_notas_viagem)
         acao_row.addWidget(btn_notas)
-        btn_finalizar = ModernButton("✅ Finalizar", ButtonStyle.SUCCESS)
+        btn_finalizar = ModernButton("Finalizar", ButtonStyle.SUCCESS, icon_name="check_circle")
         btn_finalizar.clicked.connect(self._finalizar_viagem)
         acao_row.addWidget(btn_finalizar)
         card.add_layout(acao_row)
@@ -232,7 +218,7 @@ class TelaHistorico(QWidget):
         colors = theme_manager.colors
         tokens = theme_manager.tokens
 
-        titulo = QLabel(f"📦 DETALHES DA VIAGEM #{vid}")
+        titulo = QLabel(f"DETALHES DA VIAGEM #{vid}")
         titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
         titulo.setStyleSheet(f"color: {colors['rose']}; background: transparent;")
         layout.addWidget(titulo)
@@ -279,7 +265,7 @@ class TelaHistorico(QWidget):
         tabela = QTableWidget(0, len(colunas))
         tabela.setHorizontalHeaderLabels(colunas)
         tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        tabela.setAlternatingRowColors(True)
+        tabela.setAlternatingRowColors(False)
         tabela.verticalHeader().setVisible(False)
 
         total_frete = total_peso = 0

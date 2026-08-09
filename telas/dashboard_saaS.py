@@ -200,7 +200,7 @@ class DashboardSaaS(QWidget):
 
         # Placeholder para gráfico
         chart_placeholder = QLabel()
-        chart_placeholder.setFixedHeight(280)
+        chart_placeholder.setMinimumHeight(280)
         chart_placeholder.setStyleSheet(f"""
         QLabel {{
             background: {c['bg_tertiary']};
@@ -224,7 +224,7 @@ class DashboardSaaS(QWidget):
         chart2_layout.setSpacing(t.SPACING_MD)
 
         chart2_placeholder = QLabel()
-        chart2_placeholder.setFixedHeight(280)
+        chart2_placeholder.setMinimumHeight(280)
         chart2_placeholder.setStyleSheet(f"""
         QLabel {{
             background: {c['bg_tertiary']};
@@ -256,7 +256,7 @@ class DashboardSaaS(QWidget):
         self.ranking_table = SaaSTable()
         self.ranking_table.setColumnCount(4)
         self.ranking_table.setHorizontalHeaderLabels(["Cliente", "Viagens", "Receita", "Margem"])
-        self.ranking_table.setFixedHeight(350)
+        self.ranking_table.setMinimumHeight(350)
 
         ranking_layout.addWidget(self.ranking_table)
         ranking_card.add_layout(ranking_layout)

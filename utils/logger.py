@@ -33,46 +33,80 @@ def configurar_logging(
     if _loguru_logger is None:
         log_path = Path(arquivo_log) if arquivo_log else None
         if log_path:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-        logging.basicConfig(
-            level=getattr(logging, nivel.upper(), logging.INFO),
-            format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s",
-            handlers=[logging.StreamHandler(sys.stdout)] + ([logging.FileHandler(log_path, encoding="utf-8")] if log_path else [])
-        )
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                log_path = None
+        try:
+            handlers = []
+            if log_path:
+                handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+            else:
+                handlers.append(logging.StreamHandler(sys.stderr))
+            logging.basicConfig(
+                level=getattr(logging, nivel.upper(), logging.INFO),
+                format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s",
+                handlers=handlers
+            )
+        except Exception:
+            logging.basicConfig(
+                level=logging.INFO,
+                format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s"
+            )
         return
 
-    _loguru_logger.remove()
-    console_sink = sys.stdout if sys.stdout is not None else sys.stderr
-    if console_sink is not None:
-        _loguru_logger.add(
-            console_sink,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-            level=nivel,
-            colorize=True
-        )
+    try:
+        _loguru_logger.remove()
+        
+        # Usar stderr em vez de stdout para evitar problemas no Windows
+        console_sink = sys.stderr if sys.stderr is not None else sys.stdout
+        if console_sink is not None:
+            try:
+                _loguru_logger.add(
+                    console_sink,
+                    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+                    level=nivel,
+                    colorize=True,
+                    catch=False,
+                    enqueue=True  # Thread-safe
+                )
+            except Exception:
+                pass  # Console falhou, continuar apenas com arquivo
 
-    if arquivo_log:
-        log_path = Path(arquivo_log)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        if arquivo_log:
+            log_path = Path(arquivo_log)
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
 
-        _loguru_logger.add(
-            arquivo_log,
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-            level=nivel,
-            rotation=rotacao,
-            retention=retencao,
-            compression="zip"
-        )
+            try:
+                _loguru_logger.add(
+                    arquivo_log,
+                    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+                    level=nivel,
+                    rotation=rotacao,
+                    retention=retencao,
+                    compression="zip",
+                    catch=False,
+                    enqueue=True  # Thread-safe
+                )
 
-        error_log = str(Path(arquivo_log).parent / "errors.log")
-        _loguru_logger.add(
-            error_log,
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-            level="ERROR",
-            rotation=rotacao,
-            retention=retencao,
-            compression="zip"
-        )
+                error_log = str(Path(arquivo_log).parent / "errors.log")
+                _loguru_logger.add(
+                    error_log,
+                    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+                    level="ERROR",
+                    rotation=rotacao,
+                    retention=retencao,
+                    compression="zip",
+                    catch=False,
+                    enqueue=True  # Thread-safe
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 def get_logger(nome: str):
@@ -92,7 +126,13 @@ def get_logger(nome: str):
 
 
 # Configuração padrão ao importar o módulo
-configurar_logging(
-    nivel="INFO",
-    arquivo_log=str(settings.logs_dir / "cw_transportadora.log")
-)
+try:
+    configurar_logging(
+        nivel="INFO",
+        arquivo_log=str(settings.logs_dir / "cw_transportadora.log")
+    )
+except Exception as e:
+    # Fallback silencioso se a configuração inicial falhar
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    print(f"Logger init fallback: {e}")

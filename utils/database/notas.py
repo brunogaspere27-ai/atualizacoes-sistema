@@ -291,7 +291,7 @@ def listar_notas_por_cliente(
     Lista notas filtradas por cliente.
     
     Args:
-        cliente_id: ID do cliente (destinatário)
+        cliente_id: ID do cliente (pode ser remetente ou destinatário)
         apenas_disponiveis: Se True, retorna apenas notas com status 'Disponível'
         excluir_vinculadas: Se True, exclui notas já vinculadas a alguma viagem
         
@@ -306,19 +306,31 @@ def listar_notas_por_cliente(
             notas.id,
             notas.numero_cte,
             notas.chave_nfe,
-            destinatario.nome as cliente_nome,
-            notas.destino as cidade,
+            CASE 
+                WHEN notas.destinatario_id = ? THEN destinatario.nome
+                WHEN notas.remetente_id = ? THEN remetente.nome
+                ELSE COALESCE(destinatario.nome, remetente.nome)
+            END as cliente_nome,
+            CASE 
+                WHEN notas.destinatario_id = ? THEN notas.destino
+                WHEN notas.remetente_id = ? THEN notas.origem
+                ELSE COALESCE(notas.destino, notas.origem)
+            END as cidade,
             notas.peso,
             notas.valor_frete,
-            notas.criado_em as data,
-            notas.status
+            manifestos.data_importacao as data,
+            COALESCE(notas.status, 'Disponível') as status
         FROM notas
         LEFT JOIN clientes destinatario
             ON destinatario.id = notas.destinatario_id
-        WHERE notas.destinatario_id = ?
+        LEFT JOIN clientes remetente
+            ON remetente.id = notas.remetente_id
+        LEFT JOIN manifestos
+            ON manifestos.id = notas.manifesto_id
+        WHERE notas.destinatario_id = ? OR notas.remetente_id = ?
     """
     
-    params = [cliente_id]
+    params = [cliente_id, cliente_id, cliente_id, cliente_id, cliente_id, cliente_id]
     
     if apenas_disponiveis:
         query += " AND notas.status = 'Disponível'"

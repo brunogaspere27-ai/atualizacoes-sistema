@@ -134,13 +134,13 @@ class NotasAurora(QWidget):
 
         # Botão importar
         self.btn_importar = AuroraButton("Importar Manifesto", ButtonStyle.AURORA, "upload")
-        self.btn_importar.setFixedHeight(44)
+        self.btn_importar.setMinimumHeight(44)
         self.btn_importar.clicked.connect(self._on_importar)
         hl.addWidget(self.btn_importar)
 
         # Botão apagar
-        self.btn_apagar = AuroraButton("Apagar Selecionado", ButtonStyle.CRIMSON, "trash")
-        self.btn_apagar.setFixedHeight(44)
+        self.btn_apagar = AuroraButton("Apagar Selecionado", ButtonStyle.SUNSET, "trash")
+        self.btn_apagar.setMinimumHeight(44)
         self.btn_apagar.clicked.connect(self._on_apagar)
         hl.addWidget(self.btn_apagar)
 
@@ -219,7 +219,7 @@ class NotasAurora(QWidget):
         self.tabela_notas = AuroraTable()
         self.tabela_notas.setColumnCount(len(_COLUNAS_NOTAS))
         self.tabela_notas.setHorizontalHeaderLabels(_COLUNAS_NOTAS)
-        self.tabela_notas.setFixedHeight(400)
+        self.tabela_notas.setMinimumHeight(400)
 
         table_card.add_widget(self.tabela_notas)
         layout.addWidget(table_card)

@@ -232,7 +232,8 @@ class DashboardAurora(QWidget):
         row.setSpacing(t.SPACING_LG)
 
         avatar_wrap = QFrame()
-        avatar_wrap.setFixedSize(72, 72)
+        avatar_wrap.setMinimumSize(72, 72)
+        avatar_wrap.setMaximumSize(72, 72)
         avatar_wrap.setStyleSheet(f"""
         QFrame {{
             background: {c['aurora_soft']};
@@ -285,7 +286,7 @@ class DashboardAurora(QWidget):
         }}
         """)
         btn_refresh = AuroraButton("Atualizar", ButtonStyle.GHOST, "refresh")
-        btn_refresh.setFixedHeight(36)
+        btn_refresh.setMinimumHeight(36)
         btn_refresh.clicked.connect(self._load_data)
         status_col.addWidget(self._header_timestamp, 0, Qt.AlignmentFlag.AlignRight)
         status_col.addWidget(self._context_chip, 0, Qt.AlignmentFlag.AlignRight)
@@ -311,7 +312,7 @@ class DashboardAurora(QWidget):
         for periodo in self.PERIODOS:
             btn = QPushButton(periodo)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setFixedHeight(38)
+            btn.setMinimumHeight(38)
             btn.clicked.connect(lambda checked=False, p=periodo: self._on_periodo_changed(p))
             row.addWidget(btn)
             self._period_buttons.append((btn, periodo))
@@ -325,10 +326,10 @@ class DashboardAurora(QWidget):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(16)
 
-        self.kpi_receita = AuroraKPICard("Receita total", "R$ 0,00", "+0.0%", "trending-up", AccentColor.FOREST)
+        self.kpi_receita = AuroraKPICard("Receita total", "R$ 0,00", "+0.0%", "dollar_sign", AccentColor.FOREST)
         self.kpi_fretes = AuroraKPICard("Fretes finalizados", "0", "+0.0%", "truck", AccentColor.AURORA)
-        self.kpi_ticket = AuroraKPICard("Ticket médio", "R$ 0,00", "+0.0%", "coins", AccentColor.OCEAN)
-        self.kpi_lucro = AuroraKPICard("Lucro estimado", "R$ 0,00", "+0.0%", "sparkles", AccentColor.SUNSET)
+        self.kpi_ticket = AuroraKPICard("Ticket médio", "R$ 0,00", "+0.0%", "trending_up", AccentColor.OCEAN)
+        self.kpi_lucro = AuroraKPICard("Lucro estimado", "R$ 0,00", "+0.0%", "piggy_bank", AccentColor.SUNSET)
 
         for idx, widget in enumerate([self.kpi_receita, self.kpi_fretes, self.kpi_ticket, self.kpi_lucro]):
             widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

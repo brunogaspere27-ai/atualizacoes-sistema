@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 
-from telas.theme_aurora import aurora_theme_manager as theme_manager
-from utils.components import ModernButton, ButtonStyle, ModernCard, SeparatorLine
+from ui.theme.cw_theme import cw_theme
+from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard
 from utils.icons import get_icon, get_pixmap
 from services.perfil_service import perfil_service
 from services.auth_service import auth_service
@@ -113,7 +113,7 @@ class TelaPerfil(QWidget):
         colors = theme_manager.colors
         tokens = theme_manager.tokens
 
-        card = ModernCard("Foto de Perfil", icon_name="user", padding=tokens.SPACING_XL)
+        card = ModernCard("Foto de Perfil", icon_name="user_circle", padding=tokens.SPACING_XL)
         layout = card.layout()
 
         # Avatar + botões
@@ -160,7 +160,7 @@ class TelaPerfil(QWidget):
         colors = theme_manager.colors
         tokens = theme_manager.tokens
 
-        card = ModernCard("Nome Completo", icon_name="user", padding=tokens.SPACING_XL)
+        card = ModernCard("Nome Completo", icon_name="user_circle", padding=tokens.SPACING_XL)
         layout = card.layout()
 
         # Label

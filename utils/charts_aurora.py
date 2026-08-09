@@ -20,8 +20,14 @@ from PySide6.QtGui import (
     QPainter, QColor, QPen, QBrush, QLinearGradient,
     QRadialGradient, QFont, QPainterPath
 )
-from pyqtgraph import PlotWidget, BarGraphItem, PlotCurveItem
-import pyqtgraph as pg
+try:
+    from pyqtgraph import PlotWidget, BarGraphItem, PlotCurveItem
+    import pyqtgraph as pg
+    CHARTS_AVAILABLE = True
+except ImportError:  # Permite iniciar o sistema mesmo sem o extra de gráficos.
+    PlotWidget = BarGraphItem = PlotCurveItem = None
+    pg = None
+    CHARTS_AVAILABLE = False
 
 from telas.theme_aurora import aurora_theme_manager, AccentColor
 import re
@@ -51,7 +57,6 @@ class AuroraChartCard(QFrame):
         self._accent = accent_color
 
         self.setObjectName("auroraChartCard")
-        glow = aurora_theme_manager.get_glow(accent_color)
         accent = aurora_theme_manager.get_accent(accent_color)
 
         self.setStyleSheet(f"""
@@ -62,7 +67,6 @@ class AuroraChartCard(QFrame):
         }}
         QFrame#auroraChartCard:hover {{
             border-color: {accent};
-            box-shadow: 0 0 30px {glow};
         }}
         """)
 
@@ -116,6 +120,10 @@ class AuroraLineChart(QWidget):
         layout.setSpacing(0)
         self.setLayout(layout)
 
+        if not CHARTS_AVAILABLE:
+            layout.addWidget(self._fallback())
+            return
+
         # PlotWidget com tema refinado estilo Linear
         self.plot = PlotWidget()
         self.plot.setBackground(c['chart_bg'])
@@ -146,9 +154,15 @@ class AuroraLineChart(QWidget):
         self._x_data = []
         self._y_data = []
 
+    def _fallback(self):
+        label = QLabel("Gráfico indisponível")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(f"color: {aurora_theme_manager.colors['text_tertiary']};")
+        return label
+
     def _on_mouse_move(self, pos):
         """Handle mouse move para tooltip interativo."""
-        if not self._x_data or not self._y_data:
+        if not CHARTS_AVAILABLE or not self._x_data or not self._y_data:
             return
         
         # Encontrar ponto mais próximo
@@ -163,6 +177,8 @@ class AuroraLineChart(QWidget):
 
     def set_data(self, x_data, y_data, label: str = ""):
         """Define os dados do gráfico."""
+        if not CHARTS_AVAILABLE:
+            return
         c = aurora_theme_manager.colors
         accent = aurora_theme_manager.get_accent(self._accent)
         accent_start = aurora_theme_manager.get_color(self._accent.value + '_start')
@@ -217,7 +233,7 @@ class AuroraLineChart(QWidget):
         self._full_x = x_data
         self._full_y = y_data
 
-        self._anim_timer = QTimer()
+        self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._update_animation)
         self._anim_timer.start(8)  # ~120fps para animação suave
 
@@ -241,7 +257,8 @@ class AuroraLineChart(QWidget):
 
     def clear(self):
         """Limpa o gráfico."""
-        self.plot.clear()
+        if CHARTS_AVAILABLE:
+            self.plot.clear()
 
 
 class AuroraBarChart(QWidget):
@@ -257,6 +274,10 @@ class AuroraBarChart(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
+
+        if not CHARTS_AVAILABLE:
+            layout.addWidget(self._fallback())
+            return
 
         # PlotWidget com tema refinado estilo Linear
         self.plot = PlotWidget()
@@ -279,8 +300,16 @@ class AuroraBarChart(QWidget):
         self._bar_item = None
         self._animation_progress = 0.0
 
+    def _fallback(self):
+        label = QLabel("Gráfico indisponível")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(f"color: {aurora_theme_manager.colors['text_tertiary']};")
+        return label
+
     def set_data(self, x_data, y_data, labels=None):
         """Define os dados do gráfico de barras com gradientes refinados."""
+        if not CHARTS_AVAILABLE:
+            return
         c = aurora_theme_manager.colors
         accent = aurora_theme_manager.get_accent(self._accent)
         accent_start = aurora_theme_manager.get_color(self._accent.value + '_start')
@@ -318,7 +347,7 @@ class AuroraBarChart(QWidget):
         self._animation_progress = 0.0
         self._full_y = y_data
 
-        self._anim_timer = QTimer()
+        self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._update_animation)
         self._anim_timer.start(8)  # ~120fps para animação suave
 
@@ -339,7 +368,8 @@ class AuroraBarChart(QWidget):
 
     def clear(self):
         """Limpa o gráfico."""
-        self.plot.clear()
+        if CHARTS_AVAILABLE:
+            self.plot.clear()
 
 
 class AuroraMultiLineChart(QWidget):
@@ -358,6 +388,13 @@ class AuroraMultiLineChart(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
+
+        if not CHARTS_AVAILABLE:
+            label = QLabel("Gráfico indisponível")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setStyleSheet(f"color: {c['text_tertiary']};")
+            layout.addWidget(label)
+            return
 
         self.plot = PlotWidget()
         self.plot.setBackground(c['chart_bg'])
@@ -383,6 +420,8 @@ class AuroraMultiLineChart(QWidget):
         series_data: list of (x_data, y_data) tuples
         labels: list of series labels
         """
+        if not CHARTS_AVAILABLE:
+            return
         self.plot.clear()
         self._curves = []
 
@@ -404,7 +443,8 @@ class AuroraMultiLineChart(QWidget):
 
     def clear(self):
         """Limpa o gráfico."""
-        self.plot.clear()
+        if CHARTS_AVAILABLE:
+            self.plot.clear()
 
 
 class AuroraSparkline(QWidget):

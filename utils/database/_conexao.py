@@ -410,6 +410,28 @@ def criar_banco() -> None:
     )
     """)
 
+    # Evolução do schema (instalações antigas) — campos necessários para busca profissional.
+    # Mantém o app compatível e permite pesquisa por CPF/CNPJ/telefone/código sem falhas.
+    for coluna_nome, coluna_tipo in [
+        ("razao_social", "TEXT"),
+        ("fantasia", "TEXT"),
+        ("cpf", "TEXT"),
+        ("telefone", "TEXT"),
+        ("codigo", "TEXT"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE clientes ADD COLUMN {coluna_nome} {coluna_tipo}")
+            logger.info(f"Coluna '{coluna_nome}' adicionada à tabela clientes")
+        except sqlite3.OperationalError:
+            pass  # Coluna já existe — esperado em instalações existentes
+
+    # Índices para busca rápida (LIKE ainda pode ser pesado, mas isso já reduz latência em bases reais)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_nome ON clientes(nome)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_cnpj ON clientes(cnpj)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_telefone ON clientes(telefone)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes(codigo)")
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS funcionarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -689,5 +711,4 @@ def registrar_caminhoes_para_sync(cursor):
 
         if not cursor.fetchone():
             registrar_sync(cursor, "caminhoes", caminhao_id)
-
 

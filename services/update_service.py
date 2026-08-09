@@ -387,6 +387,12 @@ class UpdateService:
             import subprocess
             import sys
 
+            # A disponibilidade do instalador é específica de plataforma.
+            # Verificar isso antes do arquivo torna o retorno correto e evita
+            # qualquer tentativa de tratar um .exe no macOS/Linux.
+            if sys.platform != "win32":
+                return False, "Sistema de atualizacao disponivel apenas para Windows."
+
             if not self.verificar_integridade(installer_path):
                 return False, "Arquivo de instalacao corrompido ou invalido."
 
@@ -396,11 +402,8 @@ class UpdateService:
 
             logger.info(f"Iniciando instalacao: {installer_path}")
 
-            if sys.platform == "win32":
-                subprocess.Popen([installer_path], shell=False)
-                return True, "Instalador iniciado. O aplicativo sera fechado."
-            else:
-                return False, "Sistema de atualizacao disponivel apenas para Windows."
+            subprocess.Popen([installer_path], shell=False)
+            return True, "Instalador iniciado. O aplicativo sera fechado."
 
         except Exception as e:
             logger.error(f"Erro ao instalar atualizacao: {e}")

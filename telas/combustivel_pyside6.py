@@ -1,6 +1,7 @@
 """
 Tela Combustível - CW Transportadora - PySide6
 Controle de abastecimentos, consumo e média km/L.
+Design System CW - Dark Mode Premium
 """
 
 from __future__ import annotations
@@ -10,16 +11,16 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
+    QTableWidgetItem, QHeaderView, QComboBox,
     QFrame, QMessageBox, QAbstractItemView, QDialog,
-    QScrollArea,
+    QScrollArea, QGridLayout,
 )
 from PySide6.QtCore import Qt, QTimer
 
 from services.frota_service import frota_service
-from telas.theme_pyside6 import theme_manager, AccentColor
-from utils.components import ModernButton, ButtonStyle, ModernCard
-from utils.helpers import formatar_moeda, parse_numero
+from ui.theme.cw_theme import cw_theme
+from ui.components import KPICard, ModernCard, ModernButton, ButtonStyle, CWButton, ButtonVariant, ButtonSize, CWCard, CWTable
+from utils.helpers import formatar_moeda, formatar_peso, parse_numero
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,8 +36,9 @@ class TelaCombustivel(QWidget):
         self._carregar_abastecimentos()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -46,26 +48,57 @@ class TelaCombustivel(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background-color: {c['bg_primary']}; border: none; }}
+            QScrollBar:vertical {{ background: transparent; width: 8px; margin: 4px 2px; }}
+            QScrollBar::handle:vertical {{ background: {c['border_subtle']}; border-radius: 4px; min-height: 40px; }}
+            QScrollBar::handle:vertical:hover {{ background: {c['border_default']}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; height: 0px; }}
+        """)
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {c['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        cl.setSpacing(t.XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
-        # Filtros
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        # Filtros card
+        filtros = CWCard("Filtros", padding=t.LG)
         fr = QHBoxLayout()
-        fr.setSpacing(tokens.SPACING_MD)
+        fr.setSpacing(t.MD)
 
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
         self.combo_periodo.setMinimumHeight(40)
         self.combo_periodo.setMinimumWidth(110)
+        self.combo_periodo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: {t.SM}px {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QComboBox:hover {{ border-color: {c['border_strong']}; }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {c['text_secondary']};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                selection-background-color: {c['primary_soft']};
+                selection-color: {c['primary']};
+            }}
+        """)
         self.combo_periodo.currentTextChanged.connect(lambda: self._carregar_abastecimentos())
         fr.addWidget(self.combo_periodo)
 
@@ -74,104 +107,128 @@ class TelaCombustivel(QWidget):
         self.combo_mes.setCurrentIndex(datetime.now().month - 1)
         self.combo_mes.setMinimumHeight(40)
         self.combo_mes.setMinimumWidth(80)
+        self.combo_mes.setStyleSheet(self.combo_periodo.styleSheet())
         self.combo_mes.currentTextChanged.connect(lambda: self._carregar_abastecimentos())
         fr.addWidget(self.combo_mes)
 
         self.entry_ano = QLineEdit(datetime.now().strftime("%Y"))
-        self.entry_ano.setFixedWidth(80)
+        self.entry_ano.setPlaceholderText("Ano")
+        self.entry_ano.setMinimumWidth(80)
         self.entry_ano.setMinimumHeight(40)
+        self.entry_ano.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_ano.textChanged.connect(lambda: self._debounce_carregar())
         fr.addWidget(self.entry_ano)
 
         self.entry_busca = QLineEdit()
         self.entry_busca.setPlaceholderText("Buscar veículo, motorista ou posto...")
-        self.entry_busca.setMinimumHeight(40)
         self.entry_busca.setMinimumWidth(220)
+        self.entry_busca.setMinimumHeight(40)
+        self.entry_busca.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: 0 {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+        """)
         self.entry_busca.textChanged.connect(lambda: self._debounce_carregar())
         fr.addWidget(self.entry_busca)
 
         fr.addStretch()
 
-        btn_novo = ModernButton("+ Novo Abastecimento", ButtonStyle.PRIMARY)
+        btn_novo = CWButton("+ Novo Abastecimento", ButtonVariant.PRIMARY, ButtonSize.MD)
         btn_novo.clicked.connect(self._abrir_modal)
         fr.addWidget(btn_novo)
 
         filtros.add_layout(fr)
         cl.addWidget(filtros)
 
-        # Resumo
-        resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
-        rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_LG)
-        resumo_frame.setLayout(rl)
+        # Resumo cards - KPI style
+        resumo_layout = QHBoxLayout()
+        resumo_layout.setSpacing(t.LG)
 
         self._resumo = {}
-        for titulo, chave in [("Abastecimentos", "qtd"), ("Litros", "litros"), ("Gasto total", "gasto"), ("Média geral", "media")]:
-            card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: 1px solid {colors['border_subtle']}; }}")
-            cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
-            card.setLayout(cardl)
-            t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            cardl.addWidget(t)
-            v = QLabel("0")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
-            v.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-            cardl.addWidget(v)
-            self._resumo[chave] = v
-            rl.addWidget(card)
-        cl.addWidget(resumo_frame)
-
-        # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
-        colunas = [
-            ("ID", 45), ("Data", 100), ("Veículo", 160), ("Motorista", 140),
-            ("KM", 90), ("Litros", 80), ("R$/Litro", 90), ("Total", 100),
-            ("Média", 90), ("Custo/KM", 90), ("Posto", 130), ("Status", 90),
+        kpi_configs = [
+            ("Abastecimentos", "qtd"),
+            ("Litros", "litros"),
+            ("Gasto total", "gasto"),
+            ("Média geral", "media")
         ]
-        self.tabela = QTableWidget(0, len(colunas))
-        self.tabela.setHorizontalHeaderLabels([c[0] for c in colunas])
-        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabela.setAlternatingRowColors(True)
-        self.tabela.verticalHeader().setVisible(False)
+
+        for titulo, chave in kpi_configs:
+            kpi_card = QFrame()
+            kpi_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['bg_elevated']};
+                    border: 1px solid {c['border_subtle']};
+                    border-radius: {r.LG}px;
+                }}
+            """)
+            kpi_layout = QVBoxLayout()
+            kpi_layout.setContentsMargins(t.LG, t.MD, t.LG, t.MD)
+            kpi_layout.setSpacing(t.XS)
+            kpi_card.setLayout(kpi_layout)
+
+            t_label = QLabel(titulo)
+            t_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+            t_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
+            kpi_layout.addWidget(t_label)
+
+            v_label = QLabel("0")
+            v_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+            v_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+            kpi_layout.addWidget(v_label)
+
+            self._resumo[chave] = v_label
+            resumo_layout.addWidget(kpi_card)
+
+        cl.addLayout(resumo_layout)
+
+        # Tabela card
+        tabela_card = CWCard("Histórico de Abastecimentos", padding=t.XL)
+        colunas = [
+            "ID", "Data", "Veículo", "Motorista",
+            "KM", "Litros", "R$/Litro", "Total",
+            "Posto", "Status"
+        ]
+        self.tabela = CWTable(colunas)
         self.tabela.setMinimumHeight(350)
 
+        # Configurar larguras das colunas
         h = self.tabela.horizontalHeader()
-        for i, (_, w) in enumerate(colunas):
+        widths = [45, 100, 160, 140, 90, 80, 90, 100, 140, 90]
+        for i, w in enumerate(widths):
             h.resizeSection(i, w)
         h.setStretchLastSection(True)
 
-        self.tabela.setStyleSheet(f"""
-            QTableWidget {{ background-color: {colors['bg_secondary']}; alternate-background-color: {colors['table_row_odd']};
-                gridline-color: {colors['border_subtle']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {tokens.RADIUS_MD}px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QTableWidget::item {{ padding: 6px 10px; border: none; color: {colors['text_primary']}; }}
-            QTableWidget::item:selected {{ background-color: {colors['emerald_soft']}; }}
-            QHeaderView::section {{ background-color: {colors['table_header_bg']}; color: {colors['table_header_text']};
-                padding: 8px; border: none; border-bottom: 2px solid {colors['border_default']};
-                font-weight: 700; font-size: {tokens.FONT_SIZE_SM}px; }}
-        """)
-
         self.tabela.cellDoubleClicked.connect(self._editar_abastecimento)
-        card.add_widget(self.tabela)
+        tabela_card.add_widget(self.tabela)
 
         # Botões
         br = QHBoxLayout()
         br.addStretch()
-        btn_excluir = ModernButton("Excluir", ButtonStyle.DANGER)
+        btn_excluir = CWButton("Excluir", ButtonVariant.DANGER, ButtonSize.MD)
         btn_excluir.clicked.connect(self._excluir)
         br.addWidget(btn_excluir)
-        btn_atualizar = ModernButton("Atualizar", ButtonStyle.SECONDARY)
+        btn_atualizar = CWButton("Atualizar", ButtonVariant.SECONDARY, ButtonSize.MD)
         btn_atualizar.clicked.connect(self._carregar_abastecimentos)
         br.addWidget(btn_atualizar)
-        card.add_layout(br)
+        tabela_card.add_layout(br)
 
-        cl.addWidget(card)
+        cl.addWidget(tabela_card)
 
     def _debounce_carregar(self):
         if hasattr(self, '_debounce_timer') and self._debounce_timer:
@@ -235,25 +292,47 @@ class TelaCombustivel(QWidget):
         dlg = QDialog(self)
         dlg.setWindowTitle("Abastecimento")
         dlg.resize(520, 600)
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        r = cw_theme.radius
+        
+        dlg.setStyleSheet(f"""
+            QDialog {{
+                background-color: {c['bg_primary']};
+            }}
+        """)
+        
         layout = QVBoxLayout()
+        layout.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
+        layout.setSpacing(t.XL)
         dlg.setLayout(layout)
 
         titulo = QLabel("Cadastro de Abastecimento")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         layout.addWidget(titulo)
 
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = CWCard(padding=t.XL)
         veiculos = frota_service.listar_veiculos_disponiveis("abastecimentos")
 
         def campo(label_texto):
             lbl = QLabel(label_texto)
-            lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+            lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             card.add_widget(lbl)
             entry = QLineEdit()
             entry.setMinimumHeight(40)
+            entry.setStyleSheet(f"""
+                QLineEdit {{
+                    background-color: {c['bg_primary']};
+                    border: 1px solid {c['border_default']};
+                    border-radius: {r.MD}px;
+                    padding: 0 {t.MD}px;
+                    font-size: {cw_theme.typography.FONT_SIZE_MD}px;
+                    color: {c['text_primary']};
+                }}
+                QLineEdit:focus {{ border: 1px solid {c['border_focus']}; }}
+            """)
             card.add_widget(entry)
             return entry
 
@@ -261,11 +340,36 @@ class TelaCombustivel(QWidget):
         data_entry.setText(datetime.now().strftime("%d/%m/%Y"))
 
         lbl = QLabel("Veículo")
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         card.add_widget(lbl)
         combo_veiculo = QComboBox()
         combo_veiculo.addItems(veiculos if veiculos else ["Nenhum veículo"])
         combo_veiculo.setMinimumHeight(40)
+        combo_veiculo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: {r.MD}px;
+                padding: {t.SM}px {t.MD}px;
+                font-size: {cw_theme.typography.FONT_SIZE_SM}px;
+                color: {c['text_primary']};
+            }}
+            QComboBox:hover {{ border-color: {c['border_strong']}; }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {c['text_secondary']};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {c['bg_primary']};
+                border: 1px solid {c['border_default']};
+                selection-background-color: {c['primary_soft']};
+                selection-color: {c['primary']};
+            }}
+        """)
         card.add_widget(combo_veiculo)
 
         motorista_entry = campo("Motorista")
@@ -314,7 +418,7 @@ class TelaCombustivel(QWidget):
             self._carregar_abastecimentos()
             QMessageBox.information(dlg, "Sucesso", "Abastecimento salvo com sucesso!")
 
-        btn = ModernButton("Salvar Abastecimento", ButtonStyle.SUCCESS)
+        btn = CWButton("Salvar Abastecimento", ButtonVariant.SUCCESS, ButtonSize.MD)
         btn.clicked.connect(salvar)
         card.add_widget(btn)
         layout.addWidget(card)

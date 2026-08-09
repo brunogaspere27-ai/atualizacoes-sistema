@@ -23,6 +23,7 @@ from utils.supabase_db import (
     conectar_supabase,
     supabase_habilitado,
     SupabaseNaoConfiguradoError,
+    SupabaseOfflineError,
 )
 
 logger = get_logger(__name__)
@@ -743,6 +744,15 @@ def sincronizar(reparar_fila: bool = True) -> Dict[str, Any]:
             status="offline",
             offline=True,
             mensagem="Nuvem desabilitada. Sistema operando em modo local.",
+            pendencias=pendencias,
+        )
+    except SupabaseOfflineError as erro:
+        pendencias = contar_pendencias_sync()
+        logger.info(str(erro))
+        return resultado_sync(
+            status="offline",
+            offline=True,
+            mensagem=str(erro),
             pendencias=pendencias,
         )
     except Exception as erro:

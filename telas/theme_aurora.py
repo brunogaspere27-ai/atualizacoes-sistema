@@ -742,6 +742,7 @@ class AuroraThemeManager:
         QLabel {{
             background-color: transparent;
             color: {c['text_primary']};
+            border: none;
         }}
 
         QToolTip {{

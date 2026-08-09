@@ -83,8 +83,8 @@ class AuroraButton(QPushButton):
         self.setFont(aurora_theme_manager.get_font(fs, bold=True))
 
         if icon_name:
-            self.setIcon(get_icon(icon_name, QSize(18, 18)))
-            self.setIconSize(QSize(18, 18))
+            self.setIcon(get_icon(icon_name, QSize(24, 24)))
+            self.setIconSize(QSize(24, 24))
 
         # Gradient styles
         gradient_map = {
@@ -109,10 +109,12 @@ class AuroraButton(QPushButton):
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 {hover}, stop:1 {end});
+                transform: translateY(-1px);
             }}
             QPushButton:pressed {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 {active}, stop:1 {start});
+                transform: translateY(1px);
             }}
             QPushButton:disabled {{
                 background: {c['bg_tertiary']};
@@ -165,7 +167,6 @@ class AuroraButton(QPushButton):
                 border-radius: {t.RADIUS_LG}px;
                 padding: {py}px {px}px;
                 font-weight: 600;
-                backdrop-filter: blur(10px);
             }}
             QPushButton:hover {{
                 background: {c['bg_elevated']};
@@ -199,14 +200,14 @@ class AuroraCard(QFrame):
                 background: {c['bg_glass']};
                 border: 1px solid {c['border_subtle']};
                 border-radius: {t.RADIUS_2XL}px;
-                backdrop-filter: blur(20px);
             }}
             QFrame#auroraCard:hover {{
                 border-color: {c['border_default']};
+                background: {c['bg_elevated']};
             }}
             """)
         elif variant == CardVariant.GLOW:
-            glow = aurora_theme_manager.get_glow(accent_color)
+            accent = aurora_theme_manager.get_accent(accent_color)
             self.setStyleSheet(f"""
             QFrame#auroraCard {{
                 background: {c['card_bg']};
@@ -214,8 +215,8 @@ class AuroraCard(QFrame):
                 border-radius: {t.RADIUS_2XL}px;
             }}
             QFrame#auroraCard:hover {{
-                border-color: {aurora_theme_manager.get_accent(accent_color)};
-                box-shadow: 0 0 30px {glow};
+                border-color: {accent};
+                background: {c['bg_surface']};
             }}
             """)
         elif variant == CardVariant.BORDERED:
@@ -226,7 +227,8 @@ class AuroraCard(QFrame):
                 border-radius: {t.RADIUS_2XL}px;
             }}
             QFrame#auroraCard:hover {{
-                border-color: {aurora_theme_manager.get_accent(accent_color)};
+                border-color: {c['border_strong']};
+                background: {c['bg_surface']};
             }}
             """)
         else:  # DEFAULT
@@ -238,7 +240,7 @@ class AuroraCard(QFrame):
             }}
             QFrame#auroraCard:hover {{
                 border-color: {c['border_default']};
-                background: {c['card_hover']};
+                background: {c['bg_surface']};
             }}
             """)
 
@@ -253,7 +255,7 @@ class AuroraCard(QFrame):
             if icon_name:
                 ico = QLabel()
                 accent = aurora_theme_manager.get_accent(accent_color)
-                ico.setPixmap(get_pixmap(icon_name, QSize(20, 20), accent))
+                ico.setPixmap(get_pixmap(icon_name, QSize(28, 28), accent))
                 hdr.addWidget(ico)
             lbl = QLabel(title)
             lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
@@ -303,7 +305,7 @@ class AuroraSidebar(QFrame):
 
         # Logo header premium com a marca oficial
         self._header = QFrame()
-        self._header.setFixedHeight(88)
+        self._header.setMinimumHeight(88)
         self._header.setStyleSheet(f"""
         QFrame {{
             background: {c['sidebar_bg']};
@@ -336,8 +338,8 @@ class AuroraSidebar(QFrame):
         self._toggle_btn = QPushButton()
         self._toggle_btn.setFixedSize(32, 32)
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_btn.setIcon(get_icon("menu", QSize(16, 16), c["text_tertiary"]))
-        self._toggle_btn.setIconSize(QSize(16, 16))
+        self._toggle_btn.setIcon(get_icon("menu", QSize(24, 24), c["text_tertiary"]))
+        self._toggle_btn.setIconSize(QSize(24, 24))
         self._toggle_btn.setStyleSheet(f"""
         QPushButton {{ background: transparent; border: none; border-radius: 8px; }}
         QPushButton:hover {{ background: {c['sidebar_hover']}; }}
@@ -385,12 +387,12 @@ class AuroraSidebar(QFrame):
         t = aurora_theme_manager.tokens
 
         sep = QFrame()
-        sep.setFixedHeight(1)
+        sep.setMinimumHeight(1)
         sep.setStyleSheet(f"background: {c['border_subtle']}; border: none;")
         self._bottom_layout.addWidget(sep)
 
         card = QFrame()
-        card.setFixedHeight(72)
+        card.setMinimumHeight(72)
         card.setStyleSheet(f"""
         QFrame {{
             background: transparent;
@@ -474,7 +476,7 @@ class AuroraSidebar(QFrame):
         accent = aurora_theme_manager.get_accent(accent_color)
 
         row = QFrame()
-        row.setFixedHeight(48)
+        row.setMinimumHeight(48)
         row.setStyleSheet("QFrame { background: transparent; }")
         rl = QHBoxLayout()
         rl.setContentsMargins(0, 0, 0, 0)
@@ -489,9 +491,9 @@ class AuroraSidebar(QFrame):
 
         btn = QPushButton("  " + label)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(48)
+        btn.setMinimumHeight(48)
         btn.setIcon(get_icon(icon_name, color=c["sidebar_text"]))
-        btn.setIconSize(QSize(20, 20))
+        btn.setIconSize(QSize(24, 24))
         btn.setStyleSheet(f"""
         QPushButton {{
             background: transparent;
@@ -664,6 +666,7 @@ class AuroraTopBar(QFrame):
     password_requested = Signal()
     logout_requested = Signal()
     search_requested = Signal(str)
+    new_operation_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -671,7 +674,7 @@ class AuroraTopBar(QFrame):
         self._usuario_nome = ""
         c = aurora_theme_manager.colors
         t = aurora_theme_manager.tokens
-        self.setFixedHeight(56)  # Linear usa 56px para mais compact
+        self.setMinimumHeight(56)  # Linear usa 56px para mais compact
         self.setObjectName("auroraTopBar")
         self.setStyleSheet(f"""
         QFrame#auroraTopBar {{
@@ -682,7 +685,7 @@ class AuroraTopBar(QFrame):
 
         hl = QHBoxLayout()
         hl.setContentsMargins(t.SPACING_XL, 0, t.SPACING_XL, 0)
-        hl.setSpacing(t.SPACING_MD)
+        hl.setSpacing(t.SPACING_LG)
         self.setLayout(hl)
 
         # Breadcrumb elegante estilo Linear
@@ -698,8 +701,8 @@ class AuroraTopBar(QFrame):
 
         # Search bar refinada estilo Linear (maior)
         search_container = QFrame()
-        search_container.setFixedHeight(40)
-        search_container.setFixedWidth(320)
+        search_container.setMinimumHeight(40)
+        search_container.setMinimumWidth(320)
         search_container.setStyleSheet(f"""
         QFrame {{
             background: {c['bg_tertiary']};
@@ -715,13 +718,15 @@ class AuroraTopBar(QFrame):
         search_container.setLayout(sl)
 
         search_icon = QLabel()
-        search_icon.setPixmap(get_pixmap("search", QSize(16, 16), c["text_tertiary"]))
+        search_icon.setPixmap(get_pixmap("search", QSize(24, 24), c["text_tertiary"]))
         search_icon.setStyleSheet("background: transparent;")
         sl.addWidget(search_icon)
 
         self._search = QLineEdit()
         self._search.setPlaceholderText("Buscar operações, clientes...")
         self._search.setFrame(False)
+        self._search.setClearButtonEnabled(True)
+        self._search.setToolTip("Digite o que deseja encontrar")
         self._search.setStyleSheet(f"""
         QLineEdit {{
             background: transparent;
@@ -733,6 +738,11 @@ class AuroraTopBar(QFrame):
         QLineEdit::placeholder {{ color: {c['text_tertiary']}; }}
         """)
         sl.addWidget(self._search, 1)
+        # Conectar tanto ao Enter quanto ao textChanged para busca dinâmica
+        self._search.returnPressed.connect(
+            lambda: self.search_requested.emit(self._search.text().strip())
+        )
+        self._search.textChanged.connect(self._on_search_changed)
 
         hint = QLabel("⌘K")
         hint.setStyleSheet(f"""
@@ -753,7 +763,7 @@ class AuroraTopBar(QFrame):
 
         # Botão Nova Operação útil
         add_btn = QPushButton("+ Nova Operação")
-        add_btn.setFixedHeight(40)
+        add_btn.setMinimumHeight(40)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setFont(QFont(t.FONT_FAMILY_QT, t.FONT_SIZE_SM, QFont.Weight.Bold))
         add_btn.setStyleSheet(f"""
@@ -777,6 +787,7 @@ class AuroraTopBar(QFrame):
         }}
         """)
         hl.addWidget(add_btn)
+        add_btn.clicked.connect(self.new_operation_requested.emit)
 
         hl.addSpacing(8)
 
@@ -791,8 +802,8 @@ class AuroraTopBar(QFrame):
         self._bell_btn = QPushButton()
         self._bell_btn.setFixedSize(36, 36)
         self._bell_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._bell_btn.setIcon(get_icon("bell", QSize(16, 16), c["text_secondary"]))
-        self._bell_btn.setIconSize(QSize(16, 16))
+        self._bell_btn.setIcon(get_icon("bell", QSize(24, 24), c["text_secondary"]))
+        self._bell_btn.setIconSize(QSize(24, 24))
         self._bell_btn.setStyleSheet(f"""
         QPushButton {{
             background: transparent;
@@ -878,9 +889,9 @@ class AuroraTopBar(QFrame):
         ]:
             btn = QPushButton(f"  {text}")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setFixedHeight(42)
-            btn.setIcon(get_icon(icon, QSize(16, 16), c["text_tertiary"]))
-            btn.setIconSize(QSize(16, 16))
+            btn.setMinimumHeight(42)
+            btn.setIcon(get_icon(icon, QSize(24, 24), c["text_tertiary"]))
+            btn.setIconSize(QSize(24, 24))
             btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {c['text_primary']};
@@ -894,15 +905,15 @@ class AuroraTopBar(QFrame):
             ml.addWidget(btn)
 
         sep2 = QFrame()
-        sep2.setFixedHeight(1)
+        sep2.setMinimumHeight(1)
         sep2.setStyleSheet(f"background: {c['border_subtle']}; margin: 4px 10px;")
         ml.addWidget(sep2)
 
         logout_btn = QPushButton("  Sair do sistema")
         logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        logout_btn.setFixedHeight(42)
-        logout_btn.setIcon(get_icon("logout", QSize(16, 16), c["crimson"]))
-        logout_btn.setIconSize(QSize(16, 16))
+        logout_btn.setMinimumHeight(42)
+        logout_btn.setIcon(get_icon("logout", QSize(24, 24), c["crimson"]))
+        logout_btn.setIconSize(QSize(24, 24))
         logout_btn.setStyleSheet(f"""
         QPushButton {{
             background: transparent; color: {c['crimson']};
@@ -923,25 +934,6 @@ class AuroraTopBar(QFrame):
             pos.setY(pos.y() + 8)
             pos.setX(pos.x() - self._menu.width() + self._avatar_container.width() + 100)
             self._menu.move(pos)
-            self._menu.raise_()
-            self._menu.setVisible(True)
-
-    def set_breadcrumb(self, section: str, page: str):
-        if section:
-            self._breadcrumb.setText(f'{section}  ›  {page}')
-        else:
-            self._breadcrumb.setText(page)
-
-    def set_user_info(self, name: str, avatar_letter: str = "U", role: str = "",
-                      usuario_id: int = None):
-        from utils.avatar import AvatarWidget, avatar_bus
-        self._usuario_nome = name
-        self._usuario_id = usuario_id
-        # TopBar minimalista - apenas avatar, sem labels de nome/role
-        if hasattr(self, '_name_label'):
-            self._name_label.setText(name)
-        if role and hasattr(self, '_role_label'):
-            self._role_label.setText(role)
         self._avatar_w.update_user(usuario_id, name)
         try:
             avatar_bus.avatar_updated.disconnect(self._on_avatar_updated)
@@ -952,6 +944,20 @@ class AuroraTopBar(QFrame):
     def _on_avatar_updated(self, uid: int):
         if uid == self._usuario_id:
             self._avatar_w.update_user(uid, self._usuario_nome)
+
+    def _on_search_changed(self, text: str):
+        """Handler para busca dinâmica em tempo real."""
+        if len(text.strip()) >= 2:
+            self.search_requested.emit(text.strip())
+
+    def set_user_info(self, nome: str, avatar_letter: str, usuario_id: int = None):
+        """Define informações do usuário."""
+        self._usuario_nome = nome
+        self._usuario_id = usuario_id
+
+    def set_breadcrumb(self, section: str, page: str):
+        """Define o breadcrumb estilo Linear."""
+        self._breadcrumb.setText(f"{section} / {page}")
 
     def update_status_dot(self, status: str):
         colors = {"online": "#10B981", "ausente": "#F59E0B",
@@ -983,89 +989,89 @@ class AuroraKPICard(QFrame):
         accent = aurora_theme_manager.get_accent(accent_color)
         soft = aurora_theme_manager.get_color(accent_color.value + '_soft')
 
-        # Premium card styling com micro-shadows e bordas refinadas
+        # Premium card styling limpo e moderno - sem bordas grossas
         self.setStyleSheet(f"""
         QFrame#kpiCard {{
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {c['card_bg']}, stop:1 {c['bg_surface']});
+            background: {c['card_bg']};
             border: 1px solid {c['border_subtle']};
             border-radius: {t.RADIUS_XL}px;
         }}
         QFrame#kpiCard:hover {{
-            border-color: {accent};
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {c['card_hover']}, stop:1 {c['bg_surface']});
+            border-color: {c['border_default']};
+            background: {c['card_hover']};
         }}
         """)
-        
-        # Animação de hover suave
-        self._hover_anim = QPropertyAnimation(self, b"geometry")
-        self._hover_anim.setDuration(200)
-        self._hover_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-        # Micro-shadow effect para profundidade
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(8)
-        shadow.setOffset(0, 2)
-        shadow.setColor(QColor(0, 0, 0, 40))
-        self.setGraphicsEffect(shadow)
+        # Sombra premium mais sofisticada
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setBlurRadius(20)
+        self._shadow.setOffset(0, 4)
+        self._shadow.setColor(QColor(0, 0, 0, 60))
+        self.setGraphicsEffect(self._shadow)
+
+        # Enable hover events
+        self.setMouseTracking(True)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
         self.setLayout(layout)
 
         # Header com icon e title refinados
         hdr = QHBoxLayout()
-        hdr.setSpacing(12)
+        hdr.setSpacing(16)
 
         if icon_name:
             ico_container = QLabel()
-            ico_container.setFixedSize(40, 40)
+            ico_container.setMinimumSize(48, 48)
+            ico_container.setMaximumSize(48, 48)
             ico_container.setStyleSheet(f"""
             QLabel {{
-                background: {c['bg_surface']};
-                border-radius: 20px;
-                border: 1px solid {c['border_subtle']};
-            }}
-            QLabel:hover {{
-                background: {c['card_hover']};
-                border-color: {accent};
+                background: {accent}26;
+                border-radius: 24px;
+                border: none;
             }}
             """)
             ico_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
+
             ico = QLabel()
-            ico.setPixmap(get_pixmap(icon_name, QSize(20, 20), accent))
+            ico.setMinimumSize(26, 26)
+            ico.setMaximumSize(26, 26)
+            ico.setPixmap(get_pixmap(icon_name, QSize(26, 26), accent))
             ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ico.setStyleSheet("background: transparent;")
-            
+
             ico_layout = QVBoxLayout()
             ico_layout.setContentsMargins(0, 0, 0, 0)
             ico_layout.addWidget(ico)
             ico_container.setLayout(ico_layout)
             hdr.addWidget(ico_container)
 
+            # Guardar referência para hover effect
+            self._icon_container = ico_container
+            self._icon_base_color = accent
+
         title_lbl = QLabel(title)
-        title_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        title_lbl.setFont(aurora_theme_manager.get_font(14, bold=True))
         title_lbl.setStyleSheet(f"""
             color: {c['text_secondary']};
             background: transparent;
-            letter-spacing: -0.01em;
+            letter-spacing: 0.02em;
+            font-weight: 600;
         """)
         hdr.addWidget(title_lbl)
         hdr.addStretch()
 
         layout.addLayout(hdr)
 
-        # Value com tipografia refinada
+        # Value com tipografia premium
         value_lbl = QLabel(value)
-        value_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_3XL, bold=True))
+        value_lbl.setFont(QFont(t.FONT_FAMILY_QT, 36, QFont.Weight.Bold))
         value_lbl.setStyleSheet(f"""
             color: {c['text_primary']};
             background: transparent;
-            letter-spacing: -0.02em;
-            line-height: 1.1;
+            letter-spacing: -0.03em;
+            line-height: 1.0;
         """)
         layout.addWidget(value_lbl)
         self._value_label = value_lbl
@@ -1074,89 +1080,141 @@ class AuroraKPICard(QFrame):
         self._change_row = None
         self._change_icon_label = None
         self._change_label = None
+        self._change_badge = None
         if change:
             change_row = QHBoxLayout()
-            change_row.setSpacing(6)
+            change_row.setSpacing(8)
             
             is_positive = change.startswith('+')
             change_color = c['forest'] if is_positive else c['crimson']
-            change_icon = "trending-up" if is_positive else "trending-down"
+            change_icon = "trending_up" if is_positive else "trending_down"
             
-            change_ico = QLabel()
-            change_ico.setPixmap(get_pixmap(change_icon, QSize(14, 14), change_color))
-            change_ico.setStyleSheet("background: transparent;")
-            change_row.addWidget(change_ico)
-            
-            change_lbl = QLabel(change)
-            change_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
-            change_lbl.setStyleSheet(f"""
-                color: {change_color};
-                background: transparent;
-                letter-spacing: -0.01em;
+            # Badge elegante para change
+            # IMPORTANTE: não usar QLabel como container de layout (gera glitch/artefatos e sizeHint ruim).
+            change_badge = QFrame()
+            change_badge.setObjectName("kpiChangeBadge")
+            change_badge.setStyleSheet(f"""
+            QFrame#kpiChangeBadge {{
+                background: {change_color}15;
+                border: 1px solid {change_color}40;
+                border-radius: 10px;
+            }}
             """)
-            change_row.addWidget(change_lbl)
+
+            badge_layout = QHBoxLayout(change_badge)
+            badge_layout.setContentsMargins(10, 6, 10, 6)
+            badge_layout.setSpacing(6)
+
+            change_ico = QLabel()
+            change_ico.setFixedSize(18, 18)
+            change_ico.setPixmap(get_pixmap(change_icon, QSize(18, 18), change_color))
+            change_ico.setStyleSheet("background: transparent;")
+
+            change_lbl = QLabel(change)
+            change_lbl.setFont(aurora_theme_manager.get_font(13, bold=True))
+            change_lbl.setStyleSheet(f"color: {change_color}; background: transparent;")
+
+            badge_layout.addWidget(change_ico)
+            badge_layout.addWidget(change_lbl)
             
+            change_row.addWidget(change_badge)
             change_row.addStretch()
             layout.addLayout(change_row)
             self._change_row = change_row
             self._change_icon_label = change_ico
             self._change_label = change_lbl
+            self._change_badge = change_badge
 
         # Sparkline real (não placeholder)
         self._sparkline_widget = _PremiumSparkline(accent_color)
-        self._sparkline_widget.setFixedHeight(48)
+        self._sparkline_widget.setMinimumHeight(56)
         layout.addWidget(self._sparkline_widget)
-
-        # Barra inferior em gradiente
-        gradient_bar = QFrame()
-        gradient_bar.setFixedHeight(4)
-        gradient_bar.setStyleSheet(f"""
-        QFrame {{
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 {aurora_theme_manager.get_color(accent_color.value + '_start')},
-                stop:1 {aurora_theme_manager.get_color(accent_color.value + '_end')});
-            border-radius: 0 0 {t.RADIUS_XL}px {t.RADIUS_XL}px;
-        }}
-        """)
-        layout.addWidget(gradient_bar)
 
     def set_value(self, value: str):
         self._value_label.setText(value)
 
     def set_change(self, change: str):
         c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
         is_positive = change.startswith('+')
         change_color = c['forest'] if is_positive else c['crimson']
-        change_icon = "trending-up" if is_positive else "trending-down"
+        change_icon = "trending_up" if is_positive else "trending_down"
 
-        if self._change_label is None or self._change_icon_label is None:
+        if self._change_label is None or self._change_badge is None or self._change_icon_label is None:
             change_row = QHBoxLayout()
-            change_row.setSpacing(6)
+            change_row.setSpacing(8)
+            
+            # Badge elegante para change (QFrame container)
+            change_badge = QFrame()
+            change_badge.setObjectName("kpiChangeBadge")
+            change_badge.setStyleSheet(f"""
+            QFrame#kpiChangeBadge {{
+                background: {change_color}15;
+                border: 1px solid {change_color}40;
+                border-radius: 10px;
+            }}
+            """)
+
+            badge_layout = QHBoxLayout(change_badge)
+            badge_layout.setContentsMargins(10, 6, 10, 6)
+            badge_layout.setSpacing(6)
+
             change_ico = QLabel()
+            change_ico.setFixedSize(18, 18)
             change_lbl = QLabel()
-            change_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
-            change_row.addWidget(change_ico)
-            change_row.addWidget(change_lbl)
+            change_lbl.setFont(aurora_theme_manager.get_font(13, bold=True))
+            
+            badge_layout.addWidget(change_ico)
+            badge_layout.addWidget(change_lbl)
+            
+            change_row.addWidget(change_badge)
             change_row.addStretch()
             self.layout().insertLayout(2, change_row)
             self._change_row = change_row
             self._change_icon_label = change_ico
             self._change_label = change_lbl
+            self._change_badge = change_badge
 
-        self._change_icon_label.setPixmap(get_pixmap(change_icon, QSize(14, 14), change_color))
+        self._change_icon_label.setPixmap(get_pixmap(change_icon, QSize(18, 18), change_color))
         self._change_icon_label.setStyleSheet("background: transparent;")
         self._change_label.setText(change)
-        self._change_label.setStyleSheet(f"""
-            color: {change_color};
-            background: transparent;
-            letter-spacing: -0.01em;
-        """)
+        self._change_label.setStyleSheet(f"color: {change_color}; background: transparent;")
 
     def set_sparkline_data(self, data: list):
         """Define os dados do sparkline."""
         self._sparkline_data = data
         self._sparkline_widget.set_data(data)
+
+    def enterEvent(self, event):
+        """Hover enter - eleva sombra e ilumina ícone."""
+        if hasattr(self, '_shadow'):
+            self._shadow.setBlurRadius(30)
+            self._shadow.setOffset(0, 6)
+            self._shadow.setColor(QColor(0, 0, 0, 80))
+        if hasattr(self, '_icon_container'):
+            self._icon_container.setStyleSheet(f"""
+            QLabel {{
+                background: {self._icon_base_color}40;
+                border-radius: 24px;
+                border: none;
+            }}
+            """)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """Hover leave - restaura sombra e ícone."""
+        if hasattr(self, '_shadow'):
+            self._shadow.setBlurRadius(20)
+            self._shadow.setOffset(0, 4)
+            self._shadow.setColor(QColor(0, 0, 0, 60))
+        if hasattr(self, '_icon_container'):
+            self._icon_container.setStyleSheet(f"""
+            QLabel {{
+                background: {self._icon_base_color}26;
+                border-radius: 24px;
+                border: none;
+            }}
+            """)
+        super().leaveEvent(event)
 
 
 # ===================================================================== _PremiumSparkline - Sparkline real estilo Linear
@@ -1379,10 +1437,10 @@ class SeparatorLine(QFrame):
         super().__init__(parent)
         c = aurora_theme_manager.colors
         if orientation == "horizontal":
-            self.setFixedHeight(1)
+            self.setMinimumHeight(1)
             self.setStyleSheet(f"background: {c['border_subtle']}; border: none;")
         else:
-            self.setFixedWidth(1)
+            self.setMinimumWidth(1)
             self.setStyleSheet(f"background: {c['border_subtle']}; border: none;")
 
 

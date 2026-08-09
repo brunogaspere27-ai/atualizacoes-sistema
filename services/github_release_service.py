@@ -541,5 +541,11 @@ class GitHubReleaseService:
             return []
 
 
-# Instância singleton do serviço
-github_release_service = GitHubReleaseService()
+# Instância singleton do serviço (lazy-loaded)
+_github_release_service_instance = None
+
+def github_release_service() -> GitHubReleaseService:
+    global _github_release_service_instance
+    if _github_release_service_instance is None:
+        _github_release_service_instance = GitHubReleaseService()
+    return _github_release_service_instance

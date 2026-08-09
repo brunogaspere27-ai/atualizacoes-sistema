@@ -50,15 +50,17 @@ class CommandPalette(QDialog):
 
     command_executed = Signal(str)    # emite o id do comando
 
-    def __init__(self, commands: List[Command], parent=None):
+    def __init__(self, commands: List[Command], parent=None,
+                 search_provider: Optional[Callable[[str], List[Command]]] = None):
         super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._commands = commands
+        self._search_provider = search_provider
         self._filtered: List[Command] = list(commands)
         self._selected_idx = 0
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
-        self._debounce.setInterval(80)
+        self._debounce.setInterval(300)
         self._debounce.timeout.connect(self._apply_filter)
         self._build()
 
@@ -125,7 +127,7 @@ class CommandPalette(QDialog):
         self._search.textChanged.connect(self._on_text_changed)
         sl.addWidget(self._search, 1)
 
-        hint = QLabel("ESC para fechar")
+        hint = QLabel("ESC limpa")
         hint.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
         hint.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         sl.addWidget(hint)
@@ -192,7 +194,15 @@ class CommandPalette(QDialog):
 
     def _apply_filter(self):
         query = self._search.text()
-        self._filtered = [cmd for cmd in self._commands if cmd.matches(query)]
+        commands = [cmd for cmd in self._commands if cmd.matches(query)]
+        if self._search_provider and query.strip():
+            try:
+                search_results = self._search_provider(query)
+                commands = search_results + commands
+            except Exception as e:
+                print(f"Erro no search_provider: {e}")
+                search_results = []
+        self._filtered = commands
         self._selected_idx = 0
         self._render_results()
 
@@ -307,7 +317,10 @@ class CommandPalette(QDialog):
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_Escape:
-            self.close()
+            if self._search.text():
+                self._search.clear()
+            else:
+                self.close()
         elif event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Tab):
             self._selected_idx = min(self._selected_idx + 1, len(self._filtered) - 1)
             self._render_results()
@@ -340,6 +353,7 @@ class CommandRegistry:
     def __init__(self):
         self._commands: List[Command] = []
         self._palette: Optional[CommandPalette] = None
+        self._search_provider: Optional[Callable[[str], List[Command]]] = None
 
     @classmethod
     def instance(cls) -> "CommandRegistry":
@@ -352,6 +366,10 @@ class CommandRegistry:
 
     def register_many(self, cmds: List[Command]):
         self._commands.extend(cmds)
+
+    def set_search_provider(self, provider: Callable[[str], List[Command]]) -> None:
+        """Define a fonte de resultados de cadastros para a busca global."""
+        self._search_provider = provider
 
     def build_default_commands(self, navigate_fn: Callable, parent=None) -> List[Command]:
         """Cria os comandos padrão do sistema."""
@@ -376,12 +394,14 @@ class CommandRegistry:
         self._commands = cmds
         return cmds
 
-    def open(self, parent=None):
-        """Abre o command palette."""
+    def open(self, parent=None, query: str = ""):
+        """Abre a busca global, opcionalmente já filtrada por ``query``."""
         if self._palette and self._palette.isVisible():
-            self._palette.close()
+            self._palette._search.setText(query)
+            self._palette._search.setFocus()
             return
-        self._palette = CommandPalette(self._commands, parent)
+        self._palette = CommandPalette(self._commands, parent, self._search_provider)
+        self._palette._search.setText(query)
         self._palette.show()
 
 
