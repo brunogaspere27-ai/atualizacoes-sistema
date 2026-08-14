@@ -9,6 +9,7 @@ Responsavel por todas as consultas de dados usadas pelo painel principal:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -469,6 +470,10 @@ class DashboardService:
         )
 
     def _kpi_soma(self, cur, tabela, coluna, f_cur, p_cur, f_ant, p_ant):
+        if not re.match(r'^[a-zA-Z0-9_]+$', str(tabela)):
+            raise ValueError("Invalid input")
+        if not re.match(r'^[a-zA-Z0-9_]+$', str(coluna)):
+            raise ValueError("Invalid input")
         cur.execute(f"SELECT COALESCE(SUM({coluna}), 0) FROM {tabela} {f_cur}", p_cur)
         val = cur.fetchone()[0]
         cur.execute(f"SELECT COALESCE(SUM({coluna}), 0) FROM {tabela} {f_ant}", p_ant)
