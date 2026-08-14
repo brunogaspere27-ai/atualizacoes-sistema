@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import threading
 from datetime import datetime
@@ -398,6 +399,8 @@ def reparar_e_enfileirar_fila() -> int:
 
 
 def enviar_lote_tabela(cursor_local, cursor_cloud, tabela: str, itens: List[sqlite3.Row]):
+    if not re.match(r'^[a-zA-Z0-9_]+$', str(tabela)):
+        raise ValueError("Invalid input")
     if not itens:
         return [], []
 
