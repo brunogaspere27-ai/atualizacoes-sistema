@@ -61,8 +61,8 @@ def _create_connection() -> sqlite3.Connection:
         DB_NAME,
         timeout=30,
         check_same_thread=False,
-        factory=sqlite_connection_factory(),
     )
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys = ON")

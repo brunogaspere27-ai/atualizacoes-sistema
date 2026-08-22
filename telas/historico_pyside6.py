@@ -4,9 +4,12 @@ Tela Histórico de Viagens - Padrão CW Moderno
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QLineEdit, QComboBox,
-    QHeaderView, QAbstractItemView, QFrame, QDateEdit
+    QHeaderView, QAbstractItemView, QFrame, QDateEdit,
+    QDialog, QDialogButtonBox, QMessageBox
 )
 from PySide6.QtCore import Qt, QDate
+
+from utils.database.viagens import listar_viagens, listar_notas_da_viagem, apagar_viagem
 
 ESTILO = """
 QWidget {
@@ -73,11 +76,75 @@ QFrame {
 """
 
 
+class DialogoNotasViagem(QDialog):
+    def __init__(self, viagem_id, parent=None):
+        super().__init__(parent)
+        self.viagem_id = viagem_id
+        self.setWindowTitle(f"Notas da Viagem #{viagem_id}")
+        self.setMinimumSize(900, 500)
+        self.setStyleSheet(ESTILO)
+        self._setup_ui()
+        self._carregar_notas()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        titulo = QLabel(f"📋 Notas da Viagem #{self.viagem_id}")
+        titulo.setObjectName("titulo")
+        layout.addWidget(titulo)
+
+        self.tabela = QTableWidget()
+        self.tabela.setColumnCount(9)
+        self.tabela.setHorizontalHeaderLabels([
+            "ID", "CT-e/Chave", "Remetente", "Destinatário", "Origem", "Destino", "Frete", "Peso", "Status"
+        ])
+        self.tabela.horizontalHeader().setStretchLastSection(True)
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabela.setAlternatingRowColors(True)
+        self.tabela.verticalHeader().setVisible(False)
+        layout.addWidget(self.tabela)
+
+        btn_ok = QPushButton("Fechar")
+        btn_ok.setObjectName("secundario")
+        btn_ok.clicked.connect(self.accept)
+        layout.addWidget(btn_ok)
+
+    def _carregar_notas(self):
+        self.tabela.setRowCount(0)
+        notas = listar_notas_da_viagem(self.viagem_id)
+        
+        for nota in notas:
+            # (id, numero_cte, remetente, destinatario, origem, destino, valor_frete, peso, status)
+            row = self.tabela.rowCount()
+            self.tabela.insertRow(row)
+            
+            valores = [
+                str(nota[0]),
+                str(nota[1] or "-"),
+                str(nota[2] or "-"),
+                str(nota[3] or "-"),
+                str(nota[4] or "-"),
+                str(nota[5] or "-"),
+                f"R$ {float(nota[6] or 0):,.2f}",
+                f"{float(nota[7] or 0):,.2f} kg",
+                str(nota[8] or "-")
+            ]
+            
+            for col, value in enumerate(valores):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.tabela.setItem(row, col, item)
+
+
 class TelaHistorico(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet(ESTILO)
         self._setup_ui()
+        self._carregar_dados()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -90,10 +157,6 @@ class TelaHistorico(QWidget):
         titulo.setObjectName("titulo")
         header.addWidget(titulo)
         header.addStretch()
-
-        btn_exportar = QPushButton("📤 Exportar")
-        btn_exportar.setObjectName("secundario")
-        header.addWidget(btn_exportar)
         layout.addLayout(header)
 
         # Filtros
@@ -105,7 +168,7 @@ class TelaHistorico(QWidget):
         filtros.addWidget(self.filtro_busca)
 
         self.filtro_status = QComboBox()
-        self.filtro_status.addItems(["Todos os status", "Concluída", "Em andamento", "Cancelada"])
+        self.filtro_status.addItems(["Todos os status", "Em viagem", "Finalizada", "Cancelada"])
         filtros.addWidget(self.filtro_status)
 
         self.data_inicio = QDateEdit()
@@ -120,12 +183,13 @@ class TelaHistorico(QWidget):
 
         btn_filtrar = QPushButton("Filtrar")
         btn_filtrar.setObjectName("secundario")
+        btn_filtrar.clicked.connect(self._carregar_dados)
         filtros.addWidget(btn_filtrar)
         layout.addLayout(filtros)
 
         # Tabela
         self.tabela = QTableWidget()
-        self.tabela.setColumnCount(8)
+        self.tabela.setColumnCount(9)
         self.tabela.setHorizontalHeaderLabels([
             "ID", "Data Saída", "Caminhão", "Motorista", "Notas", "KM", "Status", "Ações"
         ])
@@ -134,6 +198,9 @@ class TelaHistorico(QWidget):
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tabela.setAlternatingRowColors(True)
         self.tabela.verticalHeader().setVisible(False)
+        self.tabela.setColumnWidth(0, 60)
+        self.tabela.setColumnWidth(4, 80)
+        self.tabela.setColumnWidth(7, 120)
         layout.addWidget(self.tabela)
 
         # Resumo
@@ -152,23 +219,105 @@ class TelaHistorico(QWidget):
             lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
             cl.addWidget(lbl)
             val = QLabel(valor_text)
+            val.setObjectName(f"resumo_{label_text.lower().replace(' ', '_')}")
             val.setStyleSheet("color: #E6EDF3; font-size: 20px; font-weight: 700;")
             cl.addWidget(val)
             resumo.addWidget(card)
         layout.addLayout(resumo)
         layout.addStretch()
 
-        self._carregar_dados()
-
     def _carregar_dados(self):
         self.tabela.setRowCount(0)
-        for row_data in [
-            ["1", "20/08/2026", "ABC-1234", "João Silva", "12", "1.250", "Concluída", "👁️"],
-            ["2", "21/08/2026", "DEF-5678", "Pedro Santos", "8", "980", "Concluída", "👁️"],
-        ]:
+        viagens = listar_viagens()
+        
+        total_viagens = 0
+        total_km = 0
+        
+        for v in viagens:
+            # (id, data_saida, modelo, placa, motorista, status, peso_total, frete_total, total_notas)
             row = self.tabela.rowCount()
             self.tabela.insertRow(row)
-            for col, value in enumerate(row_data):
+            
+            valores = [
+                str(v[0]),
+                str(v[1] or "-"),
+                f"{v[2] or '-'} ({v[3] or '-'})",
+                str(v[4] or "-"),
+                str(v[8] or 0),  # total_notas
+                "-",  # KM não tem na query atual
+                str(v[5] or "-"),
+            ]
+            
+            for col, value in enumerate(valores):
                 item = QTableWidgetItem(value)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.tabela.setItem(row, col, item)
+            
+            # Botão de ações
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(4, 2, 4, 2)
+            btn_layout.setSpacing(6)
+            
+            btn_ver = QPushButton("👁️ Ver")
+            btn_ver.setObjectName("secundario")
+            btn_ver.setStyleSheet("""
+                QPushButton {
+                    background-color: #21262D;
+                    color: #58A6FF;
+                    border: 1px solid #30363D;
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                }
+                QPushButton:hover { background-color: #30363D; }
+            """)
+            btn_ver.clicked.connect(lambda checked, vid=v[0]: self._ver_notas(vid))
+            
+            btn_apagar = QPushButton("�️")
+            btn_apagar.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #F85149;
+                    border: none;
+                    padding: 4px 8px;
+                    font-size: 12px;
+                }
+            """)
+            btn_apagar.clicked.connect(lambda checked, vid=v[0]: self._apagar_viagem(vid))
+            
+            btn_layout.addWidget(btn_ver)
+            btn_layout.addWidget(btn_apagar)
+            btn_layout.addStretch()
+            
+            self.tabela.setCellWidget(row, 7, btn_container)
+            
+            total_viagens += 1
+        
+        # Atualizar resumo
+        self._atualizar_resumo("total_de_viagens", str(total_viagens))
+        self._atualizar_resumo("km_percorridos", "0")
+        self._atualizar_resumo("media_por_viagem", "0 km")
+
+    def _ver_notas(self, viagem_id):
+        dialogo = DialogoNotasViagem(viagem_id, self)
+        dialogo.exec()
+
+    def _apagar_viagem(self, viagem_id):
+        reply = QMessageBox.question(
+            self,
+            "Confirmar",
+            f"Deseja apagar a viagem #{viagem_id}?\nAs notas voltarão a ficar disponíveis.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                apagar_viagem(viagem_id)
+                self._carregar_dados()
+            except Exception as e:
+                QMessageBox.critical(self, "Erro", f"Erro ao apagar viagem:\n{str(e)}")
+
+    def _atualizar_resumo(self, chave, valor):
+        widget = self.findChild(QLabel, f"resumo_{chave}")
+        if widget:
+            widget.setText(valor)

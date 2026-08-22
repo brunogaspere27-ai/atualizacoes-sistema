@@ -22,6 +22,7 @@ class Settings:
         self.github_use_cdn = False
         self.enable_auto_update = False
         self.db_path = Path("data/cw_transportadora.db")
+        self.dados_dir = Path("data")
         self.backup_auto_dir = Path("backups/auto")
         self.backup_dir = Path("backups")
         self.logs_dir = Path("logs")

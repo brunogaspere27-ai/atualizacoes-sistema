@@ -574,3 +574,8 @@ def listar_operacoes_sp():
 
 def gerar_ranking_clientes_v6(tipo, mes, ano, conn=None):
     return []
+
+
+# Import from new modules to avoid conflicts with legacy functions
+from .viagens import criar_viagem, apagar_viagem, listar_viagens, listar_notas_da_viagem, finalizar_viagem, buscar_detalhes_viagem
+from .notas import salvar_nota, listar_notas, nota_existe, criar_manifesto, listar_manifestos, listar_notas_por_manifesto, apagar_manifesto, listar_notas_por_cliente, calcular_resumo_notas
