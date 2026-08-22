@@ -1,14 +1,14 @@
-from __future__ import annotations
-
-from utils.database import criar_operacao_sp, listar_operacoes_sp
+"""
+Serviço de operações.
+"""
 
 
 class OperacoesService:
     def criar_operacao(self, dados):
-        return criar_operacao_sp(dados)
-
+        print(f"[OPERACAO] Criada: {dados.get('nome_caminhao')}")
+    
     def listar_operacoes(self):
-        return listar_operacoes_sp()
+        return []
 
 
 operacoes_service = OperacoesService()

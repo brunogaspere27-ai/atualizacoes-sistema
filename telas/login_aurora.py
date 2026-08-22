@@ -26,7 +26,7 @@ from PySide6.QtGui import (
     QLinearGradient, QRadialGradient, QPen, QFont,
 )
 
-from telas.theme_aurora import aurora_theme_manager, AccentColor
+from telas.theme_aurora import aurora_cw_theme
 from utils.branding import load_official_logo_pixmap
 from utils.icons import get_icon, get_pixmap
 

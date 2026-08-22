@@ -638,6 +638,11 @@ class AuroraThemeManager:
     def tokens(self) -> ThemeTokens:
         return self._tokens
 
+    @property
+    def spacing(self) -> ThemeTokens:
+        """Alias para tokens para compatibilidade com código existente."""
+        return self._tokens
+
     def get_color(self, color_name: str) -> str:
         return self.colors.get(color_name, "#000000")
 
@@ -1020,6 +1025,9 @@ aurora_theme_manager = AuroraThemeManager()
 # Backward compatibility: allow importing as theme_manager
 theme_manager = aurora_theme_manager
 
+# CW Theme instance for compatibility
+aurora_cw_theme = aurora_theme_manager
+
 
 def setup_aurora_theme(settings) -> Dict[str, str]:
     """Configura o tema Aurora. Retorna dict de cores com aliases."""
@@ -1031,51 +1039,51 @@ def setup_aurora_theme(settings) -> Dict[str, str]:
 
     colors = aurora_cw_theme.colors
     return {
-        "fundo": cw_theme.colors["bg_primary"],
-        "sidebar": cw_theme.colors["sidebar_bg"],
-        "sidebar_card": cw_theme.colors["bg_elevated"],
-        "header": cw_theme.colors["header_bg"],
-        "header_bg": cw_theme.colors["header_bg"],
-        "header_tag": cw_theme.colors["aurora"],
-        "header_title": cw_theme.colors["text_primary"],
-        "header_subtitle": cw_theme.colors["text_secondary"],
-        "principal": cw_theme.colors["aurora"],
-        "hover": cw_theme.colors["aurora_hover"],
-        "texto": cw_theme.colors["text_primary"],
-        "texto_suave": cw_theme.colors["text_secondary"],
-        "card_bg": cw_theme.colors["card_bg"],
-        "card_text": cw_theme.colors["text_primary"],
-        "muted_border": cw_theme.colors["border_subtle"],
-        "surface_alt": cw_theme.colors["bg_tertiary"],
-        "accent": cw_theme.colors["aurora"],
-        "divider": cw_theme.colors["border_default"],
-        "shadow": cw_theme.colors["aurora_glow"],
+        "fundo": colors["bg_primary"],
+        "sidebar": colors["bg_secondary"],
+        "sidebar_card": colors["bg_elevated"],
+        "header": colors["bg_surface"],
+        "header_bg": colors["bg_surface"],
+        "header_tag": colors["aurora"],
+        "header_title": colors["text_primary"],
+        "header_subtitle": colors["text_secondary"],
+        "principal": colors["aurora"],
+        "hover": colors["aurora_hover"],
+        "texto": colors["text_primary"],
+        "texto_suave": colors["text_secondary"],
+        "card_bg": colors["bg_surface"],
+        "card_text": colors["text_primary"],
+        "muted_border": colors["border_subtle"],
+        "surface_alt": colors["bg_tertiary"],
+        "accent": colors["aurora"],
+        "divider": colors["border_default"],
+        "shadow": colors["aurora"],
         "font_family": aurora_cw_theme.spacing.FONT_FAMILY,
-        "aurora": cw_theme.colors["aurora"],
-        "aurora_soft": cw_theme.colors["aurora_soft"],
-        "ocean": cw_theme.colors["ocean"],
-        "ocean_soft": cw_theme.colors["ocean_soft"],
-        "sunset": cw_theme.colors["sunset"],
-        "sunset_soft": cw_theme.colors["sunset_soft"],
-        "forest": cw_theme.colors["forest"],
-        "forest_soft": cw_theme.colors["forest_soft"],
-        "cosmos": cw_theme.colors["cosmos"],
-        "cosmos_soft": cw_theme.colors["cosmos_soft"],
-        "ember": cw_theme.colors["ember"],
-        "ember_soft": cw_theme.colors["ember_soft"],
-        "crimson": cw_theme.colors["crimson"],
-        "crimson_soft": cw_theme.colors["crimson_soft"],
-        "neon": cw_theme.colors["neon"],
-        "neon_soft": cw_theme.colors["neon_soft"],
-        "success": cw_theme.colors["success"],
-        "success_soft": cw_theme.colors["success_soft"],
-        "warning": cw_theme.colors["warning"],
-        "warning_soft": cw_theme.colors["warning_soft"],
-        "error": cw_theme.colors["error"],
-        "error_soft": cw_theme.colors["error_soft"],
-        "info": cw_theme.colors["info"],
-        "info_soft": cw_theme.colors["info_soft"],
-        "chart_bg": cw_theme.colors["chart_bg"],
-        "chart_grid": cw_theme.colors["chart_grid"],
-        "chart_text": cw_theme.colors["chart_text"],
+        "aurora": colors["aurora"],
+        "aurora_soft": colors["aurora_soft"],
+        "ocean": colors["ocean"],
+        "ocean_soft": colors["ocean_soft"],
+        "sunset": colors["sunset"],
+        "sunset_soft": colors["sunset_soft"],
+        "forest": colors["forest"],
+        "forest_soft": colors["forest_soft"],
+        "cosmos": colors["cosmos"],
+        "cosmos_soft": colors["cosmos_soft"],
+        "ember": colors["ember"],
+        "ember_soft": colors["ember_soft"],
+        "crimson": colors["crimson"],
+        "crimson_soft": colors["crimson_soft"],
+        "neon": colors["neon"],
+        "neon_soft": colors["neon_soft"],
+        "success": colors["success"],
+        "success_soft": colors["success_soft"],
+        "warning": colors["warning"],
+        "warning_soft": colors["warning_soft"],
+        "error": colors["error"],
+        "error_soft": colors["error_soft"],
+        "info": colors["info"],
+        "info_soft": colors["info_soft"],
+        "chart_bg": colors["bg_surface"],
+        "chart_grid": colors["border_subtle"],
+        "chart_text": colors["text_secondary"],
     }

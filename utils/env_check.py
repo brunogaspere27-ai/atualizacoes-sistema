@@ -2,21 +2,14 @@
 Verificação de ambiente.
 """
 import os
-import sys
 
 
-def check_environment():
-    """Verifica se o ambiente está configurado corretamente."""
-    required_vars = ["SUPABASE_URL", "SUPABASE_KEY"]
-    missing = [v for v in required_vars if not os.getenv(v)]
+def verificar_configuracao_env():
+    """Verifica se variáveis de ambiente estão configuradas."""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
     
-    if missing:
-        print(f"❌ Variáveis ausentes: {', '.join(missing)}")
-        return False
+    if not url or not key:
+        return False, "SUPABASE_URL e SUPABASE_KEY não configurados. Sincronização desativada."
     
-    print("✅ Ambiente OK")
-    return True
-
-
-if __name__ == "__main__":
-    sys.exit(0 if check_environment() else 1)
+    return True, "OK"

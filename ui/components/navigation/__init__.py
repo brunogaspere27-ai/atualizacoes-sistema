@@ -1,3 +1,6 @@
 """Navigation Components - CW Transportadora (Sidebar, Header, etc)"""
 
-__all__ = []
+from .cw_sidebar import CWSidebar
+from .cw_header import CWHeader
+
+__all__ = ['CWSidebar', 'CWHeader']

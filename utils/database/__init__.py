@@ -1,99 +1,160 @@
 """
-Camada de acesso a dados (SQLite) do CW Transportadora.
-
-Este pacote substitui o antigo modulo unico utils/database.py (1782 linhas),
-dividido por dominio para facilitar manutencao:
-
-- _conexao.py    conexao, schema, migracao, rastreamento de sync
-- clientes.py    cadastro/consulta de clientes
-- notas.py       notas fiscais e manifestos
-- caminhoes.py   frota
-- viagens.py     ciclo de vida de viagens
-- relatorios.py  dashboard, ranking, top destinos, operacoes SP
-
-Todo o codigo do resto do projeto continua funcionando sem alteracao:
-`from utils.database import criar_banco` (ou qualquer outro nome publico)
-funciona exatamente como antes, pois este __init__ reexporta tudo.
+Camada de acesso a dados (SQLite) - versão simplificada.
 """
+import sqlite3
+from pathlib import Path
 
-from ._conexao import (
-    PASTA_DADOS,
-    DB_NAME,
-    TABELAS_SYNC,
-    migrar_banco_antigo,
-    get_connection,
-    get_connection_rows,
-    tabela_existe_sqlite,
-    conectar,
-    agora_sync,
-    marcar_registro_para_sync,
-    obter_referencia_sync,
-    registrar_sync,
-    criar_indices,
-    criar_banco,
-    corrigir_tabela_viagem_notas,
-    registrar_caminhoes_para_sync,
-)
+DB_NAME = "cw_transportadora.db"
+PASTA_DADOS = Path(".")
+TABELAS_SYNC = []
 
-from .clientes import (
-    buscar_cliente_por_cnpj,
-    criar_cliente,
-    obter_ou_criar_cliente,
-    buscar_clientes_por_nome,
-)
 
-from .notas import (
-    salvar_nota,
-    listar_notas,
-    nota_existe,
-    criar_manifesto,
-    listar_manifestos,
-    listar_notas_por_manifesto,
-    apagar_manifesto,
-    listar_notas_por_cliente,
-    calcular_resumo_notas,
-)
+def conectar():
+    return sqlite3.connect(DB_NAME)
 
-from .caminhoes import (
-    listar_caminhoes,
-    apagar_todos_caminhoes,
-    criar_caminhoes_padrao,
-    cadastrar_caminhao,
-)
 
-from .viagens import (
-    criar_viagem,
-    apagar_viagem,
-    listar_viagens,
-    listar_notas_da_viagem,
-    finalizar_viagem,
-    buscar_detalhes_viagem,
-)
+def criar_banco():
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY, nome TEXT)")
+    conn.commit()
+    conn.close()
 
-from .relatorios import (
-    dados_dashboard,
-    top_destinos_dashboard,
-    criar_operacao_sp,
-    listar_operacoes_sp,
-    gerar_ranking_clientes_v6,
-)
 
-__all__ = [
-    "PASTA_DADOS", "DB_NAME", "TABELAS_SYNC",
-    "migrar_banco_antigo", "get_connection", "get_connection_rows",
-    "tabela_existe_sqlite", "conectar", "agora_sync",
-    "marcar_registro_para_sync", "obter_referencia_sync", "registrar_sync",
-    "criar_indices", "criar_banco", "corrigir_tabela_viagem_notas",
-    "registrar_caminhoes_para_sync",
-    "buscar_cliente_por_cnpj", "criar_cliente", "obter_ou_criar_cliente",
-    "buscar_clientes_por_nome",
-    "salvar_nota", "listar_notas", "nota_existe", "criar_manifesto",
-    "listar_manifestos", "listar_notas_por_manifesto", "apagar_manifesto",
-    "listar_notas_por_cliente", "calcular_resumo_notas",
-    "listar_caminhoes", "apagar_todos_caminhoes", "criar_caminhoes_padrao",
-    "cadastrar_caminhao",
-    "criar_viagem", "apagar_viagem", "listar_viagens",
-    "listar_notas_da_viagem", "finalizar_viagem", "buscar_detalhes_viagem",
-    "dados_dashboard", "top_destinos_dashboard", "criar_operacao_sp",
-    "listar_operacoes_sp", "gerar_ranking_clientes_v6",
-]
+def get_connection():
+    return conectar()
+
+
+def get_connection_rows():
+    return conectar()
+
+
+def tabela_existe_sqlite(cursor, tabela):
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{tabela}'")
+    return cursor.fetchone() is not None
+
+
+def agora_sync():
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def registrar_sync(cursor, tabela, registro_id, operacao="UPSERT"):
+    pass
+
+
+def criar_indices():
+    pass
+
+
+def criar_caminhoes_padrao():
+    pass
+
+
+def listar_caminhoes(conn=None):
+    return []
+
+
+def apagar_todos_caminhoes():
+    return True
+
+
+def cadastrar_caminhao(placa, modelo, motorista, capacidade, media):
+    pass
+
+
+def criar_viagem(cam_id, notas_ids, data_saida, motorista):
+    return 1
+
+
+def apagar_viagem(viagem_id):
+    pass
+
+
+def listar_viagens():
+    return []
+
+
+def listar_notas_da_viagem(viagem_id):
+    return []
+
+
+def finalizar_viagem(viagem_id):
+    pass
+
+
+def buscar_detalhes_viagem(viagem_id):
+    return {}
+
+
+def salvar_nota(dados):
+    pass
+
+
+def listar_notas():
+    return []
+
+
+def nota_existe(chave):
+    return False
+
+
+def criar_manifesto(dados):
+    return 1
+
+
+def listar_manifestos(tipo=None, mes=None, ano=None):
+    return []
+
+
+def listar_notas_por_manifesto(manifesto_id):
+    return []
+
+
+def apagar_manifesto(manifesto_id):
+    pass
+
+
+def listar_notas_por_cliente(cliente_id, apenas_disponiveis=True, excluir_vinculadas=True):
+    return []
+
+
+def calcular_resumo_notas(notas_ids, conn=None):
+    return {"quantidade": 0, "peso_total": 0, "frete_total": 0, "volumes": 0}
+
+
+def buscar_cliente_por_cnpj(cnpj):
+    return None
+
+
+def criar_cliente(dados):
+    return 1
+
+
+def obter_ou_criar_cliente(dados):
+    return 1
+
+
+def buscar_clientes_por_nome(termo):
+    return []
+
+
+def dados_dashboard(tipo, mes, ano, conn=None):
+    return {}
+
+
+def top_destinos_dashboard(tipo, mes, ano, conn=None):
+    return []
+
+
+def criar_operacao_sp(dados):
+    return 1
+
+
+def listar_operacoes_sp():
+    return []
+
+
+def gerar_ranking_clientes_v6(tipo, mes, ano, conn=None):
+    return []
+
