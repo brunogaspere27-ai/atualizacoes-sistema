@@ -4,10 +4,14 @@ Serviço de atualização.
 import json
 import os
 
+CANAL_ESTAVEL = "estavel"
+CANAL_BETA = "beta"
+CANAL_DEV = "dev"
+
 
 class UpdateService:
     def __init__(self):
-        pass
+        self.channel = CANAL_ESTAVEL
     
     def check_for_updates(self):
         return {"has_update": False, "version": "2.0.0"}
@@ -29,6 +33,9 @@ class UpdateService:
         return [
             {"versao": "2.0.0", "data": "01/01/2024", "notas": "Versão inicial", "prerelease": False}
         ]
+    
+    def download_and_install(self, version, canal=CANAL_ESTAVEL):
+        return True
 
 
 update_service = UpdateService()

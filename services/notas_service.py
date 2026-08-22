@@ -1,5 +1,5 @@
 """
-Serviço de notas.
+Serviço de notas/manifestos.
 """
 
 
