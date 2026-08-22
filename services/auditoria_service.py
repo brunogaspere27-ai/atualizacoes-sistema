@@ -1,68 +1,274 @@
 """
-Serviço de auditoria de integridade.
+Servico de auditoria do sistema CW Transportadora.
+
+Registra e consulta eventos importantes do sistema:
+- Logins / logouts
+- Tentativas invalidas
+- Criacao / exclusao / alteracao de usuarios
+- Alteracoes de permissoes e senhas
+- Operacoes criticas do sistema
 """
-import re
-import threading
+
+from __future__ import annotations
+
 from datetime import datetime
-from utils.logger import Logger
+from typing import Any, Dict, List, Optional, Tuple
+
+from utils.database import conectar
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Acoes padronizadas
+ACAO_LOGIN = "LOGIN"
+ACAO_LOGOUT = "LOGOUT"
+ACAO_LOGIN_FALHOU = "LOGIN_FALHOU"
+ACAO_USUARIO_CRIADO = "USUARIO_CRIADO"
+ACAO_USUARIO_EXCLUIDO = "USUARIO_EXCLUIDO"
+ACAO_USUARIO_ATIVADO = "USUARIO_ATIVADO"
+ACAO_USUARIO_DESATIVADO = "USUARIO_DESATIVADO"
+ACAO_PERMISSAO_ALTERADA = "PERMISSAO_ALTERADA"
+ACAO_NIVEL_ALTERADO = "NIVEL_ALTERADO"
+ACAO_SENHA_ALTERADA = "SENHA_ALTERADA"
+ACAO_SENHA_REDEFINIDA = "SENHA_REDEFINIDA"
+ACAO_REGISTRO_EXCLUIDO = "REGISTRO_EXCLUIDO"
+ACAO_REGISTRO_ALTERADO = "REGISTRO_ALTERADO"
+ACAO_SINCRONIZACAO = "SINCRONIZACAO"
+ACAO_CONFIG_ALTERADA = "CONFIG_ALTERADA"
+ACAO_PUBLICAR_VERSAO = "PUBLICAR_VERSAO"
 
 
 class AuditoriaService:
-    """Audita integridade dos dados."""
-    
-    def __init__(self, db_manager):
-        self.db = db_manager
-        self.logger = Logger()
-        self._lock = threading.Lock()
-        self._integrity_rules = {
-            "usuarios": {
-                "email": {"required": True, "type": "email", "description": "Email válido obrigatório"},
-                "nome": {"required": True, "description": "Nome obrigatório"}
+    """Servico singleton para registro e consulta de auditoria."""
+
+    def registrar(
+        self,
+        acao: str,
+        modulo: str = "",
+        registro_afetado: str = "",
+        detalhes: str = "",
+        usuario_id: Optional[int] = None,
+        usuario_nome: str = "",
+    ) -> None:
+        """
+        Registra um evento de auditoria.
+
+        Se usuario_id/nome nao forem informados, tenta usar o usuario logado
+        via auth_service (importacao tardia para evitar ciclo).
+        """
+        if usuario_id is None:
+            try:
+                from services.auth_service import auth_service
+                u = auth_service.usuario_atual
+                if u:
+                    usuario_id = u["id"]
+                    usuario_nome = u.get("nome_completo", "")
+            except Exception:
+                pass  # auth_service pode nao estar disponivel ainda
+
+        try:
+            conn = conectar()
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO auditoria
+                        (usuario_id, usuario_nome, acao, modulo,
+                         registro_afetado, detalhes, criado_em)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        usuario_id,
+                        usuario_nome,
+                        acao,
+                        modulo,
+                        registro_afetado,
+                        detalhes,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as erro:
+            # Auditoria nao deve quebrar o fluxo principal
+            logger.error(f"Erro ao registrar auditoria ({acao}): {erro}")
+
+    # Alias para compatibilidade
+    registrar_acao = registrar
+
+    def listar(
+        self,
+        usuario_id: Optional[int] = None,
+        acao: Optional[str] = None,
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+        modulo: Optional[str] = None,
+        limite: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Consulta registros de auditoria com filtros e paginacao.
+
+        Args:
+            usuario_id: Filtrar por usuario especifico.
+            acao: Filtrar por tipo de acao.
+            data_inicio: Data inicial (YYYY-MM-DD).
+            data_fim: Data final (YYYY-MM-DD).
+            modulo: Filtrar por modulo.
+            limite: Quantidade maxima de registros.
+            offset: Posicao inicial (para paginacao).
+
+        Returns:
+            Lista de dicts com registros de auditoria.
+        """
+        where_clauses = []
+        params: list = []
+
+        if usuario_id is not None:
+            where_clauses.append("usuario_id = ?")
+            params.append(usuario_id)
+
+        if acao:
+            where_clauses.append("acao = ?")
+            params.append(acao)
+
+        if modulo:
+            where_clauses.append("modulo = ?")
+            params.append(modulo)
+
+        if data_inicio:
+            where_clauses.append("criado_em >= ?")
+            params.append(f"{data_inicio} 00:00:00")
+
+        if data_fim:
+            where_clauses.append("criado_em <= ?")
+            params.append(f"{data_fim} 23:59:59")
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"""
+                SELECT id, usuario_id, usuario_nome, acao, modulo,
+                       registro_afetado, detalhes, criado_em
+                FROM auditoria
+                {where_sql}
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+                [*params, limite, offset],
+            )
+
+            resultado = []
+            for row in cursor.fetchall():
+                resultado.append(
+                    {
+                        "id": row[0],
+                        "usuario_id": row[1],
+                        "usuario_nome": row[2] or "Sistema",
+                        "acao": row[3],
+                        "modulo": row[4] or "",
+                        "registro_afetado": row[5] or "",
+                        "detalhes": row[6] or "",
+                        "criado_em": row[7],
+                    }
+                )
+            return resultado
+        finally:
+            conn.close()
+
+    def contar_total(
+        self,
+        usuario_id: Optional[int] = None,
+        acao: Optional[str] = None,
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+        modulo: Optional[str] = None,
+    ) -> int:
+        """Conta total de registros com os mesmos filtros de listar()."""
+        where_clauses = []
+        params: list = []
+
+        if usuario_id is not None:
+            where_clauses.append("usuario_id = ?")
+            params.append(usuario_id)
+        if acao:
+            where_clauses.append("acao = ?")
+            params.append(acao)
+        if modulo:
+            where_clauses.append("modulo = ?")
+            params.append(modulo)
+        if data_inicio:
+            where_clauses.append("criado_em >= ?")
+            params.append(f"{data_inicio} 00:00:00")
+        if data_fim:
+            where_clauses.append("criado_em <= ?")
+            params.append(f"{data_fim} 23:59:59")
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM auditoria {where_sql}", params
+            )
+            return cursor.fetchone()[0]
+        finally:
+            conn.close()
+
+    def estatisticas_hoje(self) -> Dict[str, int]:
+        """Retorna contadores de eventos do dia atual."""
+        hoje = datetime.now().strftime("%Y-%m-%d")
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            stats: Dict[str, int] = {
+                "logins": 0,
+                "tentativas_falhas": 0,
+                "alteracoes": 0,
             }
-        }
-    
-    def run_full_audit(self):
-        """Executa auditoria completa."""
+
+            cursor.execute(
+                """
+                SELECT acao, COUNT(*)
+                FROM auditoria
+                WHERE criado_em >= ? AND criado_em <= ?
+                GROUP BY acao
+                """,
+                (f"{hoje} 00:00:00", f"{hoje} 23:59:59"),
+            )
+
+            for acao, total in cursor.fetchall():
+                if acao == ACAO_LOGIN:
+                    stats["logins"] = total
+                elif acao == ACAO_LOGIN_FALHOU:
+                    stats["tentativas_falhas"] = total
+                elif acao in (
+                    ACAO_REGISTRO_ALTERADO,
+                    ACAO_REGISTRO_EXCLUIDO,
+                    ACAO_SENHA_ALTERADA,
+                    ACAO_PERMISSAO_ALTERADA,
+                    ACAO_CONFIG_ALTERADA,
+                ):
+                    stats["alteracoes"] += total
+
+            return stats
+        finally:
+            conn.close()
+
+    def listar_acoes_distintas(self) -> List[str]:
+        """Retorna lista de acoes distintas ja registradas."""
+        conn = conectar()
+        cursor = conn.cursor()
         try:
-            with self._lock:
-                results = {}
-                for table in self._integrity_rules:
-                    records = self._get_table_records(table)
-                    issues = self._check_integrity(table, records)
-                    results[table] = issues
-                return results
-        except Exception as e:
-            self.logger.log(f"Erro na auditoria: {e}", "error")
-            return {}
-    
-    def _get_table_records(self, table):
-        try:
-            return self.db.query_all(table)
-        except Exception:
-            return []
-    
-    def _check_integrity(self, table, records):
-        issues = []
-        for record in records:
-            for field, rules in self._integrity_rules.get(table, {}).items():
-                value = record.get(field)
-                if rules.get("required") and (value is None or value == ""):
-                    issues.append({
-                        "tipo": "campo_obrigatorio",
-                        "tabela": table,
-                        "campo": field,
-                        "registro_id": record.get("id"),
-                        "valor": value,
-                        "regra": rules.get("description", "Campo obrigatório")
-                    })
-                if rules.get("type") == "email" and value:
-                    if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
-                        issues.append({
-                            "tipo": "email_invalido",
-                            "tabela": table,
-                            "campo": field,
-                            "registro_id": record.get("id"),
-                            "valor": value,
-                            "regra": "Email inválido"
-                        })
-        return issues
+            cursor.execute("SELECT DISTINCT acao FROM auditoria ORDER BY acao")
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+
+auditoria_service = AuditoriaService()

@@ -1,34 +1,33 @@
-"""
-Gerenciador Supabase.
-"""
 import os
-from supabase import create_client
+from dotenv import load_dotenv
+from config.settings import settings
+
+try:
+    import psycopg2
+except ImportError:  # pragma: no cover
+    psycopg2 = None
+
+load_dotenv()
+
+class SupabaseNaoConfiguradoError(RuntimeError):
+    """Erro levantado quando a nuvem não está configurada."""
 
 
-class SupabaseManager:
-    """Interface com Supabase."""
-    
-    def __init__(self, url=None, key=None):
-        self.supabase_url = url or os.getenv("SUPABASE_URL")
-        self.supabase_key = key or os.getenv("SUPABASE_KEY")
-        self._client = None
-    
-    def _get_client(self):
-        if not self._client:
-            self._client = create_client(self.supabase_url, self.supabase_key)
-        return self._client
-    
-    def check_connection(self):
-        try:
-            client = self._get_client()
-            return client is not None
-        except Exception:
-            return False
-    
-    @property
-    def auth(self):
-        return self._get_client().auth
-    
-    @property
-    def table(self, name):
-        return self._get_client().table(name)
+def supabase_habilitado() -> bool:
+    return settings.supabase_enabled
+
+
+def conectar_supabase():
+    if not supabase_habilitado():
+        raise SupabaseNaoConfiguradoError(
+            "SUPABASE_URL não configurado. O sistema seguirá em modo local."
+        )
+    if psycopg2 is None:
+        raise SupabaseNaoConfiguradoError(
+            "psycopg2 não está instalado. O sistema seguirá em modo local."
+        )
+
+    return psycopg2.connect(
+        settings.supabase_url,
+        connect_timeout=10
+    )
