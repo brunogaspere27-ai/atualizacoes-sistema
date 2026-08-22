@@ -1,22 +1,19 @@
 """
-Serviço de notas/manifestos.
+Servico de notas/manifestos.
+Delega importacao TXT para utils.importador_txt (que ja funciona).
 """
-import os
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
+from utils.importador_txt import importar_manifesto_txt, apagar_manifesto_importado
 from utils.database.notas import (
     listar_manifestos as db_listar_manifestos,
     listar_notas_por_manifesto as db_listar_notas_por_manifesto,
-    criar_manifesto as db_criar_manifesto,
-    apagar_manifesto as db_apagar_manifesto,
-    salvar_nota,
-    nota_existe,
+    listar_notas,
+    calcular_resumo_notas,
 )
 from utils.database.viagens import apagar_viagem
-from utils.database import calcular_resumo_notas
 
 
 class NotasService:
@@ -28,74 +25,26 @@ class NotasService:
     
     def importar_manifesto(self, caminho: str) -> Dict[str, Any]:
         """
-        Importa um arquivo TXT de manifesto.
-        Formato esperado: linhas com dados separados por tabulação ou pipe.
+        Delega para o importador TXT que ja funciona.
+        Retorna dict com: arquivo, encontradas, salvas, duplicadas
         """
-        encontradas = 0
-        salvas = 0
-        duplicadas = 0
-        
-        # Criar manifesto no banco
-        nome_arquivo = os.path.basename(caminho)
-        manifesto_id = db_criar_manifesto(nome_arquivo)
-        
-        with open(caminho, 'r', encoding='utf-8', errors='ignore') as f:
-            linhas = f.readlines()
-        
-        for linha in linhas:
-            linha = linha.strip()
-            if not linha:
-                continue
-            
-            encontradas += 1
-            
-            # Tenta parsear linha com campos separados por | ou tab
-            campos = linha.split('|') if '|' in linha else linha.split('\t')
-            
-            if len(campos) < 3:
-                continue
-            
-            nota = {
-                "manifesto_id": manifesto_id,
-                "chave_nfe": campos[0].strip() if len(campos) > 0 else "",
-                "numero_cte": campos[1].strip() if len(campos) > 1 else "",
-                "remetente_nome": campos[2].strip() if len(campos) > 2 else "",
-                "destinatario_nome": campos[3].strip() if len(campos) > 3 else "",
-                "origem": campos[4].strip() if len(campos) > 4 else "",
-                "destino": campos[5].strip() if len(campos) > 5 else "",
-                "valor_mercadoria": float(campos[6]) if len(campos) > 6 and campos[6].strip() else 0,
-                "valor_frete": float(campos[7]) if len(campos) > 7 and campos[7].strip() else 0,
-                "peso": float(campos[8]) if len(campos) > 8 and campos[8].strip() else 0,
-                "uf_origem": "",
-                "uf_destino": "",
-                "status": "Disponível"
-            }
-            
-            chave = nota.get("chave_nfe") or nota.get("numero_cte")
-            if nota_existe(chave):
-                duplicadas += 1
-                continue
-            
-            if salvar_nota(nota):
-                salvas += 1
-        
+        resultado = importar_manifesto_txt(caminho)
         return {
-            "arquivo": nome_arquivo,
-            "encontradas": encontradas,
-            "salvas": salvas,
-            "duplicadas": duplicadas
+            "arquivo": resultado["arquivo"],
+            "encontradas": resultado["encontradas"],
+            "salvas": resultado["salvas"],
+            "duplicadas": resultado["duplicadas"],
         }
     
     def exportar_manifesto_xml(self, manifesto_id: int, caminho_destino: str) -> bool:
         """
-        Exporta um manifesto e suas notas para XML no formato padrão de transporte.
+        Exporta um manifesto e suas notas para XML no formato padrao de transporte.
         """
         try:
             notas = db_listar_notas_por_manifesto(manifesto_id)
             if not notas:
                 return False
             
-            # Buscar info do manifesto
             from utils.database._conexao import conectar
             conn = conectar()
             cursor = conn.cursor()
@@ -139,7 +88,9 @@ class NotasService:
             return False
     
     def apagar_manifesto(self, manifesto_id):
-        return db_apagar_manifesto(manifesto_id)
+        """Delega para o importador que ja gerencia sync e relacionamentos."""
+        resultado = apagar_manifesto_importado(manifesto_id=manifesto_id)
+        return True
     
     def apagar_viagem(self, viagem_id):
         return apagar_viagem(viagem_id)
