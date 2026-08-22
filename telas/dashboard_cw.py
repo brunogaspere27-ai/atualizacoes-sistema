@@ -1,437 +1,836 @@
 """
-Dashboard Executivo CW Transportadora - Design System CW
-Dashboard premium com KPIs financeiros/operacionais e gráficos reais
-Inspiração: Linear, Stripe, Attio
+CW Transportadora — Dashboard EMU
+Gráficos próprios via QPainter (sem dependência de cw_theme ou pyqtgraph).
+Substitua o arquivo dashboard_cw.py ou dashboard_pyside6.py por este.
 """
+from __future__ import annotations
 
+import math
 from datetime import datetime
 
+from PySide6.QtCore import Qt, QTimer, QRectF, QPointF, QSize
+from PySide6.QtGui import (
+    QColor, QFont, QPainter, QPen, QBrush, QLinearGradient,
+    QPainterPath, QFontMetrics,
+)
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QScrollArea, QFrame, QLabel, QComboBox, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
+    QScrollArea, QComboBox, QPushButton, QTableWidget,
+    QTableWidgetItem, QHeaderView, QSizePolicy, QGraphicsDropShadowEffect,
 )
-from PySide6.QtCore import Qt
 
-from ui.theme.cw_theme import cw_theme, CWSpacing
-from ui.components import (
-    KPICard, CWCard, CWButton, ButtonVariant, ButtonSize,
-    CWChartCard, ChartType, CWEmptyState
-)
-from utils.helpers import formatar_moeda, formatar_peso
-from services.dashboard_service import DashboardService
+try:
+    from services import dashboard_service
+except Exception:
+    dashboard_service = None
+
+try:
+    from utils.helpers import formatar_moeda
+    def _brl(v):
+        try:
+            return formatar_moeda(float(v or 0))
+        except Exception:
+            return _brl_fallback(v)
+except Exception:
+    def _brl(v):
+        return _brl_fallback(v)
+
+def _brl_fallback(v):
+    try:
+        v = float(v or 0)
+    except Exception:
+        v = 0.0
+    s = f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
 
 
-class DashboardCW(QWidget):
-    """Dashboard executivo com Design System CW e dados reais."""
+# ── paleta ────────────────────────────────────────────────────────────────────
+
+BG       = "#0A0E14"
+SURF     = "#11161D"
+ELEV     = "#1A202C"
+OVER     = "#232D3F"
+B1       = "#2D3748"
+B2       = "#4A5568"
+
+T1       = "#E2E8F0"
+T2       = "#A0AEC0"
+T3       = "#718096"
+
+BRAND    = "#DC2626"
+BRAND_H  = "#EF4444"
+BRAND_BG = "#1F1515"
+
+EMERALD  = "#059669"
+SKY      = "#0284C7"
+AMBER    = "#D97706"
+ROSE     = "#E11D48"
+VIOLET   = "#7C3AED"
+CYAN     = "#0891B2"
+
+
+# ── helpers de widget ─────────────────────────────────────────────────────────
+
+def _shadow(w: QWidget, blur=12, dy=2, alpha=0.25):
+    # Desabilitado temporariamente para investigar linhas fantasma
+    pass
+
+
+def _lbl(text="", size=11, color=T1, bold=False, mono=False) -> QLabel:
+    lb = QLabel(str(text))
+    fam = "Cascadia Code" if mono else "Segoe UI"
+    f = QFont(fam, size)
+    f.setBold(bold)
+    lb.setFont(f)
+    lb.setStyleSheet(f"color:{color};background:transparent;")
+    return lb
+
+
+def _sep() -> QFrame:
+    f = QFrame()
+    f.setFrameShape(QFrame.Shape.HLine)
+    f.setFixedHeight(1)
+    f.setStyleSheet(f"background:{B1};border:none;")
+    return f
+
+
+# ── card base ─────────────────────────────────────────────────────────────────
+
+class Card(QFrame):
+    def __init__(self, accent=None, radius=14):
+        super().__init__()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{SURF};
+                border:none;
+                border-radius:{radius}px;
+            }}
+        """)
+        _shadow(self)
+
+
+# ── KPI card ──────────────────────────────────────────────────────────────────
+
+class KPICard(Card):
+    def __init__(self, titulo: str, acento: str = BRAND):
+        super().__init__(accent=acento)
+        self._acento = acento
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(3)
+
+        # linha colorida topo
+        bar = QFrame()
+        bar.setFixedHeight(2)
+        bar.setStyleSheet(f"background:{acento};border:none;border-radius:1px;")
+        lay.addWidget(bar)
+        lay.addSpacing(4)
+
+        self._titulo = _lbl(titulo.upper(), 8, T3)
+        lay.addWidget(self._titulo)
+
+        self._valor = QLabel("—")
+        f = QFont("Segoe UI", 18)
+        f.setBold(True)
+        self._valor.setFont(f)
+        self._valor.setStyleSheet(f"color:{T1};background:transparent;")
+        lay.addWidget(self._valor)
+
+        self._delta = _lbl("", 9, T3, mono=True)
+        lay.addWidget(self._delta)
+
+    def set(self, valor: str, delta: str = "", positivo: bool | None = None):
+        self._valor.setText(valor)
+        if delta:
+            if positivo is True:
+                cor, seta = EMERALD, "↑ "
+            elif positivo is False:
+                cor, seta = ROSE, "↓ "
+            else:
+                cor, seta = T3, ""
+            self._delta.setText(seta + delta)
+            self._delta.setStyleSheet(f"color:{cor};background:transparent;")
+        else:
+            self._delta.setText("")
+
+
+# ── Linha chart (QPainter) ────────────────────────────────────────────────────
+
+class LineChart(QWidget):
+    """
+    Gráfico de linha com gradiente, desenhado com QPainter.
+    series: lista de (nome, [valores], cor_hex)
+    labels: lista de strings para o eixo X
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._series: list[tuple[str, list[float], str]] = []
+        self._labels: list[str] = []
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setStyleSheet("background:transparent;")
 
+    def set_data(self, labels: list[str],
+                 series: list[tuple[str, list[float], str]]):
+        self._labels = labels
+        self._series = series
+        self.update()
+
+    def paintEvent(self, _):
+        if not self._series:
+            return
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        W, H = self.width(), self.height()
+        pad_l, pad_r, pad_t, pad_b = 52, 16, 12, 32
+        cw = W - pad_l - pad_r
+        ch = H - pad_t - pad_b
+
+        all_vals = [v for _, vs, _ in self._series for v in vs]
+        if not all_vals:
+            p.end()
+            return
+        mn, mx = min(all_vals), max(all_vals)
+        span = (mx - mn) or 1
+        mn -= span * 0.08
+        mx += span * 0.12
+        span = mx - mn
+
+        n = max(len(vs) for _, vs, _ in self._series)
+        if n < 2:
+            p.end()
+            return
+
+        def px(i, v):
+            x = pad_l + i * cw / (n - 1)
+            y = pad_t + ch - (v - mn) / span * ch
+            return QPointF(x, y)
+
+        # grid
+        grid_pen = QPen(QColor(B1))
+        grid_pen.setWidthF(1.0)
+        p.setPen(grid_pen)
+        for i in range(5):
+            y = pad_t + i * ch / 4
+            p.drawLine(int(pad_l), int(y), int(W - pad_r), int(y))
+
+        # eixo Y labels
+        p.setFont(QFont("Cascadia Code", 8))
+        p.setPen(QColor(T3))
+        for i in range(5):
+            v = mx - i * span / 4
+            y = pad_t + i * ch / 4
+            txt = f"{v/1000:.0f}k" if abs(v) >= 1000 else f"{v:.0f}"
+            p.drawText(0, int(y) - 8, pad_l - 6, 16,
+                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, txt)
+
+        # eixo X labels
+        if self._labels:
+            for i, lb in enumerate(self._labels[:n]):
+                x = pad_l + i * cw / (n - 1)
+                p.drawText(int(x) - 20, H - pad_b + 4, 40, 20,
+                           Qt.AlignmentFlag.AlignCenter, lb)
+
+        # série
+        for nome, vals, cor_hex in self._series:
+            if not vals:
+                continue
+            cor = QColor(cor_hex)
+
+            # gradiente de preenchimento
+            path_fill = QPainterPath()
+            path_fill.moveTo(px(0, vals[0]))
+            for i in range(1, len(vals)):
+                path_fill.lineTo(px(i, vals[i]))
+            path_fill.lineTo(QPointF(px(len(vals) - 1, vals[-1]).x(), pad_t + ch))
+            path_fill.lineTo(QPointF(px(0, vals[0]).x(), pad_t + ch))
+            path_fill.closeSubpath()
+
+            grad = QLinearGradient(0, pad_t, 0, pad_t + ch)
+            c1 = QColor(cor_hex)
+            c1.setAlphaF(0.18)
+            c2 = QColor(cor_hex)
+            c2.setAlphaF(0.0)
+            grad.setColorAt(0, c1)
+            grad.setColorAt(1, c2)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(grad))
+            p.drawPath(path_fill)
+
+            # linha
+            path_line = QPainterPath()
+            path_line.moveTo(px(0, vals[0]))
+            for i in range(1, len(vals)):
+                path_line.lineTo(px(i, vals[i]))
+            pen = QPen(cor)
+            pen.setWidthF(2.5)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawPath(path_line)
+
+            # pontos
+            p.setBrush(QBrush(QColor(SURF)))
+            p.setPen(QPen(cor, 2))
+            for i, v in enumerate(vals):
+                pt = px(i, v)
+                p.drawEllipse(pt, 4, 4)
+
+        p.end()
+
+
+# ── barra de progresso customizada ────────────────────────────────────────────
+
+class ProgressBar(QWidget):
+    def __init__(self, pct: float, cor: str, parent=None):
+        super().__init__(parent)
+        self._pct = max(0.0, min(1.0, pct))
+        self._cor = QColor(cor)
+        self.setFixedHeight(6)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet("background:transparent;")
+
+    def set_pct(self, pct: float):
+        self._pct = max(0.0, min(1.0, pct))
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        W, H = self.width(), self.height()
+
+        # trilha
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(ELEV))
+        p.drawRoundedRect(0, 0, W, H, 3, 3)
+
+        # preenchimento com gradiente
+        fill_w = int(W * self._pct)
+        if fill_w > 0:
+            grad = QLinearGradient(0, 0, fill_w, 0)
+            c1 = QColor(self._cor)
+            c2 = QColor(self._cor)
+            c2.setAlphaF(0.65)
+            grad.setColorAt(0, c1)
+            grad.setColorAt(1, c2)
+            p.setBrush(QBrush(grad))
+            p.drawRoundedRect(0, 0, fill_w, H, 3, 3)
+
+        p.end()
+
+
+# ── badge de status ───────────────────────────────────────────────────────────
+
+_STATUS = {
+    "Entregue":   (EMERALD, "#0D2818"),
+    "Concluído":  (EMERALD, "#0D2818"),
+    "Em Rota":    (SKY,     "#0C2D6B"),
+    "Trânsito":   (SKY,     "#0C2D6B"),
+    "Agendado":   (CYAN,    "#0A2A2E"),
+    "Pendente":   (AMBER,   "#2A1F0A"),
+    "Manutenção": (ROSE,    "#2E141C"),
+    "Atrasado":   (BRAND,   BRAND_BG),
+}
+
+def _badge(texto: str) -> QLabel:
+    fg, bg = _STATUS.get(texto, (T2, ELEV))
+    lb = QLabel(texto)
+    lb.setFont(QFont("Cascadia Code", 9))
+    lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lb.setFixedHeight(22)
+    lb.setStyleSheet(f"""
+        QLabel {{
+            color:{fg};background:{bg};
+            border:none;border-radius:4px;
+            padding:0 8px;
+        }}
+    """)
+    return lb
+
+
+# ── DashboardCW ───────────────────────────────────────────────────────────────
+
+class DashboardCW(QWidget):
+    """
+    Dashboard principal EMU. Compatível com a chamada DashboardCW() do main_pyside6.py.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.tipo_periodo = "Geral"
         self.mes = datetime.now().strftime("%m")
         self.ano = datetime.now().strftime("%Y")
+        self._build()
+        QTimer.singleShot(0, self._load_data)
 
-        self.dashboard_service = DashboardService()
-        self.kpis = {}
-        self.chart_data = {}
-        self.contas_resumo = {}
-        self.combustivel_resumo = {}
-        self.manutencoes_resumo = {}
-        self.atividades = []
+    # ── layout ────────────────────────────────────────────────────────────
 
-        self._setup_ui()
-        self._load_data()
-
-    def _setup_ui(self):
-        """Configura UI com Design System CW."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
-
-        # Scroll area
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setStyleSheet(f"""
-        QScrollArea {{ background: transparent; border: none; }}
-        QScrollBar:vertical {{ background: transparent; width: 8px; margin: 4px 2px; }}
-        QScrollBar::handle:vertical {{ background: {c['border_subtle']}; border-radius: 4px; min-height: 40px; }}
-        QScrollBar::handle:vertical:hover {{ background: {c['border_default']}; }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; height: 0px; }}
+    def _build(self):
+        self.setStyleSheet(f"""
+            background:{BG};
+            QLabel {{
+                border: none;
+                background: transparent;
+            }}
+            QFrame {{
+                border: none;
+            }}
         """)
 
-        # Content area
-        self.content = QWidget()
-        self.content.setStyleSheet(f"background: {c['bg_primary']};")
-        self.content_layout = QVBoxLayout()
-        self.content_layout.setContentsMargins(t._2XL, t.XL, t._2XL, t._2XL)
-        self.content_layout.setSpacing(t.LG)
-        self.content.setLayout(self.content_layout)
-        self.scroll.setWidget(self.content)
-
-        # Main layout
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        self.setLayout(main_layout)
-        main_layout.addWidget(self.scroll)
-
-        # Criar seções
-        self._create_header()
-        self._create_kpi_cards()
-        self._create_charts_section()
-        self._create_summary_cards()
-        self._create_activity_section()
-
-    def _create_header(self):
-        """Cria header do dashboard."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
-
-        header = QHBoxLayout()
-
-        # Título
-        titulo_box = QVBoxLayout()
-        titulo_box.setSpacing(t.XS)
-        
-        titulo = QLabel("Olá, Administrador!")
-        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        titulo_box.addWidget(titulo)
-
-        subtitulo = QLabel("Aqui está o resumo geral da sua operação.")
-        subtitulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        subtitulo.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        titulo_box.addWidget(subtitulo)
-
-        header.addLayout(titulo_box, 1)
-
-        # Seletor de período
-        self.periodo_combo = QComboBox()
-        self.periodo_combo.addItems(["Geral", "Mês Atual", "Mês Anterior"])
-        self.periodo_combo.setCurrentText(self.tipo_periodo)
-        self.periodo_combo.setStyleSheet(f"""
-        QComboBox {{
-            background-color: {c['bg_primary']};
-            border: 1px solid {c['border_default']};
-            border-radius: {cw_theme.radius.MD}px;
-            padding: {t.SM}px {t.MD}px;
-            font-size: {cw_theme.typography.FONT_SIZE_SM}px;
-            color: {c['text_primary']};
-            min-width: 150px;
-        }}
-        QComboBox:hover {{
-            border-color: {c['border_strong']};
-        }}
-        QComboBox::drop-down {{
-            border: none;
-            width: 30px;
-        }}
-        QComboBox::down-arrow {{
-            image: none;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 5px solid {c['text_secondary']};
-        }}
-        QComboBox QAbstractItemView {{
-            background-color: {c['bg_primary']};
-            border: 1px solid {c['border_default']};
-            selection-background-color: {c['primary_soft']};
-            selection-color: {c['primary']};
-        }}
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ border:none; background:{BG}; }}
+            QScrollBar:vertical {{
+                width:6px; background:transparent; margin:0;
+            }}
+            QScrollBar::handle:vertical {{
+                background:{B2}; border-radius:3px; min-height:40px;
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{ height:0; }}
         """)
-        self.periodo_combo.currentTextChanged.connect(self._on_periodo_changed)
-        header.addWidget(self.periodo_combo)
 
-        self.content_layout.addLayout(header)
+        page = QWidget()
+        page.setStyleSheet(f"background:{BG};")
+        self._root = QVBoxLayout(page)
+        self._root.setContentsMargins(24, 20, 24, 32)
+        self._root.setSpacing(16)
 
-    def _create_kpi_cards(self):
-        """Cria cards de KPIs com dados reais."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
+        scroll.setWidget(page)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
 
-        kpi_layout = QGridLayout()
-        kpi_layout.setSpacing(t.LG)
+        self._build_header()
+        self._build_kpis()
+        self._build_charts()
+        self._build_operations()
+        self._root.addStretch()
 
-        # KPI: Receita Total
-        receita_data = self.kpis.get('receita_total', {})
-        receita_valor = receita_data.get('valor', 0)
-        receita_crescimento = receita_data.get('crescimento', 0)
-        
-        self.kpi_receita = KPICard(
-            title="Receita Total",
-            value=formatar_moeda(receita_valor),
-            subtitle="No período selecionado",
-            trend=f"+{receita_crescimento:.1f}%" if receita_crescimento >= 0 else f"{receita_crescimento:.1f}%",
-            trend_positive=receita_crescimento >= 0
-        )
-        kpi_layout.addWidget(self.kpi_receita, 0, 0)
+    # ── cabeçalho ─────────────────────────────────────────────────────────
 
-        # KPI: Lucro Estimado
-        lucro_data = self.kpis.get('lucro_estimado', {})
-        lucro_valor = lucro_data.get('valor', 0)
-        lucro_crescimento = lucro_data.get('crescimento', 0)
-        
-        self.kpi_lucro = KPICard(
-            title="Lucro Estimado",
-            value=formatar_moeda(lucro_valor),
-            subtitle="Margem operacional",
-            trend=f"+{lucro_crescimento:.1f}%" if lucro_crescimento >= 0 else f"{lucro_crescimento:.1f}%",
-            trend_positive=lucro_crescimento >= 0
-        )
-        kpi_layout.addWidget(self.kpi_lucro, 0, 1)
+    def _build_header(self):
+        row = QHBoxLayout()
+        row.setSpacing(12)
 
-        # KPI: Fretes Realizados
-        fretes_data = self.kpis.get('fretes_realizados', {})
-        fretes_valor = fretes_data.get('valor', 0)
-        fretes_crescimento = fretes_data.get('crescimento', 0)
-        
-        self.kpi_fretes = KPICard(
-            title="Fretes Realizados",
-            value=str(int(fretes_valor)),
-            subtitle="Viagens concluídas",
-            trend=f"+{fretes_crescimento:.1f}%" if fretes_crescimento >= 0 else f"{fretes_crescimento:.1f}%",
-            trend_positive=fretes_crescimento >= 0
-        )
-        kpi_layout.addWidget(self.kpi_fretes, 0, 2)
+        # identidade
+        ident = QVBoxLayout()
+        ident.setSpacing(1)
+        ident.addWidget(_lbl("CW TRANSPORTADORA", 14, T1, bold=True))
+        ident.addWidget(_lbl(
+            datetime.now().strftime("Dashboard executivo  ·  %d/%m/%Y"),
+            8, T3, mono=True
+        ))
+        row.addLayout(ident)
+        row.addStretch()
 
-        # KPI: Clientes Ativos
-        clientes_data = self.kpis.get('clientes_ativos', {})
-        clientes_valor = clientes_data.get('valor', 0)
-        clientes_crescimento = clientes_data.get('crescimento', 0)
-        
-        self.kpi_clientes = KPICard(
-            title="Clientes Ativos",
-            value=str(int(clientes_valor)),
-            subtitle="No período selecionado",
-            trend=f"+{clientes_crescimento:.1f}%" if clientes_crescimento >= 0 else f"{clientes_crescimento:.1f}%",
-            trend_positive=clientes_crescimento >= 0
-        )
-        kpi_layout.addWidget(self.kpi_clientes, 0, 3)
+        # período
+        self._combo = QComboBox()
+        self._combo.addItems(["Geral", "Mês", "Ano"])
+        self._combo.setMaximumHeight(32)
+        self._combo.setMinimumWidth(100)
+        self._combo.setStyleSheet(f"""
+            QComboBox {{
+                background:{SURF}; color:{T1};
+                border:none; border-radius:6px;
+                padding:0 10px; font-size:10px; font-family:'Segoe UI';
+            }}
+            QComboBox:hover {{ background:{ELEV}; }}
+            QComboBox::drop-down {{ border:none; width:16px; }}
+            QComboBox::down-arrow {{
+                width:0; height:0;
+                border-left:3px solid transparent;
+                border-right:3px solid transparent;
+                border-top:4px solid {T2};
+            }}
+            QComboBox QAbstractItemView {{
+                background:{ELEV}; color:{T1};
+                border:none; border-radius:6px;
+                selection-background-color:{BRAND_BG};
+            }}
+        """)
+        self._combo.currentTextChanged.connect(self._change_period)
+        row.addWidget(self._combo)
 
-        self.content_layout.addLayout(kpi_layout)
+        # botão atualizar
+        btn = QPushButton("Atualizar")
+        btn.setMaximumHeight(32)
+        btn.setMinimumWidth(80)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{BRAND}; color:#fff; border:none;
+                border-radius:6px; font-size:10px; font-weight:600;
+                font-family:'Segoe UI'; padding:0 12px;
+            }}
+            QPushButton:hover {{ background:{BRAND_H}; }}
+            QPushButton:pressed {{ background:#B91C1C; }}
+        """)
+        btn.clicked.connect(self._load_data)
+        row.addWidget(btn)
 
-    def _create_charts_section(self):
-        """Cria seção de gráficos com dados reais."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
+        self._root.addLayout(row)
+        self._root.addWidget(_sep())
 
-        charts_layout = QHBoxLayout()
-        charts_layout.setSpacing(t.LG)
+    # ── KPIs ──────────────────────────────────────────────────────────────
 
-        # Gráfico de Receita Mensal - dados reais
-        receita_data = self.chart_data.get('receita', {})
-        if not receita_data.get('labels') or not receita_data.get('valores'):
-            # Dados fallback se não houver dados reais
-            receita_data = {
-                'labels': ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                'valores': [0, 0, 0, 0, 0, 0]
-            }
-        
-        self.chart_receita = CWChartCard(
-            "Receita Mensal",
-            ChartType.LINE,
-            receita_data
-        )
-        charts_layout.addWidget(self.chart_receita, 1)
+    def _build_kpis(self):
+        row = QHBoxLayout()
+        row.setSpacing(10)
 
-        # Gráfico de Fretes por Status - dados reais
-        fretes_status = self.dashboard_service.resumo_fretes_status(
-            self.tipo_periodo, self.mes, self.ano
-        )
-        if not fretes_status:
-            fretes_status = [("Concluídas", 0), ("Em andamento", 0), ("Pendentes", 0)]
-        
-        fretes_labels = [status[0] for status in fretes_status]
-        fretes_valores = [status[1] for status in fretes_status]
-        
-        self.chart_fretes = CWChartCard(
-            "Fretes por Status",
-            ChartType.DONUT,
-            {'labels': fretes_labels, 'valores': fretes_valores}
-        )
-        charts_layout.addWidget(self.chart_fretes, 1)
+        self._kpi_receita   = KPICard("Receita Bruta",      EMERALD)
+        self._kpi_lucro     = KPICard("Lucro Estimado",     SKY)
+        self._kpi_fretes    = KPICard("Fretes Realizados",  BRAND)
+        self._kpi_andamento = KPICard("Em Andamento",       AMBER)
+        self._kpi_clientes  = KPICard("Clientes Ativos",    VIOLET)
 
-        self.content_layout.addLayout(charts_layout)
+        for kpi in [self._kpi_receita, self._kpi_lucro, self._kpi_fretes,
+                    self._kpi_andamento, self._kpi_clientes]:
+            row.addWidget(kpi, 1)
 
-        # Gráfico de Despesas por Categoria - dados reais
-        despesas_data = self.chart_data.get('despesas', {})
-        if not despesas_data.get('labels') or not despesas_data.get('valores'):
-            # Dados fallback se não houver dados reais
-            despesas_data = {
-                'labels': ['Combustível', 'Manutenção', 'Salários', 'Outros'],
-                'valores': [0, 0, 0, 0]
-            }
-        
-        self.chart_despesas = CWChartCard(
-            "Despesas por Categoria",
-            ChartType.BAR,
-            despesas_data
-        )
-        self.content_layout.addWidget(self.chart_despesas)
+        self._root.addLayout(row)
 
-    def _create_summary_cards(self):
-        """Cria cards de resumo (contas, combustível, manutenção)."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
+    # ── gráficos ──────────────────────────────────────────────────────────
 
-        summary_layout = QHBoxLayout()
-        summary_layout.setSpacing(t.LG)
+    def _build_charts(self):
+        row = QHBoxLayout()
+        row.setSpacing(12)
 
-        # Card Contas
-        contas_card = CWCard(title="Contas a Pagar")
-        contas_info = QLabel(f"Pendentes: {self.contas_resumo.get('pendentes', 0)}")
-        contas_info.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        contas_info.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        contas_card.add_widget(contas_info)
-        
-        valor_contas = QLabel(formatar_moeda(self.contas_resumo.get('total', 0)))
-        valor_contas.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        valor_contas.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        contas_card.add_widget(valor_contas)
-        
-        contas_card.add_spacing()
-        
-        btn_contas = CWButton("Ver Contas", ButtonVariant.GHOST, ButtonSize.SM)
-        contas_card.add_widget(btn_contas)
-        
-        summary_layout.addWidget(contas_card, 1)
+        # ── gráfico de linha (2/3)
+        card_chart = Card()
+        cc = QVBoxLayout(card_chart)
+        cc.setContentsMargins(16, 14, 16, 14)
+        cc.setSpacing(10)
 
-        # Card Combustível
-        combustivel_card = CWCard(title="Combustível")
-        combustivel_info = QLabel(f"Abastecimentos: {self.combustivel_resumo.get('total', 0)}")
-        combustivel_info.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        combustivel_info.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        combustivel_card.add_widget(combustivel_info)
-        
-        valor_combustivel = QLabel(formatar_moeda(self.combustivel_resumo.get('gasto', 0)))
-        valor_combustivel.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        valor_combustivel.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        combustivel_card.add_widget(valor_combustivel)
-        
-        combustivel_card.add_spacing()
-        
-        btn_combustivel = CWButton("Ver Abastecimentos", ButtonVariant.GHOST, ButtonSize.SM)
-        combustivel_card.add_widget(btn_combustivel)
-        
-        summary_layout.addWidget(combustivel_card, 1)
+        head = QHBoxLayout()
+        ttl = QVBoxLayout()
+        ttl.setSpacing(1)
+        ttl.addWidget(_lbl("Receita × Despesas", 12, T1, bold=True))
+        ttl.addWidget(_lbl("Evolução mensal do período", 8, T3))
+        head.addLayout(ttl)
+        head.addStretch()
 
-        # Card Manutenção
-        manutencao_card = CWCard(title="Manutenções")
-        manutencao_info = QLabel(f"Em andamento: {self.manutencoes_resumo.get('andamento', 0)}")
-        manutencao_info.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        manutencao_info.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        manutencao_card.add_widget(manutencao_info)
-        
-        valor_manutencao = QLabel(formatar_moeda(self.manutencoes_resumo.get('gasto', 0)))
-        valor_manutencao.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        valor_manutencao.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        manutencao_card.add_widget(valor_manutencao)
-        
-        manutencao_card.add_spacing()
-        
-        btn_manutencao = CWButton("Ver Manutenções", ButtonVariant.GHOST, ButtonSize.SM)
-        manutencao_card.add_widget(btn_manutencao)
-        
-        summary_layout.addWidget(manutencao_card, 1)
+        for nome, cor in [("Receita", EMERALD), ("Despesa", ROSE)]:
+            dot = QLabel(f"● {nome}")
+            dot.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            dot.setStyleSheet(f"color:{cor};background:transparent;")
+            head.addSpacing(10)
+            head.addWidget(dot)
 
-        self.content_layout.addLayout(summary_layout)
+        cc.addLayout(head)
 
-    def _create_activity_section(self):
-        """Cria seção de atividades recentes."""
-        c = cw_theme.colors
-        t = cw_theme.spacing
+        self._chart = LineChart()
+        self._chart.setMinimumHeight(200)
+        cc.addWidget(self._chart, 1)
 
-        atividades_card = CWCard(title="Atividades Recentes")
-        
-        if not self.atividades:
-            empty_label = QLabel("Nenhuma atividade recente")
-            empty_label.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
-            empty_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-            atividades_card.add_widget(empty_label)
-        else:
-            for atividade in self.atividades[:5]:
-                atividade_label = QLabel(f"• {atividade}")
-                atividade_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-                atividade_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-                atividades_card.add_widget(atividade_label)
-        
-        self.content_layout.addWidget(atividades_card)
-        self.content_layout.addStretch()
+        row.addWidget(card_chart, 2)
+
+        # ── painel operacional (1/3)
+        card_ops = Card()
+        co = QVBoxLayout(card_ops)
+        co.setContentsMargins(14, 14, 14, 14)
+        co.setSpacing(10)
+
+        co.addWidget(_lbl("Operação atual", 12, T1, bold=True))
+        co.addWidget(_lbl("Fretes por status", 8, T3))
+        co.addWidget(_sep())
+
+        self._op_rows: dict[str, tuple[QLabel, ProgressBar, QLabel]] = {}
+        for nome, cor in [("Entregue", EMERALD), ("Em Rota", SKY), ("Pendente", AMBER)]:
+            bloco = QVBoxLayout()
+            bloco.setSpacing(4)
+
+            linha = QHBoxLayout()
+            dot = QLabel("●")
+            dot.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            dot.setStyleSheet(f"color:{cor};background:transparent;")
+            linha.addWidget(dot)
+            nm = _lbl(nome, 9, T2)
+            linha.addWidget(nm)
+            linha.addStretch()
+            val = _lbl("—", 10, T1, bold=True, mono=True)
+            linha.addWidget(val)
+
+            bloco.addLayout(linha)
+            bar = ProgressBar(0.0, cor)
+            bloco.addWidget(bar)
+            co.addLayout(bloco)
+            self._op_rows[nome] = (val, bar, nm)
+
+        co.addWidget(_sep())
+        co.addWidget(_lbl("Utilização", 10, T1, bold=True))
+
+        self._util_rows: dict[str, tuple[QLabel, ProgressBar]] = {}
+        for nome, pct, cor in [
+            ("Frota disponível", 0.86, SKY),
+            ("Entregas no prazo", 0.92, EMERALD),
+            ("Contas em dia",     0.83, VIOLET),
+        ]:
+            bloco = QVBoxLayout()
+            bloco.setSpacing(3)
+            ln = QHBoxLayout()
+            ln.addWidget(_lbl(nome, 8, T2))
+            ln.addStretch()
+            vl = _lbl(f"{int(pct*100)}%", 8, T1, bold=True, mono=True)
+            ln.addWidget(vl)
+            bloco.addLayout(ln)
+            bar = ProgressBar(pct, cor)
+            bloco.addWidget(bar)
+            co.addLayout(bloco)
+            self._util_rows[nome] = (vl, bar)
+
+        co.addStretch()
+        row.addWidget(card_ops, 1)
+        self._root.addLayout(row)
+
+    # ── operações ─────────────────────────────────────────────────────────
+
+    def _build_operations(self):
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        # tabela entregas (2/3)
+        card_tbl = Card()
+        ct = QVBoxLayout(card_tbl)
+        ct.setContentsMargins(16, 14, 16, 14)
+        ct.setSpacing(8)
+        ct.addWidget(_lbl("Próximas Entregas", 12, T1, bold=True))
+
+        self._table = QTableWidget(0, 4)
+        self._table.setHorizontalHeaderLabels(["Data", "Documento", "Destino", "Status"])
+        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self._table.verticalHeader().setVisible(False)
+        self._table.setShowGrid(False)
+        self._table.setAlternatingRowColors(False)
+        self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._table.setMinimumHeight(180)
+        self._table.setStyleSheet(f"""
+            QTableWidget {{
+                background:{SURF}; border:none;
+                color:{T1}; font-size:10px; font-family:'Segoe UI';
+                outline:0;
+            }}
+            QHeaderView::section {{
+                background:{BG}; color:{T3};
+                border:none;
+                padding:6px 8px;
+                font-size:8px; font-weight:700;
+                font-family:'Segoe UI'; letter-spacing:0.5px;
+                text-transform:uppercase;
+            }}
+            QTableWidget::item {{
+                border:none;
+                padding:8px;
+            }}
+            QTableWidget::item:selected {{
+                background:{BRAND_BG}; color:{T1};
+            }}
+            QScrollBar:vertical {{
+                width:5px; background:transparent;
+            }}
+            QScrollBar::handle:vertical {{
+                background:{B2}; border-radius:3px;
+            }}
+        """)
+        ct.addWidget(self._table)
+        row.addWidget(card_tbl, 2)
+
+        # rail financeiro (1/3)
+        card_fin = Card()
+        cf = QVBoxLayout(card_fin)
+        cf.setContentsMargins(14, 14, 14, 14)
+        cf.setSpacing(8)
+        cf.addWidget(_lbl("Financeiro", 12, T1, bold=True))
+        cf.addWidget(_lbl("Posição resumida", 8, T3))
+        cf.addWidget(_sep())
+
+        self._fin_items: dict[str, tuple[QLabel, QLabel]] = {}
+        for nome, cor in [
+            ("A receber",  EMERALD),
+            ("A pagar",    ROSE),
+            ("Combustível",AMBER),
+            ("Manutenção", SKY),
+        ]:
+            box = QFrame()
+            box.setStyleSheet(f"""
+                QFrame {{
+                    background:{ELEV};
+                    border:none;
+                    border-left:3px solid {cor};
+                    border-radius:6px;
+                }}
+            """)
+            bl = QVBoxLayout(box)
+            bl.setContentsMargins(10, 8, 10, 8)
+            bl.setSpacing(1)
+            bl.addWidget(_lbl(nome.upper(), 7, T3))
+            val = _lbl("R$ —", 12, T1, bold=True)
+            det = _lbl("—", 8, T3, mono=True)
+            bl.addWidget(val)
+            bl.addWidget(det)
+            cf.addWidget(box)
+            self._fin_items[nome] = (val, det)
+
+        cf.addStretch()
+        row.addWidget(card_fin, 1)
+        self._root.addLayout(row)
+
+    # ── dados ─────────────────────────────────────────────────────────────
 
     def _load_data(self):
-        """Carrega dados reais do dashboard usando dashboard_service."""
+        if dashboard_service is None:
+            self._demo()
+            return
         try:
-            # Carregar KPIs executivos
-            self.kpis = self.dashboard_service.calcular_kpis(
-                self.tipo_periodo, self.mes, self.ano
-            )
-            
-            # Carregar dados de gráficos
-            dashboard_executivo = self.dashboard_service.carregar_dashboard_executivo(
-                self.tipo_periodo, self.mes, self.ano
-            )
-            self.chart_data = dashboard_executivo
-            
-            # Carregar resumo de contas
-            contas_resumo = self.dashboard_service.resumo_contas_receber_pagar(
-                self.tipo_periodo, self.mes, self.ano
-            )
-            self.contas_resumo = {
-                'pendentes': contas_resumo.get('Pagar', {}).get('total', 0),
-                'total': contas_resumo.get('Pagar', {}).get('total', 0)
-            }
-            
-            # Carregar resumo de combustível (usando dados de KPIs)
-            combustivel_data = self.kpis.get('total_abastecido', {})
-            self.combustivel_resumo = {
-                'total': int(combustivel_data.get('valor', 0) / 100),  # Estimativa de abastecimentos
-                'gasto': combustivel_data.get('valor', 0)
-            }
-            
-            # Manutenções (placeholder - implementar quando houver serviço específico)
-            self.manutencoes_resumo = {'andamento': 0, 'gasto': 0}
-            
-            # Atividades (placeholder - implementar quando houver serviço específico)
-            self.atividades = []
-            
+            kpis = dashboard_service.calcular_kpis(
+                self.tipo_periodo, self.mes, self.ano)
+            status = dashboard_service.resumo_fretes_status(
+                self.tipo_periodo, self.mes, self.ano)
+            contas = dashboard_service.resumo_contas_receber_pagar(
+                self.tipo_periodo, self.mes, self.ano)
+            comb = dashboard_service.resumo_combustivel_mes()
+            manut = dashboard_service.resumo_manutencoes()
+            entregas = dashboard_service.proximas_entregas(8)
+            graf = dashboard_service.dados_graficos_comparativo_mensal(self.ano)
+            self._render(kpis, status, contas, comb, manut, entregas, graf)
         except Exception as e:
-            print(f"Erro ao carregar dados do dashboard: {e}")
-            # Fallback para dados vazios
-            self.kpis = {}
-            self.chart_data = {}
-            self.contas_resumo = {'pendentes': 0, 'total': 0}
-            self.combustivel_resumo = {'total': 0, 'gasto': 0}
-            self.manutencoes_resumo = {'andamento': 0, 'gasto': 0}
-            self.atividades = []
+            print(f"[DashboardCW] {e}")
+            self._demo()
 
-    def _on_periodo_changed(self, periodo):
-        """Handler para mudança de período."""
-        self.tipo_periodo = periodo
+    def _demo(self):
+        kpis = {
+            "receita_total":    {"valor": 613400, "crescimento": 12.8},
+            "lucro_estimado":   {"valor": 142800, "crescimento": 8.4},
+            "fretes_realizados":{"valor": 89,     "crescimento": 5.2},
+            "fretes_andamento": {"valor": 14,     "crescimento": 0},
+            "clientes_ativos":  {"valor": 37,     "crescimento": 3.1},
+        }
+        status = [("Entregue", 68), ("Em Rota", 21), ("Pendente", 11)]
+        contas = {
+            "Receber": {"total": 61020, "vencidas": 10200},
+            "Pagar":   {"total": 60700, "vencidas": 8300},
+        }
+        comb  = {"total": 18400, "litros": 5200}
+        manut = {"total": 4,     "atrasadas": 1}
+        entregas = [
+            {"quando": "15/08", "titulo": "NF-00341", "detalhe": "Campinas, SP",       "status": "Em Rota"},
+            {"quando": "15/08", "titulo": "NF-00340", "detalhe": "Ribeirão Preto, SP", "status": "Em Rota"},
+            {"quando": "16/08", "titulo": "NF-00338", "detalhe": "Santos, SP",         "status": "Agendado"},
+            {"quando": "18/08", "titulo": "NF-00331", "detalhe": "Curitiba, PR",       "status": "Agendado"},
+            {"quando": "19/08", "titulo": "NF-00329", "detalhe": "Sorocaba, SP",       "status": "Pendente"},
+        ]
+        graf = {
+            "labels":  ["Mar", "Abr", "Mai", "Jun", "Jul", "Ago"],
+            "receitas":[142000,168000,155000,189000,204000,231400],
+            "despesas":[98000, 112000,109000,126000,139000,151000],
+        }
+        self._render(kpis, status, contas, comb, manut, entregas, graf)
+
+    def _render(self, kpis, status, contas, comb, manut, entregas, graf):
+        def g(k):
+            v = kpis.get(k, {})
+            return v if isinstance(v, dict) else {}
+
+        rec   = g("receita_total")
+        luc   = g("lucro_estimado")
+        fre   = g("fretes_realizados")
+        and_  = g("fretes_andamento")
+        cli   = g("clientes_ativos")
+
+        def _delta(d):
+            if d is None:
+                return "", None
+            return f"{float(d):.1f}% vs. anterior", float(d) >= 0
+
+        self._kpi_receita.set(
+            _brl(rec.get("valor", 0)), *_delta(rec.get("crescimento")))
+        self._kpi_lucro.set(
+            _brl(luc.get("valor", 0)), *_delta(luc.get("crescimento")))
+        self._kpi_fretes.set(
+            str(int(fre.get("valor", 0))), "fretes no período")
+        self._kpi_andamento.set(
+            str(int(and_.get("valor", 0))), "em tempo real")
+        self._kpi_clientes.set(
+            str(int(cli.get("valor", 0))), "cadastrados")
+
+        # gráfico de linha
+        labels = graf.get("labels", [])
+        receitas = graf.get("receitas", [])
+        despesas = graf.get("despesas", [])
+        self._chart.set_data(labels, [
+            ("Receita", receitas, EMERALD),
+            ("Despesa", despesas, ROSE),
+        ])
+
+        # status operacional
+        total_status = sum(v for _, v in status) or 1
+        for nome, val_num in status:
+            if nome in self._op_rows:
+                vl, bar, _ = self._op_rows[nome]
+                vl.setText(str(int(val_num)))
+                bar.set_pct(val_num / total_status)
+
+        # tabela entregas
+        self._table.setRowCount(0)
+        for item in entregas:
+            r = self._table.rowCount()
+            self._table.insertRow(r)
+            self._table.setRowHeight(r, 42)
+            for c, val in enumerate([
+                item.get("quando", ""),
+                item.get("titulo", ""),
+                item.get("detalhe", ""),
+                item.get("status", ""),
+            ]):
+                if c == 3:
+                    # badge centralizado
+                    w = QWidget()
+                    w.setStyleSheet("background:transparent;")
+                    wl = QHBoxLayout(w)
+                    wl.setContentsMargins(6, 4, 6, 4)
+                    wl.addStretch()
+                    wl.addWidget(_badge(val))
+                    wl.addStretch()
+                    self._table.setCellWidget(r, c, w)
+                else:
+                    cell = QTableWidgetItem(str(val))
+                    cell.setFont(QFont("Segoe UI", 11 if c > 0 else 10))
+                    if c == 0:
+                        cell.setForeground(QColor(T3))
+                    self._table.setItem(r, c, cell)
+
+        # financeiro
+        cr = contas.get("Receber", {})
+        cp = contas.get("Pagar",   {})
+        cb = comb  or {}
+        cm = manut or {}
+
+        def _set_fin(nome, val, det):
+            if nome in self._fin_items:
+                v, d = self._fin_items[nome]
+                v.setText(val)
+                d.setText(det)
+
+        _set_fin("A receber",  _brl(cr.get("total", 0)),
+                               f"{_brl(cr.get('vencidas', 0))} vencidas")
+        _set_fin("A pagar",    _brl(cp.get("total", 0)),
+                               f"{_brl(cp.get('vencidas', 0))} vencidas")
+        _set_fin("Combustível",_brl(cb.get("total", 0)),
+                               f"{float(cb.get('litros', 0) or 0):,.0f} litros")
+        _set_fin("Manutenção", str(cm.get("total", 0)),
+                               f"{cm.get('atrasadas', 0)} atrasadas")
+
+    def _change_period(self, value: str):
+        self.tipo_periodo = value
         self._load_data()
-        self._update_ui()
-
-    def _update_ui(self):
-        """Atualiza UI com novos dados."""
-        # Atualizar KPIs
-        receita_data = self.kpis.get('receita_total', {})
-        self.kpi_receita._value = formatar_moeda(receita_data.get('valor', 0))
-        
-        lucro_data = self.kpis.get('lucro_estimado', {})
-        self.kpi_lucro._value = formatar_moeda(lucro_data.get('valor', 0))
-        
-        fretes_data = self.kpis.get('fretes_realizados', {})
-        self.kpi_fretes._value = str(int(fretes_data.get('valor', 0)))
-        
-        clientes_data = self.kpis.get('clientes_ativos', {})
-        self.kpi_clientes._value = str(int(clientes_data.get('valor', 0)))
-        
-        # Atualizar gráficos
-        if hasattr(self, 'chart_receita'):
-            receita_data = self.chart_data.get('receita', {})
-            self.chart_receita.update_data(receita_data)
-        
-        if hasattr(self, 'chart_despesas'):
-            despesas_data = self.chart_data.get('despesas', {})
-            self.chart_despesas.update_data(despesas_data)

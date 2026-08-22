@@ -33,21 +33,26 @@ class CWCard(QWidget):
         self,
         title: Optional[str] = None,
         variant: CardVariant = CardVariant.DEFAULT,
+        padding: Optional[int] = None,
         parent=None
     ):
         super().__init__(parent)
         self.title = title
         self.variant = variant
+        self.padding = padding
         self.content_widgets = []
-        
+
         # Layout principal
         self.main_layout = QVBoxLayout()
-        self.main_layout.setContentsMargins(
-            cw_theme.spacing.LG,
-            cw_theme.spacing.LG,
-            cw_theme.spacing.LG,
-            cw_theme.spacing.LG
-        )
+        if padding is not None:
+            self.main_layout.setContentsMargins(padding, padding, padding, padding)
+        else:
+            self.main_layout.setContentsMargins(
+                cw_theme.spacing.LG,
+                cw_theme.spacing.LG,
+                cw_theme.spacing.LG,
+                cw_theme.spacing.LG
+            )
         self.main_layout.setSpacing(cw_theme.spacing.MD)
         self.setLayout(self.main_layout)
         
@@ -90,7 +95,7 @@ class CWCard(QWidget):
             stylesheet = f"""
                 QWidget {{
                     background-color: {cw_theme.colors['card_bg']};
-                    border: 1px solid {cw_theme.colors['card_border']};
+                    border: none;
                     border-radius: {cw_theme.radius.LG}px;
                 }}
             """
@@ -98,7 +103,7 @@ class CWCard(QWidget):
             stylesheet = f"""
                 QWidget {{
                     background-color: {cw_theme.colors['bg_elevated']};
-                    border: 1px solid {cw_theme.colors['border_subtle']};
+                    border: none;
                     border-radius: {cw_theme.radius.LG}px;
                 }}
             """
@@ -106,7 +111,7 @@ class CWCard(QWidget):
             stylesheet = f"""
                 QWidget {{
                     background-color: transparent;
-                    border: 2px solid {cw_theme.colors['border_default']};
+                    border: none;
                     border-radius: {cw_theme.radius.LG}px;
                 }}
             """
@@ -130,10 +135,18 @@ class CWCard(QWidget):
         """Adiciona layout ao conteúdo do card."""
         self.content_layout.addLayout(layout)
     
+    def add_spacing(self, size: int = None):
+        """Adiciona espaçamento vertical ao conteúdo do card."""
+        if size is None:
+            size = cw_theme.spacing.MD
+        self.content_layout.addSpacing(size)
+    
     def clear_content(self):
         """Remove todos os widgets do conteúdo."""
         while self.content_layout.count():
-            self.content_layout.takeAt(0).widget()?.deleteLater()
+            widget = self.content_layout.takeAt(0).widget()
+            if widget:
+                widget.deleteLater()
         self.content_widgets.clear()
 
 
@@ -150,6 +163,8 @@ class KPICard(QWidget):
         unit: str = "",
         change: Optional[str] = None,
         change_positive: bool = True,
+        subtitle: Optional[str] = None,
+        icon_name: Optional[str] = None,
         parent=None
     ):
         super().__init__(parent)
@@ -158,7 +173,9 @@ class KPICard(QWidget):
         self.unit = unit
         self.change = change
         self.change_positive = change_positive
-        
+        self.subtitle = subtitle
+        self.icon_name = icon_name
+
         self._setup_ui()
     
     def _setup_ui(self):
@@ -173,7 +190,14 @@ class KPICard(QWidget):
         title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         title_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         layout.addWidget(title_label)
-        
+
+        # Subtítulo (se fornecido)
+        if self.subtitle:
+            subtitle_label = QLabel(self.subtitle)
+            subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
+            subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
+            layout.addWidget(subtitle_label)
+
         # Valor principal
         value_text = f"{self.value}{self.unit}"
         value_label = QLabel(value_text)
@@ -195,7 +219,7 @@ class KPICard(QWidget):
         self.setStyleSheet(f"""
             QWidget {{
                 background-color: {cw_theme.colors['card_bg']};
-                border: 1px solid {cw_theme.colors['card_border']};
+                border: none;
                 border-radius: {cw_theme.radius.LG}px;
             }}
         """)

@@ -15,6 +15,9 @@ from .feedback.cw_loading_state import CWLoadingState, CWLoadingSpinner
 from .tables.cw_table import CWTable
 from .charts.cw_chart import CWChartCard, CWChartWidget, ChartType
 
+# Importações de compatibilidade de utils.components
+from utils.components import ModernCard, ModernButton, ButtonStyle
+
 __all__ = [
     'CWButton',
     'ButtonVariant',
@@ -38,4 +41,7 @@ __all__ = [
     'CWChartCard',
     'CWChartWidget',
     'ChartType',
+    'ModernCard',
+    'ModernButton',
+    'ButtonStyle',
 ]

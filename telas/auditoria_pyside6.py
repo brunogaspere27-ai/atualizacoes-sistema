@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt, QTimer
 from services.auditoria_service import auditoria_service
 from ui.theme.cw_theme import cw_theme
 from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
+from utils.components import ModernCard, ModernInput, ModernButton, ButtonStyle, ModernTable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -39,8 +40,8 @@ class TelaAuditoria(QWidget):
         self._carregar_dados()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -50,60 +51,60 @@ class TelaAuditoria(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_primary']}; border: none; }}")
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL)
+        cl.setSpacing(cw_theme.spacing.SPACING_XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
         # Cards resumo
         resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
+        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; border: none; }}")
         rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_LG)
+        rl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD)
+        rl.setSpacing(cw_theme.spacing.SPACING_LG)
         resumo_frame.setLayout(rl)
 
         self._cards = {}
         for titulo, chave in [("Logins hoje", "logins"), ("Tentativas falhas", "falhas"), ("Alterações hoje", "alteracoes")]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_primary']}; border-radius: {cw_theme.radius.MD}px; border: none; }}")
             cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+            cardl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
             card.setLayout(cardl)
             t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+            t.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            t.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
             cardl.addWidget(t)
             v = QLabel("0")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
-            v.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+            v.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+            v.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
             cardl.addWidget(v)
             self._cards[chave] = v
             rl.addWidget(card)
         cl.addWidget(resumo_frame)
 
         # Filtros
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        filtros = ModernCard(padding=cw_theme.spacing.SPACING_LG)
         fr = QHBoxLayout()
-        fr.setSpacing(tokens.SPACING_MD)
+        fr.setSpacing(cw_theme.spacing.SPACING_MD)
 
         fr.addWidget(self._lbl_filtro("Ação:"))
         self.combo_acao = QComboBox()
         self.combo_acao.addItems(["Todas"])
-        self.combo_acao.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
+        self.combo_acao.setMinimumHeight(cw_theme.spacing.SPACING_XL * 2 + cw_theme.spacing.SPACING_SM)
         self.combo_acao.setMinimumWidth(160)
         fr.addWidget(self.combo_acao)
 
         fr.addWidget(self._lbl_filtro("Módulo:"))
         self.combo_modulo = QComboBox()
         self.combo_modulo.addItems(["Todos", "auth", "usuarios", "viagens", "financeiro", "sistema"])
-        self.combo_modulo.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
+        self.combo_modulo.setMinimumHeight(cw_theme.spacing.SPACING_XL * 2 + cw_theme.spacing.SPACING_SM)
         self.combo_modulo.setMinimumWidth(120)
         fr.addWidget(self.combo_modulo)
 
@@ -131,7 +132,7 @@ class TelaAuditoria(QWidget):
         cl.addWidget(filtros)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = ModernCard(padding=cw_theme.spacing.SPACING_XL)
         colunas = [
             ("ID", 50), ("Data/Hora", 150), ("Usuário", 140), ("Ação", 150),
             ("Módulo", 100), ("Registro Afetado", 140), ("Detalhes", 250),
@@ -150,15 +151,15 @@ class TelaAuditoria(QWidget):
 
         # Paginação
         pag = QHBoxLayout()
-        pag.setSpacing(tokens.SPACING_MD)
+        pag.setSpacing(cw_theme.spacing.SPACING_MD)
 
         self.btn_anterior = ModernButton("< Anterior", ButtonStyle.SECONDARY)
         self.btn_anterior.clicked.connect(self._pagina_anterior)
         pag.addWidget(self.btn_anterior)
 
         self.label_pagina = QLabel("Página 1 de 1")
-        self.label_pagina.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
-        self.label_pagina.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        self.label_pagina.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
+        self.label_pagina.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         pag.addWidget(self.label_pagina)
 
         self.btn_proximo = ModernButton("Próximo >", ButtonStyle.SECONDARY)
@@ -168,29 +169,29 @@ class TelaAuditoria(QWidget):
         pag.addStretch()
 
         self.label_total = QLabel("0 registros")
-        self.label_total.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_total.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        self.label_total.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_total.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         pag.addWidget(self.label_total)
 
         card.add_layout(pag)
         cl.addWidget(card)
 
     def _lbl_filtro(self, texto) -> QLabel:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
         lbl = QLabel(texto)
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         return lbl
 
     def _aplicar_estilo_entry(self, entry: QLineEdit):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
         entry.setStyleSheet(f"""
-            QLineEdit {{ background-color: {colors['bg_tertiary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: 6px 10px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QLineEdit:focus {{ border: 1.5px solid {colors['violet']}; }}
+            QLineEdit {{ background-color: {cw_theme.colors['bg_tertiary']}; color: {cw_theme.colors['text_primary']};
+                border: 1.5px solid {cw_theme.colors['border_subtle']}; border-radius: {cw_theme.radius.MD}px;
+                padding: 6px 10px; font-size: {cw_theme.typography.FONT_SIZE_MD}px; }}
+            QLineEdit:focus {{ border: 1.5px solid {cw_theme.colors['info']}; }}
         """)
 
     def _get_filtros(self) -> dict:

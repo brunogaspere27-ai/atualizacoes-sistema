@@ -1,7 +1,7 @@
 """
-Tela Funcionários - CW Transportadora - PySide6
+Tela Funcionários - CW Transportadora - PySide6 Premium Dark Red
 Cadastro, folha de pagamento e controle de horas extras.
-Design System CW - Dark Mode Premium
+Design System CW - Premium Dark Industrial
 """
 
 from __future__ import annotations
@@ -410,24 +410,24 @@ class TelaFuncionarios(QWidget):
         dlg.setWindowTitle("Funcionário")
         dlg.resize(520, 480)
 
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        layout.setSpacing(cw_theme.spacing.SPACING_MD)
         dlg.setLayout(layout)
 
         titulo = QLabel("Cadastro de Funcionário")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']};")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']};")
         layout.addWidget(titulo)
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; }}")
         fl = QFormLayout()
-        fl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        fl.setSpacing(tokens.SPACING_SM)
+        fl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        fl.setSpacing(cw_theme.spacing.SPACING_SM)
         frame.setLayout(fl)
 
         input_style = self._input_style("sky")
@@ -536,29 +536,29 @@ class TelaFuncionarios(QWidget):
         dlg.setWindowTitle("Hora Extra")
         dlg.resize(480, 500)
 
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        layout.setSpacing(cw_theme.spacing.SPACING_MD)
         dlg.setLayout(layout)
 
         titulo = QLabel(f"Folha de {nome}")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']};")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']};")
         layout.addWidget(titulo)
 
         ref = QLabel(f"Referência: {mes}/{ano}")
-        ref.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD))
-        ref.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        ref.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+        ref.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         layout.addWidget(ref)
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; }}")
         fl = QFormLayout()
-        fl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        fl.setSpacing(tokens.SPACING_SM)
+        fl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        fl.setSpacing(cw_theme.spacing.SPACING_SM)
         frame.setLayout(fl)
 
         input_style = self._input_style("sky")
@@ -585,8 +585,8 @@ class TelaFuncionarios(QWidget):
         fl.addRow(self._lbl("Outros adicionais"), entry_outros)
 
         label_total = QLabel("")
-        label_total.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        label_total.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        label_total.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        label_total.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
         fl.addRow(label_total)
 
         def atualizar_total():
@@ -663,18 +663,18 @@ class TelaFuncionarios(QWidget):
         self._carregar_folha_mes()
 
     def _input_style(self, accent: str) -> str:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
-        accent_color = colors.get(accent, colors["sky"])
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
+        accent_color = colors.get(accent, cw_theme.colors["sky"])
         return f"""
-            QLineEdit {{ background-color: {colors['bg_primary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: 8px 12px; font-size: {tokens.FONT_SIZE_MD}px; }}
+            QLineEdit {{ background-color: {cw_theme.colors['bg_primary']}; color: {cw_theme.colors['text_primary']};
+                border: 1.5px solid {cw_theme.colors['border_subtle']}; border-radius: {cw_theme.radius.MD}px;
+                padding: 8px 12px; font-size: {cw_theme.typography.FONT_SIZE_MD}px; }}
             QLineEdit:focus {{ border: 1.5px solid {accent_color}; }}
         """
 
     def _lbl(self, texto) -> QLabel:
-        colors = theme_manager.colors
+        colors = cw_theme.colors
         lbl = QLabel(texto)
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; font-weight: 600; background: transparent;")
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; font-weight: 600; background: transparent;")
         return lbl

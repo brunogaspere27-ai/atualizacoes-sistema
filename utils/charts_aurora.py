@@ -52,8 +52,8 @@ class AuroraChartCard(QFrame):
                  accent_color: AccentColor = AccentColor.AURORA,
                  parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._accent = accent_color
 
         self.setObjectName("auroraChartCard")
@@ -94,7 +94,7 @@ class AuroraChartCard(QFrame):
             hdr.addWidget(ico)
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+        title_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_LG, bold=True))
         title_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         hdr.addWidget(title_lbl)
         hdr.addStretch()
@@ -110,8 +110,8 @@ class AuroraLineChart(QWidget):
 
     def __init__(self, accent_color: AccentColor = AccentColor.AURORA, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._accent = accent_color
         self._hover_data = None
 
@@ -134,7 +134,7 @@ class AuroraLineChart(QWidget):
         self.plot.getAxis('bottom').setTextPen(pg.mkPen(color=c['text_tertiary'], width=1))
 
         # Configurar fonte refinada
-        font = aurora_theme_manager.get_font(t.FONT_SIZE_XS)
+        font = aurora_cw_theme.get_font(t.FONT_SIZE_XS)
         self.plot.getAxis('left').tickFont = font
         self.plot.getAxis('bottom').tickFont = font
 
@@ -157,7 +157,7 @@ class AuroraLineChart(QWidget):
     def _fallback(self):
         label = QLabel("Gráfico indisponível")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"color: {aurora_theme_manager.colors['text_tertiary']};")
+        label.setStyleSheet(f"color: {aurora_cw_theme.cw_theme.colors['text_tertiary']};")
         return label
 
     def _on_mouse_move(self, pos):
@@ -179,7 +179,7 @@ class AuroraLineChart(QWidget):
         """Define os dados do gráfico."""
         if not CHARTS_AVAILABLE:
             return
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         accent = aurora_theme_manager.get_accent(self._accent)
         accent_start = aurora_theme_manager.get_color(self._accent.value + '_start')
         accent_end = aurora_theme_manager.get_color(self._accent.value + '_end')
@@ -266,8 +266,8 @@ class AuroraBarChart(QWidget):
 
     def __init__(self, accent_color: AccentColor = AccentColor.AURORA, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._accent = accent_color
 
         layout = QVBoxLayout()
@@ -288,7 +288,7 @@ class AuroraBarChart(QWidget):
         self.plot.getAxis('left').setTextPen(pg.mkPen(color=c['text_tertiary'], width=1))
         self.plot.getAxis('bottom').setTextPen(pg.mkPen(color=c['text_tertiary'], width=1))
 
-        font = aurora_theme_manager.get_font(t.FONT_SIZE_XS)
+        font = aurora_cw_theme.get_font(t.FONT_SIZE_XS)
         self.plot.getAxis('left').tickFont = font
         self.plot.getAxis('bottom').tickFont = font
 
@@ -303,14 +303,14 @@ class AuroraBarChart(QWidget):
     def _fallback(self):
         label = QLabel("Gráfico indisponível")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"color: {aurora_theme_manager.colors['text_tertiary']};")
+        label.setStyleSheet(f"color: {aurora_cw_theme.cw_theme.colors['text_tertiary']};")
         return label
 
     def set_data(self, x_data, y_data, labels=None):
         """Define os dados do gráfico de barras com gradientes refinados."""
         if not CHARTS_AVAILABLE:
             return
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         accent = aurora_theme_manager.get_accent(self._accent)
         accent_start = aurora_theme_manager.get_color(self._accent.value + '_start')
         accent_end = aurora_theme_manager.get_color(self._accent.value + '_end')
@@ -377,8 +377,8 @@ class AuroraMultiLineChart(QWidget):
 
     def __init__(self, accent_colors: list = None, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         self._accent_colors = accent_colors or [
             AccentColor.AURORA, AccentColor.OCEAN, AccentColor.FOREST
@@ -404,7 +404,7 @@ class AuroraMultiLineChart(QWidget):
         self.plot.getAxis('left').setTextPen(pg.mkPen(color=c['chart_text'], width=1))
         self.plot.getAxis('bottom').setTextPen(pg.mkPen(color=c['chart_text'], width=1))
 
-        font = aurora_theme_manager.get_font(t.FONT_SIZE_XS)
+        font = aurora_cw_theme.get_font(t.FONT_SIZE_XS)
         self.plot.getAxis('left').tickFont = font
         self.plot.getAxis('bottom').tickFont = font
 
@@ -426,7 +426,7 @@ class AuroraMultiLineChart(QWidget):
         self._curves = []
 
         for idx, (x_data, y_data) in enumerate(series_data):
-            accent = self._accent_colors[idx % len(self._accent_colors)]
+            accent = self._accent_cw_theme.colors[idx % len(self._accent_colors)]
             color = aurora_theme_manager.get_accent(accent)
 
             curve = PlotCurveItem(
@@ -469,7 +469,7 @@ class AuroraSparkline(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         accent = aurora_theme_manager.get_accent(self._accent)
         accent_soft = aurora_theme_manager.get_color(self._accent.value + '_soft')
 

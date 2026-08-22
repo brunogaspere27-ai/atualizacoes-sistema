@@ -1,7 +1,7 @@
 """
-Tela Relatórios Gerenciais - CW Transportadora - PySide6
+Tela Relatórios Gerenciais - CW Transportadora - PySide6 Premium Dark Red
 Central de relatórios com abas: Resumo, Clientes, Viagens, Custos, Contas.
-Design System CW - Dark Mode Premium
+Design System CW - Premium Dark Industrial
 """
 
 from __future__ import annotations

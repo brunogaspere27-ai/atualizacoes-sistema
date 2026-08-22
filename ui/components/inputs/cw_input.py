@@ -6,7 +6,7 @@ from typing import Optional, Callable
 from enum import Enum
 from PySide6.QtWidgets import QLineEdit, QWidget, QVBoxLayout, QLabel
 from PySide6.QtGui import QFont, QColor
-from PySide6.QtCore import Qt, pyqtSignal
+from PySide6.QtCore import Qt, Signal
 
 from ui.theme.cw_theme import cw_theme
 
@@ -32,8 +32,8 @@ class CWInput(QLineEdit):
     """
     
     # Sinais customizados
-    state_changed = pyqtSignal(InputState)
-    validation_changed = pyqtSignal(bool)
+    state_changed = Signal(InputState)
+    validation_changed = Signal(bool)
     
     def __init__(
         self,
@@ -109,7 +109,7 @@ class CWInput(QLineEdit):
             QLineEdit {{
                 background-color: {cw_theme.colors['bg_tertiary']};
                 color: {cw_theme.colors['text_primary']};
-                border: 1px solid {cw_theme.colors['border_subtle']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 8px 12px;
                 font-size: {cw_theme.typography.FONT_SIZE_MD}px;
@@ -143,7 +143,7 @@ class CWInput(QLineEdit):
             QLineEdit {{
                 background-color: {cw_theme.colors['error_soft']};
                 color: {cw_theme.colors['text_primary']};
-                border: 1px solid {cw_theme.colors['error']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 8px 12px;
                 font-size: {cw_theme.typography.FONT_SIZE_MD}px;
@@ -160,7 +160,7 @@ class CWInput(QLineEdit):
             QLineEdit {{
                 background-color: {cw_theme.colors['success_soft']};
                 color: {cw_theme.colors['text_primary']};
-                border: 1px solid {cw_theme.colors['success']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 8px 12px;
                 font-size: {cw_theme.typography.FONT_SIZE_MD}px;
@@ -177,7 +177,7 @@ class CWInput(QLineEdit):
             QLineEdit {{
                 background-color: {cw_theme.colors['bg_secondary']};
                 color: {cw_theme.colors['text_disabled']};
-                border: 1px solid {cw_theme.colors['border_subtle']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 8px 12px;
                 font-size: {cw_theme.typography.FONT_SIZE_MD}px;

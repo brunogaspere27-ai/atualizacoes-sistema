@@ -23,6 +23,7 @@ from enum import Enum
 import os
 
 from telas.theme_aurora import aurora_theme_manager as theme_manager, ThemeTokens, AccentColor
+from ui.theme.cw_theme import cw_theme
 from utils.icons import get_icon, get_pixmap
 from utils.avatar import AvatarWidget
 from config.settings import settings
@@ -82,17 +83,17 @@ class ModernButton(QPushButton):
         self._apply()
 
     def _apply(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         sizes = {
-            ButtonSize.SM: (28, 12, 16, t.FONT_SIZE_SM),
-            ButtonSize.MD: (36, 14, 20, t.FONT_SIZE_MD),
-            ButtonSize.LG: (44, 16, 24, t.FONT_SIZE_LG),
+            ButtonSize.SM: (28, 12, 16, cw_theme.typography.FONT_SIZE_SM),
+            ButtonSize.MD: (36, 14, 20, cw_theme.typography.FONT_SIZE_MD),
+            ButtonSize.LG: (44, 16, 24, cw_theme.typography.FONT_SIZE_LG),
         }
         h, px, py, fs = sizes[self._size]
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(h)
-        self.setFont(theme_manager.get_font(fs, bold=True))
+        self.setFont(cw_theme.get_font(fs, bold=True))
 
         if self._icon_name:
             self.setIcon(get_icon(self._icon_name, QSize(16, 16)))
@@ -105,7 +106,7 @@ class ModernButton(QPushButton):
                     stop:0 {c['aurora_start']}, stop:1 {c['aurora_end']});
                 color: #FFFFFF;
                 border: none;
-                border-radius: {t.RADIUS_LG}px;
+                border-radius: {cw_theme.radius.LG}px;
                 padding: {py}px {px}px;
                 font-weight: 600;
                 letter-spacing: 0.2px;
@@ -137,7 +138,7 @@ class ModernButton(QPushButton):
         self.setStyleSheet(f"""
         QPushButton {{
             background-color: {bg}; color: {fg}; border: {border};
-            border-radius: {t.RADIUS_LG}px; padding: {py}px {px}px;
+            border-radius: {cw_theme.radius.LG}px; padding: {py}px {px}px;
             font-weight: 600; letter-spacing: 0.2px;
         }}
         QPushButton:hover {{ background-color: {hover}; }}
@@ -153,20 +154,18 @@ class ModernCard(QFrame):
     def __init__(self, title: Optional[str] = None, icon_name: Optional[str] = None,
                  padding: int = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         pad = padding or t.SPACING_LG
 
         self.setObjectName("mCard")
         self.setStyleSheet(f"""
         QFrame#mCard {{
             background-color: {c['card_bg']};
-            border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_XL}px;
-            border-top: 2px solid {c['aurora']};
+            border: none;
+            border-radius: {cw_theme.radius.XL}px;
         }}
         QFrame#mCard:hover {{
-            border-color: {c['border_strong']};
             background-color: {c['card_hover']};
         }}
         """)
@@ -190,7 +189,7 @@ class ModernCard(QFrame):
                 ico.setPixmap(get_pixmap(icon_name, QSize(18, 18), c["text_secondary"]))
                 hdr.addWidget(ico)
             lbl = QLabel(title)
-            lbl.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+            lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
             lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
             hdr.addWidget(lbl)
             hdr.addStretch()
@@ -215,21 +214,21 @@ class ModernInput(QLineEdit):
         self._apply_style()
 
     def _apply_style(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         border = c["error"] if self._has_error else c["border_subtle"]
         focus_border = c["error"] if self._has_error else c["brand"]
         self.setPlaceholderText(self._placeholder)
         self.setMinimumHeight(44)
-        self.setFont(theme_manager.get_font(t.FONT_SIZE_MD))
+        self.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         self.setStyleSheet(f"""
         QLineEdit {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
             border: 1.5px solid {border};
-            border-radius: {t.RADIUS_LG}px;
+            border-radius: {cw_theme.radius.LG}px;
             padding: {t.SPACING_SM}px {t.SPACING_MD}px;
-            font-size: {t.FONT_SIZE_MD}px;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px;
         }}
         QLineEdit:focus {{
             border-color: {focus_border};
@@ -256,17 +255,17 @@ class ModernTable(QTableWidget):
         super().__init__(parent)
         if columns > 0:
             self.setColumnCount(columns)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setStyleSheet(f"""
         QTableWidget {{
             background-color: {c['bg_secondary']};
             alternate-background-color: {c['bg_primary']};
-            gridline-color: {c['border_subtle']};
-            border: 1px solid {c['border_subtle']};
-            border-radius: {t.RADIUS_MD}px;
-            font-size: {t.FONT_SIZE_MD}px;
+            gridline-color: transparent;
+            border: none;
+            border-radius: {cw_theme.radius.MD}px;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px;
             selection-background-color: {c['brand']};
             selection-color: #FFFFFF;
         }}
@@ -287,7 +286,7 @@ class ModernTable(QTableWidget):
             border: none;
             border-bottom: 2px solid {c['border_default']};
             font-weight: 700;
-            font-size: {t.FONT_SIZE_SM}px;
+            font-size: {cw_theme.typography.FONT_SIZE_SM}px;
         }}
         QHeaderView::section:hover {{ background-color: {c['bg_overlay']}; }}
         QScrollBar:vertical {{
@@ -316,22 +315,21 @@ class ModernComboBox(QComboBox):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setMinimumHeight(42)
         self.setStyleSheet(f"""
         QComboBox {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1.5px solid {c['border_subtle']};
-            border-radius: {t.RADIUS_MD}px;
+            border: none;
+            border-radius: {cw_theme.radius.MD}px;
             padding: {t.SPACING_SM}px {t.SPACING_MD}px;
-            font-size: {t.FONT_SIZE_MD}px;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px;
         }}
-        QComboBox:hover {{ border-color: {c['border_default']}; }}
+        QComboBox:hover {{ background-color: {c['bg_elevated']}; }}
         QComboBox:focus {{
-            border-color: {c['brand']};
             background-color: {c['bg_elevated']};
         }}
         QComboBox::drop-down {{
@@ -347,21 +345,20 @@ class ModernComboBox(QComboBox):
         QComboBox QAbstractItemView {{
             background-color: {c['bg_elevated']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_subtle']};
-            border-radius: {t.RADIUS_MD}px;
+            border: none;
+            border-radius: {cw_theme.radius.MD}px;
             selection-background-color: {c['brand_soft']};
             selection-color: {c['text_primary']};
             padding: 4px;
         }}
         QComboBox QAbstractItemView::item {{
             padding: 8px 12px;
-            border-radius: {t.RADIUS_SM}px;
+            border-radius: {cw_theme.radius.SM}px;
         }}
         QComboBox QAbstractItemView::item:hover {{ background-color: {c['bg_overlay']}; }}
         QComboBox:disabled {{
             background-color: {c['bg_secondary']};
             color: {c['text_disabled']};
-            border-color: {c['border_subtle']};
         }}
         """)
 
@@ -385,14 +382,14 @@ class ModernSidebar(QFrame):
         self._setup()
 
     def _setup(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         self.setFixedWidth(self.EXPANDED_W)
         self.setObjectName("sidebar")
         self.setStyleSheet(f"""
         QFrame#sidebar {{
             background-color: {c['sidebar_bg']};
-            border-right: 1px solid {c['sidebar_border']};
+            border: none;
         }}
         """)
 
@@ -405,7 +402,7 @@ class ModernSidebar(QFrame):
         self._header = QFrame()
         self._header.setMinimumHeight(72)
         self._header.setStyleSheet(f"""
-        QFrame {{ background: transparent; border-bottom: 1px solid {c['sidebar_border']}; }}
+        QFrame {{ background: transparent; border: none; }}
         """)
         hl = QHBoxLayout()
         hl.setContentsMargins(20, 0, 20, 0)
@@ -422,7 +419,7 @@ class ModernSidebar(QFrame):
             self._logo.setPixmap(pix)
         else:
             self._logo.setText("CW")
-            self._logo.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+            self._logo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
             self._logo.setStyleSheet(f"""
             QLabel {{ background: {c['brand']}; color: #FFF; border-radius: 20px; }}
             """)
@@ -430,7 +427,7 @@ class ModernSidebar(QFrame):
 
         # Brand name com estilo premium
         self._brand_label = QLabel("CW Transportadora")
-        self._brand_label.setFont(theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        self._brand_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         self._brand_label.setStyleSheet(f"""
         color: {c['sidebar_text']}; background: transparent; 
         letter-spacing: 0.3px; font-weight: 600;
@@ -496,14 +493,14 @@ class ModernSidebar(QFrame):
 
     def add_user_card(self, name: str, role: str, usuario_id: Optional[int] = None):
         """Avatar com foto real + nome + cargo no topo."""
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         card = QFrame()
         card.setObjectName("userCard")
         card.setStyleSheet(f"""
         QFrame#userCard {{
             background: transparent;
-            border-bottom: 1px solid {c['sidebar_border']};
+            border: none;
         }}
         """)
         card.setFixedHeight(56)
@@ -520,11 +517,11 @@ class ModernSidebar(QFrame):
         info.setContentsMargins(0, 0, 0, 0)
         info.setSpacing(0)
         self._user_name_label = QLabel(name)
-        self._user_name_label.setFont(theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        self._user_name_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         self._user_name_label.setStyleSheet(f"color: {c['sidebar_text']}; background: transparent;")
         info.addWidget(self._user_name_label)
         self._user_role_label = QLabel(role)
-        self._user_role_label.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+        self._user_role_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
         self._user_role_label.setStyleSheet(f"color: {c['sidebar_text_muted']}; background: transparent;")
         info.addWidget(self._user_role_label)
         hl.addLayout(info)
@@ -534,12 +531,12 @@ class ModernSidebar(QFrame):
         self._user_card_layout.addWidget(card)
 
     def add_section(self, title: str):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         if self._scroll_layout.count() > 0:
             self._scroll_layout.addSpacing(12)
         lbl = QLabel(title.upper())
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         lbl.setObjectName("sectionLabel")
         lbl.setStyleSheet(f"""
         QLabel {{
@@ -552,8 +549,8 @@ class ModernSidebar(QFrame):
 
     def add_menu_item(self, name: str, label: str, icon_name: str,
                       accent_color: AccentColor = AccentColor.AURORA):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         accent = theme_manager.get_accent(accent_color)
 
         row = QFrame()
@@ -578,9 +575,9 @@ class ModernSidebar(QFrame):
         btn.setStyleSheet(f"""
         QPushButton {{
             background: transparent; color: {c['sidebar_text']};
-            border: none; border-radius: {t.RADIUS_MD}px;
+            border: none; border-radius: {cw_theme.radius.MD}px;
             padding: 6px 10px; text-align: left;
-            font-size: {t.FONT_SIZE_MD}px; font-weight: 500;
+            font-size: {cw_theme.typography.FONT_SIZE_MD}px; font-weight: 500;
         }}
         QPushButton:hover {{ background: {c['sidebar_hover']}; }}
         """)
@@ -601,8 +598,8 @@ class ModernSidebar(QFrame):
         self.navigation_requested.emit(name)
 
     def _update_active(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         for item in self._menu_items:
             btn = item["button"]
             ind = item["indicator"]
@@ -613,9 +610,9 @@ class ModernSidebar(QFrame):
                 btn.setStyleSheet(f"""
                 QPushButton {{
                     background: {c['sidebar_active_bg']}; color: {c['text_primary']};
-                    border: none; border-radius: {t.RADIUS_MD}px;
+                    border: none; border-radius: {cw_theme.radius.MD}px;
                     padding: 6px 10px; text-align: left;
-                    font-size: {t.FONT_SIZE_MD}px; font-weight: 700;
+                    font-size: {cw_theme.typography.FONT_SIZE_MD}px; font-weight: 700;
                 }}
                 """)
                 btn.setIcon(get_icon(icon_name, color=accent))
@@ -624,9 +621,9 @@ class ModernSidebar(QFrame):
                 btn.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {c['sidebar_text']};
-                    border: none; border-radius: {t.RADIUS_MD}px;
+                    border: none; border-radius: {cw_theme.radius.MD}px;
                     padding: 6px 10px; text-align: left;
-                    font-size: {t.FONT_SIZE_MD}px; font-weight: 500;
+                    font-size: {cw_theme.typography.FONT_SIZE_MD}px; font-weight: 500;
                 }}
                 QPushButton:hover {{ background: {c['sidebar_hover']}; }}
                 """)
@@ -685,13 +682,13 @@ class TopBar(QFrame):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         self.setMinimumHeight(48)
         self.setStyleSheet(f"""
         QFrame {{
             background-color: {c['bg_secondary']};
-            border-bottom: 1px solid {c['header_border']};
+            border: none;
         }}
         """)
 
@@ -702,7 +699,7 @@ class TopBar(QFrame):
 
         # Breadcrumb
         self._breadcrumb = QLabel("")
-        self._breadcrumb.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+        self._breadcrumb.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         self._breadcrumb.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         hl.addWidget(self._breadcrumb)
         hl.addStretch()
@@ -715,10 +712,10 @@ class TopBar(QFrame):
         self._search.setStyleSheet(f"""
         QLineEdit {{
             background: {c['bg_tertiary']}; color: {c['text_primary']};
-            border: 1px solid {c['border_subtle']}; border-radius: {t.RADIUS_MD}px;
-            padding: 4px 12px; font-size: {t.FONT_SIZE_SM}px;
+            border: none; border-radius: {cw_theme.radius.MD}px;
+            padding: 4px 12px; font-size: {cw_theme.typography.FONT_SIZE_SM}px;
         }}
-        QLineEdit:focus {{ border-color: {c['brand']}; }}
+        QLineEdit:focus {{ background: {c['bg_elevated']}; }}
         """)
         hl.addWidget(self._search)
 
@@ -739,7 +736,7 @@ class TopBar(QFrame):
         self._avatar_btn.setFixedSize(32, 32)
         self._avatar_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._avatar_btn.setText("U")
-        self._avatar_btn.setFont(theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        self._avatar_btn.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
         self._avatar_btn.setStyleSheet(f"""
         QPushButton {{
             background: {c['brand']}; color: #FFF; border: none; border-radius: 16px;
@@ -750,7 +747,7 @@ class TopBar(QFrame):
 
         # Name label
         self._name_label = QLabel("")
-        self._name_label.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+        self._name_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         self._name_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         hl.addWidget(self._name_label)
 
@@ -759,8 +756,8 @@ class TopBar(QFrame):
         self._menu.setFixedWidth(200)
         self._menu.setStyleSheet(f"""
         QFrame {{
-            background: {c['bg_elevated']}; border: 1px solid {c['border_default']};
-            border-radius: {t.RADIUS_MD}px;
+            background: {c['bg_elevated']}; border: none;
+            border-radius: {cw_theme.radius.MD}px;
         }}
         """)
         ml = QVBoxLayout()
@@ -783,8 +780,8 @@ class TopBar(QFrame):
             btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {c['text_primary']};
-                border: none; border-radius: {t.RADIUS_SM}px;
-                padding: 6px 12px; text-align: left; font-size: {t.FONT_SIZE_SM}px;
+                border: none; border-radius: {cw_theme.radius.SM}px;
+                padding: 6px 12px; text-align: left; font-size: {cw_theme.typography.FONT_SIZE_SM}px;
             }}
             QPushButton:hover {{ background: {c['bg_overlay']}; }}
             """)
@@ -807,8 +804,8 @@ class TopBar(QFrame):
         logout_btn.setStyleSheet(f"""
         QPushButton {{
             background: transparent; color: {c['error']};
-            border: none; border-radius: {t.RADIUS_SM}px;
-            padding: 6px 12px; text-align: left; font-size: {t.FONT_SIZE_SM}px;
+            border: none; border-radius: {cw_theme.radius.SM}px;
+            padding: 6px 12px; text-align: left; font-size: {cw_theme.typography.FONT_SIZE_SM}px;
         }}
         QPushButton:hover {{ background: {c['error_soft']}; }}
         """)
@@ -831,7 +828,7 @@ class TopBar(QFrame):
             self._menu.setVisible(True)
 
     def set_breadcrumb(self, section: str, page: str):
-        c = theme_manager.colors
+        c = cw_theme.colors
         self._breadcrumb.setText(f'{section}  /  {page}')
 
     def set_user_info(self, name: str, avatar_letter: str = "U"):
@@ -845,30 +842,30 @@ class ModernInput(QLineEdit):
 
     def __init__(self, placeholder: str = "", label: str = "", parent: Optional[QWidget] = None):
         super().__init__()
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         self.setPlaceholderText(placeholder)
         self.setMinimumHeight(40)
-        self.setFont(theme_manager.get_font(t.FONT_SIZE_MD))
+        self.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         self.setStyleSheet(f"""
         QLineEdit {{
             background: {c['bg_tertiary']}; color: {c['text_primary']};
-            border: 1px solid {c['border_default']}; border-radius: {t.RADIUS_MD}px;
+            border: none; border-radius: {cw_theme.radius.MD}px;
             padding: 8px 14px;
         }}
-        QLineEdit:hover {{ border-color: {c['border_strong']}; }}
-        QLineEdit:focus {{ border: 1px solid {c['brand']}; background: {c['bg_secondary']}; }}
+        QLineEdit:hover {{ background: {c['bg_elevated']}; }}
+        QLineEdit:focus {{ background: {c['bg_elevated']}; }}
         QLineEdit:disabled {{ background: {c['bg_secondary']}; color: {c['text_disabled']}; }}
         """)
 
     def set_error(self, has_error: bool):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         if has_error:
             self.setStyleSheet(f"""
             QLineEdit {{
-                background: {c['bg_tertiary']}; color: {c['text_primary']};
-                border: 1px solid {c['error']}; border-radius: {t.RADIUS_MD}px; padding: 8px 14px;
+                background: {c['error_soft']}; color: {c['text_primary']};
+                border: none; border-radius: {cw_theme.radius.MD}px; padding: 8px 14px;
             }}
             """)
         else:
@@ -879,14 +876,14 @@ class ModernInput(QLineEdit):
 class ModernComboBox(QComboBox):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         self.setMinimumHeight(40)
-        self.setFont(theme_manager.get_font(t.FONT_SIZE_MD))
+        self.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
         self.setStyleSheet(f"""
         QComboBox {{
             background: {c['bg_tertiary']}; color: {c['text_primary']};
-            border: 1px solid {c['border_default']}; border-radius: {t.RADIUS_MD}px;
+            border: 1px solid {c['border_default']}; border-radius: {cw_theme.radius.MD}px;
             padding: 8px 14px;
         }}
         QComboBox:hover {{ border-color: {c['border_strong']}; }}
@@ -898,7 +895,7 @@ class ModernComboBox(QComboBox):
         }}
         QComboBox QAbstractItemView {{
             background: {c['bg_elevated']}; border: 1px solid {c['border_default']};
-            border-radius: {t.RADIUS_MD}px; selection-background-color: {c['brand_soft']};
+            border-radius: {cw_theme.radius.MD}px; selection-background-color: {c['brand_soft']};
             selection-color: {c['text_primary']}; padding: 4px;
         }}
         QComboBox QAbstractItemView::item {{ padding: 6px 10px; border-radius: 4px; }}
@@ -920,8 +917,8 @@ class KPICard(QFrame):
         self._build(label, value, trend, icon_name)
 
     def _build(self, label, value, trend, icon_name):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         accent = theme_manager.get_accent(self._accent)
 
         self.setObjectName("kpiCard")
@@ -931,11 +928,10 @@ class KPICard(QFrame):
         self.setStyleSheet(f"""
         QFrame#kpiCard {{
             background: {c['card_bg']};
-            border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_LG}px;
+            border: none;
+            border-radius: {cw_theme.radius.LG}px;
         }}
         QFrame#kpiCard:hover {{
-            border-color: {c['border_strong']};
             background: {c['card_hover']};
         }}
         """)
@@ -963,7 +959,7 @@ class KPICard(QFrame):
         icon_container.setStyleSheet(f"""
         QFrame {{
             background: {c['bg_tertiary']};
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: 16px;
         }}
         """)
@@ -975,13 +971,13 @@ class KPICard(QFrame):
             icon_label.setPixmap(get_pixmap(icon_name, QSize(16, 16), c["text_secondary"]))
         else:
             icon_label.setText("📊")
-            icon_label.setFont(theme_manager.get_font(14))
+            icon_label.setFont(cw_theme.get_font(14))
         icon_layout.addWidget(icon_label)
         header.addWidget(icon_container)
 
         # Título pequeno
         title = QLabel(label)
-        title.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        title.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         title.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 0.5px;")
         header.addWidget(title)
         header.addStretch()
@@ -990,7 +986,7 @@ class KPICard(QFrame):
 
         # Valor ENORME
         val = QLabel(value)
-        val.setFont(theme_manager.get_font(t.FONT_SIZE_4XL, bold=True))
+        val.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_4XL, bold=True))
         val.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         layout.addWidget(val)
         self._value_label = val
@@ -1006,7 +1002,7 @@ class KPICard(QFrame):
             arrow_color = c["success"] if is_positive else c["error"]
 
             trend_label = QLabel(f"{arrow} {trend}")
-            trend_label.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+            trend_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
             trend_label.setStyleSheet(f"""
             QLabel {{
                 color: {arrow_color};
@@ -1065,8 +1061,8 @@ class Badge(QLabel):
         self._setup()
 
     def _setup(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         variant_colors = {
             "default": (c["text_primary"], c["bg_tertiary"]),
@@ -1077,14 +1073,14 @@ class Badge(QLabel):
             "brand": (c["brand"], c["brand_soft"]),
         }
 
-        fg, bg = variant_colors.get(self._variant, variant_colors["default"])
+        fg, bg = variant_colors.get(self._variant, variant_cw_theme.colors["default"])
 
-        self.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        self.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         self.setStyleSheet(f"""
         QLabel {{
             background-color: {bg};
             color: {fg};
-            border-radius: {t.RADIUS_SM}px;
+            border-radius: {cw_theme.radius.SM}px;
             padding: 4px 10px;
             font-weight: 600;
             letter-spacing: 0.3px;
@@ -1105,8 +1101,8 @@ class Chip(QFrame):
         self._setup()
 
     def _setup(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_style()
@@ -1117,7 +1113,7 @@ class Chip(QFrame):
         self.setLayout(layout)
 
         label = QLabel(self._text)
-        label.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+        label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         label.setStyleSheet("background: transparent;")
         layout.addWidget(label)
 
@@ -1135,26 +1131,25 @@ class Chip(QFrame):
             layout.addWidget(close_btn)
 
     def _update_style(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         if self._selected:
             self.setStyleSheet(f"""
             QFrame {{
                 background-color: {c['brand']};
-                border: 1px solid {c['brand']};
-                border-radius: {t.RADIUS_MD}px;
+                border: none;
+                border-radius: {cw_theme.radius.MD}px;
             }}
             """)
         else:
             self.setStyleSheet(f"""
             QFrame {{
                 background-color: {c['bg_tertiary']};
-                border: 1px solid {c['border_default']};
-                border-radius: {t.RADIUS_MD}px;
+                border: none;
+                border-radius: {cw_theme.radius.MD}px;
             }}
             QFrame:hover {{
-                border-color: {c['border_strong']};
                 background-color: {c['bg_overlay']};
             }}
             """)
@@ -1181,8 +1176,8 @@ class ProgressBar(QFrame):
         self._setup()
 
     def _setup(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         bar_color = self._color or c["brand"]
 
         self.setMinimumHeight(8)
@@ -1203,7 +1198,7 @@ class ProgressBar(QFrame):
         layout.addWidget(self._progress_bar)
 
     def _update_progress(self):
-        c = theme_manager.colors
+        c = cw_theme.colors
         bar_color = self._color or c["brand"]
         percentage = min(100, max(0, (self._value / self._max_value) * 100)) if self._max_value > 0 else 0
 
@@ -1232,14 +1227,14 @@ class SummaryCard(QFrame):
     def __init__(self, label: str, value: str = "—",
                  accent: AccentColor = AccentColor.AURORA, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         accent_color = theme_manager.get_accent(accent)
         self.setObjectName("summaryCard")
         self.setStyleSheet(f"""
         QFrame#summaryCard {{
-            background: {c['card_bg']}; border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_LG}px; border-top: 3px solid {accent_color};
+            background: {c['card_bg']}; border: none;
+            border-radius: {cw_theme.radius.LG}px; border-top: 3px solid {accent_color};
         }}
         """)
         layout = QVBoxLayout()
@@ -1248,12 +1243,12 @@ class SummaryCard(QFrame):
         self.setLayout(layout)
 
         lbl = QLabel(label.upper())
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 1px;")
         layout.addWidget(lbl)
 
         self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        self._value_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
         self._value_lbl.setStyleSheet(f"color: {accent_color}; background: transparent;")
         layout.addWidget(self._value_lbl)
 
@@ -1273,8 +1268,8 @@ class StatusBadge(QFrame):
         self._build()
 
     def _build(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         sc = {
             "info": (c["info"], c["info_soft"]),
             "success": (c["success"], c["success_soft"]),
@@ -1291,10 +1286,10 @@ class StatusBadge(QFrame):
         dot.setStyleSheet(f"background: {tc}; border-radius: 3px;")
         hl.addWidget(dot)
         lbl = QLabel(self._text)
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         lbl.setStyleSheet(f"color: {tc}; background: transparent;")
         hl.addWidget(lbl)
-        self.setStyleSheet(f"QFrame {{ background: {bg}; border-radius: {t.RADIUS_FULL}px; }}")
+        self.setStyleSheet(f"QFrame {{ background: {bg}; border-radius: {cw_theme.radius.FULL}px; }}")
 
     def setText(self, text: str):
         self._text = text
@@ -1312,7 +1307,7 @@ class StatusBadge(QFrame):
 class SeparatorLine(QFrame):
     def __init__(self, orientation: str = "horizontal", parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
+        c = cw_theme.colors
         b = c["border_subtle"]
         if orientation == "horizontal":
             self.setMinimumHeight(1)
@@ -1378,7 +1373,7 @@ class LoadingOverlay(QWidget):
         r = 28
         p.drawEllipse(cx - r, cy - r - 20, r * 2, r * 2)
         # Arc
-        c = theme_manager.colors
+        c = cw_theme.colors
         brand = QColor(c["brand"])
         brand.setAlpha(int(255 * self._opacity))
         pen = QPen(brand)
@@ -1387,8 +1382,8 @@ class LoadingOverlay(QWidget):
         p.setPen(pen)
         p.drawArc(cx - r, cy - r - 20, r * 2, r * 2, int(self._angle * 16), 120 * 16)
         # Text
-        t = theme_manager.tokens
-        p.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+        t = cw_theme.spacing
+        p.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
         p.setPen(QColor(255, 255, 255, int(230 * self._opacity)))
         p.drawText(QRectF(cx - 150, cy + 20, 300, 40), Qt.AlignmentFlag.AlignCenter, self._message)
         p.end()
@@ -1413,8 +1408,8 @@ class ToastNotification(QFrame):
         self._show()
 
     def _build(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         cfg = {
             "info": (c["info"], c["info_soft"], "i"),
             "success": (c["success"], c["success_soft"], "✓"),
@@ -1444,21 +1439,21 @@ class ToastNotification(QFrame):
         ico.setLayout(ico_l)
         lbl = QLabel(icon_char)
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
         lbl.setStyleSheet("color: #FFF; background: transparent;")
         ico_l.addWidget(lbl)
         hl.addWidget(ico)
 
         msg = QLabel(self._message)
-        msg.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+        msg.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
         msg.setWordWrap(True)
         msg.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         hl.addWidget(msg, 1)
 
         self.setStyleSheet(f"""
         QFrame#toast {{
-            background: {c['card_bg']}; border: 1px solid {c['card_border']};
-            border-left: 3px solid {accent}; border-radius: {t.RADIUS_LG}px;
+            background: {c['card_bg']}; border: none;
+            border-left: 3px solid {accent}; border-radius: {cw_theme.radius.LG}px;
         }}
         """)
 
@@ -1486,8 +1481,8 @@ class PlaceholderScreen(QWidget):
     def __init__(self, title: str, subtitle: str = "", icon_name: str = "settings",
                  accent: AccentColor = AccentColor.AURORA, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         ac = theme_manager.get_accent(accent)
         ac_soft = theme_manager.get_color(f"{accent.value}_soft")
 
@@ -1499,8 +1494,8 @@ class PlaceholderScreen(QWidget):
         card = QFrame()
         card.setStyleSheet(f"""
         QFrame {{
-            background: {c['card_bg']}; border: 1px solid {c['card_border']};
-            border-radius: {t.RADIUS_XL}px;
+            background: {c['card_bg']}; border: none;
+            border-radius: {cw_theme.radius.XL}px;
         }}
         """)
         card.setMinimumSize(480, 320)
@@ -1528,14 +1523,14 @@ class PlaceholderScreen(QWidget):
         cl.addLayout(row)
 
         tl = QLabel(title)
-        tl.setFont(theme_manager.get_font(t.FONT_SIZE_3XL, bold=True))
+        tl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_3XL, bold=True))
         tl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         cl.addWidget(tl)
 
         if subtitle:
             sl = QLabel(subtitle)
-            sl.setFont(theme_manager.get_font(t.FONT_SIZE_LG))
+            sl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG))
             sl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             sl.setWordWrap(True)
             sl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")

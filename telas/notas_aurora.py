@@ -79,8 +79,8 @@ class NotasAurora(QWidget):
         self._carregar_manifestos()
 
     def _setup_ui(self) -> None:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         self.setStyleSheet(f"background-color: {c['bg_primary']};")
 
@@ -115,8 +115,8 @@ class NotasAurora(QWidget):
         root.addWidget(splitter)
 
     def _create_header(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         header = QFrame()
         header.setStyleSheet("background: transparent;")
@@ -147,8 +147,8 @@ class NotasAurora(QWidget):
         return header
 
     def _build_manifestos_panel(self) -> AuroraCard:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         card = AuroraCard(
             "Manifestos",
@@ -197,8 +197,8 @@ class NotasAurora(QWidget):
         return card
 
     def _build_notas_panel(self) -> QWidget:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         container = QWidget()
         container.setStyleSheet("background: transparent;")

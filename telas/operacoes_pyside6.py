@@ -266,6 +266,35 @@ class TelaOperacoes(QWidget):
         line.setStyleSheet(f"background-color: {c['border_subtle']}; border: none;")
         return line
 
+    def _build_historico(self) -> CWCard:
+        """Cria a tabela de histórico de transferências."""
+        c = cw_theme.colors
+        t = cw_theme.spacing
+
+        card = CWCard(padding=t.XL)
+
+        titulo = QLabel("HISTÓRICO DE TRANSFERÊNCIAS")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
+        card.add_widget(titulo)
+
+        colunas = ["ID", "Data", "Caminhão", "Placa", "Motorista", "Notas", "Frete", "Pedágio", "Outros", "Custo", "Líquido"]
+        self.tabela = QTableWidget(0, len(colunas))
+        self.tabela.setHorizontalHeaderLabels(colunas)
+        self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabela.setAlternatingRowColors(False)
+        self.tabela.verticalHeader().setVisible(False)
+        self.tabela.setMinimumHeight(300)
+
+        header = self.tabela.horizontalHeader()
+        for i in range(len(colunas)):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+        header.setStretchLastSection(True)
+
+        card.add_widget(self.tabela)
+        return card
+
     # ------------------------------------------------------------------ #
     #  Lógica de negócio                                                    #
     # ------------------------------------------------------------------ #
@@ -294,7 +323,7 @@ class TelaOperacoes(QWidget):
 
     def _atualizar_resumo(self):
         """Recalcula e atualiza os labels do painel de resumo."""
-        colors = theme_manager.colors
+        colors = cw_theme.colors
         r = self._calcular()
 
         for chave in ("valor_notas", "frete_carreta", "pedagio_carreta",
@@ -306,10 +335,11 @@ class TelaOperacoes(QWidget):
         lbl_liq = self._resumo_labels.get("liquido")
         if lbl_liq:
             lbl_liq.setText(formatar_moeda(r["liquido"]))
-            cor = colors["emerald"] if r["liquido"] >= 0 else colors["error"]
+            cor = cw_theme.colors["success"] if r["liquido"] >= 0 else cw_theme.colors["error"]
             lbl_liq.setStyleSheet(f"color: {cor}; background: transparent;")
 
-    def _salvar(self):
+    def _salvar_operacao(self):
+        """Salva a operação de transferência."""
         nome_caminhao = self.campos["nome_caminhao"].text().strip()
         placa         = self.campos["placa"].text().strip()
 
@@ -342,6 +372,10 @@ class TelaOperacoes(QWidget):
 
         self._limpar()
         self._carregar_historico()
+
+    def _salvar(self):
+        """Alias para _salvar_operacao para compatibilidade."""
+        self._salvar_operacao()
 
     def _limpar(self):
         for entry in self.campos.values():
@@ -397,9 +431,9 @@ class TelaOperacoes(QWidget):
                 # Colorir coluna Líquido
                 if col == 10:
                     try:
-                        colors = theme_manager.colors
+                        colors = cw_theme.colors
                         val = float(liquido)
-                        cor = colors["emerald"] if val >= 0 else colors["error"]
+                        cor = cw_theme.colors["success"] if val >= 0 else cw_theme.colors["error"]
                         item.setForeground(QColor(cor))
                     except (TypeError, ValueError):
                         pass

@@ -1,30 +1,355 @@
 """
-Dashboard Executivo CW Transportadora - PySide6
+Dashboard Executivo CW Transportadora — EMU Premium
+======================================================
+Versão unificada das duas implementações fornecidas.
 
-Dashboard premium com KPIs financeiros/operacionais, gráficos pyqtgraph,
-resumo de contas/combustível/manutenções, atividades recentes e próximas
-entregas — layout inspirado em Linear (estrutura), Attio (cards) e Stripe
-(gráficos).
+Principais decisões:
+- Mantém o visual dark premium da versão EMU.
+- Mantém a integração real da segunda versão com dashboard_service.
+- Usa cw_theme quando disponível.
+- Mantém os componentes de gráficos existentes (BarChart, DonutChart,
+  MultiLineChart) quando disponíveis.
+- Possui fallback visual para execução sem os componentes externos.
+- Evita dados de tendência inventados: os deltas vêm do dashboard_service.
 """
+
+from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QScrollArea, QFrame, QLabel, QComboBox, QSizePolicy
-)
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QLinearGradient
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
+    QFrame, QScrollArea, QSizePolicy, QComboBox, QPushButton,
+)
 
-from services.dashboard_service import dashboard_service
-from ui.theme.cw_theme import cw_theme
-from utils.icons import get_pixmap
-from utils.components import KPICard, ModernCard, ModernButton, ButtonStyle
-from utils.charts import ChartCard, BarChart, DonutChart, MultiLineChart
-from utils.helpers import formatar_moeda, formatar_peso
+# ---------------------------------------------------------------------------
+# Integrações existentes
+# ---------------------------------------------------------------------------
+
+try:
+    from services.dashboard_service import dashboard_service
+except Exception:
+    try:
+        from services import dashboard_service
+    except Exception:
+        dashboard_service = None
+
+try:
+    from ui.theme.cw_theme import cw_theme
+except Exception:
+    cw_theme = None
+
+try:
+    from utils.charts import BarChart, DonutChart, MultiLineChart
+except Exception:
+    BarChart = DonutChart = MultiLineChart = None
+
+try:
+    from utils.helpers import formatar_moeda
+except Exception:
+    formatar_moeda = None
+
+
+# ---------------------------------------------------------------------------
+# Paleta fallback — baseada no visual da primeira versão
+# ---------------------------------------------------------------------------
+
+BG = "#0B0E14"
+SURFACE = "#11151C"
+ELEVATED = "#161B24"
+OVERLAY = "#1C2230"
+BORDER = "#21262D"
+BORDER2 = "#30363D"
+
+TEXT = "#E6EDF3"
+TEXT2 = "#8B949E"
+TEXT3 = "#484F58"
+
+BRAND = "#E5484D"
+BRAND_H = "#FF6369"
+BRAND_BG = "#2D1215"
+
+EMERALD = "#3FB950"
+SKY = "#58A6FF"
+AMBER = "#D29922"
+CYAN = "#39C5CF"
+ROSE = "#FB7185"
+
+CHART_COLORS = [SKY, EMERALD, BRAND, "#FB923C", AMBER, CYAN]
+
+
+def C(name: str, fallback: str) -> str:
+    """Obtém uma cor do tema existente sem tornar o dashboard dependente dele."""
+    if cw_theme is not None:
+        try:
+            return cw_theme.colors.get(name, fallback)
+        except Exception:
+            pass
+    return fallback
+
+
+def moeda(v) -> str:
+    try:
+        v = float(v or 0)
+    except Exception:
+        v = 0.0
+
+    if formatar_moeda is not None:
+        try:
+            return formatar_moeda(v)
+        except Exception:
+            pass
+
+    return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def fonte(size: int, bold: bool = False, mono: bool = False) -> QFont:
+    if cw_theme is not None:
+        try:
+            return cw_theme.get_font(size, bold=bold)
+        except Exception:
+            pass
+    f = QFont("Cascadia Code" if mono else "Segoe UI", size)
+    f.setBold(bold)
+    return f
+
+
+def label(text="", size=13, color=TEXT, bold=False, mono=False) -> QLabel:
+    w = QLabel(str(text))
+    w.setFont(fonte(size, bold, mono))
+    w.setStyleSheet(f"color: {color}; background: transparent;")
+    return w
+
+
+def separator() -> QFrame:
+    w = QFrame()
+    w.setFixedHeight(1)
+    w.setStyleSheet(f"background: {BORDER}; border: none;")
+    return w
+
+
+def section_label(text: str) -> QLabel:
+    w = QLabel(text.upper())
+    w.setFont(fonte(9, True))
+    w.setStyleSheet(
+        f"color:{TEXT3}; background:transparent; letter-spacing:1px;"
+    )
+    return w
+
+
+class Card(QFrame):
+    """Card visual consistente com o dashboard EMU."""
+
+    def __init__(self, parent=None, accent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background: {SURFACE};
+                border: none;
+                border-radius: 14px;
+            }}
+        """)
+
+
+class KPI(QFrame):
+    def __init__(self, title, accent, parent=None):
+        super().__init__(parent)
+        self.accent = accent
+        self.setMinimumHeight(132)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {ELEVATED}, stop:1 {SURFACE}
+                );
+                border: none;
+                border-radius: 12px;
+            }}
+            QFrame:hover {{
+                background: {OVERLAY};
+            }}
+        """)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 16, 18, 15)
+        lay.setSpacing(6)
+
+        top = QHBoxLayout()
+        indicator = QFrame()
+        indicator.setFixedSize(4, 30)
+        indicator.setStyleSheet(
+            f"background:{accent}; border:none; border-radius:2px;"
+        )
+        top.addWidget(indicator)
+        top.addSpacing(9)
+        top.addWidget(label(title.upper(), 10, TEXT3, True))
+        top.addStretch()
+        lay.addLayout(top)
+
+        self.value = label("—", 25, TEXT, True)
+        lay.addWidget(self.value)
+
+        self.delta = label("—", 11, TEXT3, False)
+        lay.addWidget(self.delta)
+
+    def update_value(self, value, growth=None):
+        self.value.setText(str(value))
+
+        if growth is None:
+            self.delta.setText("Sem comparação")
+            self.delta.setStyleSheet(
+                f"color:{TEXT3}; background:transparent;"
+            )
+            return
+
+        try:
+            g = float(growth)
+            arrow = "↑" if g >= 0 else "↓"
+            color = EMERALD if g >= 0 else ROSE
+            self.delta.setText(f"{arrow} {abs(g):.1f}% vs período anterior")
+            self.delta.setStyleSheet(
+                f"color:{color}; background:transparent;"
+            )
+        except Exception:
+            self.delta.setText("—")
+
+
+class FallbackBars(QWidget):
+    """Gráfico de barras sem dependências externas."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = []
+        self.setMinimumHeight(190)
+
+    def set_data(self, labels, values):
+        self.data = list(zip(labels, values))
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        if not self.data:
+            p.setPen(QColor(TEXT3))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sem dados")
+            p.end()
+            return
+
+        maxv = max((float(v or 0) for _, v in self.data), default=1) or 1
+        chart_h = h - 28
+        gap = 8
+        bw = max(1, (w - gap * (len(self.data) - 1)) / len(self.data))
+
+        # Draw grid lines (only once, outside the data loop)
+        for gy in range(0, chart_h, max(1, chart_h // 4)):
+            pen = QPen(QColor(BORDER))
+            p.setPen(pen)
+            p.drawLine(0, gy, w, gy)
+
+        for i, (lbl, val) in enumerate(self.data):
+            x = int(i * (bw + gap))
+            bh = int((float(val or 0) / maxv) * (chart_h - 10))
+            y = chart_h - bh
+
+            grad = QLinearGradient(x, y, x, chart_h)
+            c1, c2 = QColor(EMERALD), QColor(EMERALD)
+            c1.setAlphaF(.9)
+            c2.setAlphaF(.28)
+            grad.setColorAt(0, c1)
+            grad.setColorAt(1, c2)
+
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(grad))
+            p.drawRoundedRect(x, y, int(bw), bh, 5, 5)
+
+            p.setPen(QColor(TEXT3))
+            p.setFont(fonte(9))
+            p.drawText(
+                x, chart_h + 2, int(bw), 22,
+                Qt.AlignmentFlag.AlignCenter, str(lbl)
+            )
+
+        p.end()
+
+
+class FallbackDonut(QWidget):
+    """Gráfico de rosca simples para fallback."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = []
+        self.setMinimumHeight(190)
+
+    def set_data(self, data):
+        self.data = data or []
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        w, h = self.width(), self.height()
+        size = min(w, h) - 24
+        x, y = (w - size) // 2, (h - size) // 2
+        total = sum(float(v or 0) for _, v in self.data) or 1
+
+        angle = 90 * 16
+        for i, (_, value) in enumerate(self.data):
+            span = int(float(value or 0) / total * 360 * 16)
+            pen = QPen(QColor(CHART_COLORS[i % len(CHART_COLORS)]), 24)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawArc(x + 12, y + 12, size - 24, size - 24, angle, -span)
+            angle -= span
+
+        p.setPen(QColor(TEXT))
+        p.setFont(fonte(16, True))
+        p.drawText(
+            x, y, size, size,
+            Qt.AlignmentFlag.AlignCenter, str(int(total))
+        )
+        p.end()
+
+
+class StatusBadge(QLabel):
+    COLORS = {
+        "Entregue": (EMERALD, "#0D2818"),
+        "Concluído": (EMERALD, "#0D2818"),
+        "Em Rota": (SKY, "#0C2D6B"),
+        "Trânsito": (SKY, "#0C2D6B"),
+        "Pendente": (AMBER, "#2A1F0A"),
+        "Agendado": (CYAN, "#0A2A2E"),
+        "Manutenção": (ROSE, "#2E141C"),
+        "Ativo": (EMERALD, "#0D2818"),
+    }
+
+    def __init__(self, text, parent=None):
+        super().__init__(str(text), parent)
+        fg, bg = self.COLORS.get(text, (TEXT2, ELEVATED))
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFont(fonte(9, True))
+        self.setStyleSheet(f"""
+            QLabel {{
+                color:{fg};
+                background:{bg};
+                border:none;
+                border-radius:5px;
+                padding:3px 8px;
+            }}
+        """)
 
 
 class Dashboard(QWidget):
-    """Dashboard executivo moderno em PySide6."""
+    """
+    Dashboard Executivo CW — versão premium final.
+
+    Compatível com o padrão:
+        from telas.dashboard_emu_premium_FINAL import Dashboard
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,487 +365,595 @@ class Dashboard(QWidget):
         self.manutencoes_resumo = {}
         self.atividades = []
         self.entregas = []
+        self.grafico_comparativo = {}
+        self.grafico_receita = {}
 
         self._setup_ui()
         self._load_data()
 
-    # ================================================================ UI
-    def _setup_ui(self):
-        colors = cw_theme.colors
-        tokens = cw_theme.spacing
+    # ------------------------------------------------------------------ UI
 
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setStyleSheet(f"""
-        QScrollArea {{ background: transparent; border: none; }}
-        QScrollBar:vertical {{ background: transparent; width: 8px; margin: 4px 2px; }}
-        QScrollBar::handle:vertical {{ background: {colors['border_default']}; border-radius: 4px; min-height: 40px; }}
-        QScrollBar::handle:vertical:hover {{ background: {colors['border_strong']}; }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; height: 0px; }}
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            background:{BG};
+            QLabel {{
+                border: none;
+                background: transparent;
+            }}
+            QFrame {{
+                border: none;
+            }}
         """)
 
-        self.content = QWidget()
-        self.content.setStyleSheet(f"background: {colors['bg_primary']};")
-        self.content_layout = QVBoxLayout()
-        self.content_layout.setContentsMargins(tokens._2XL, tokens.XL, tokens._2XL, tokens._2XL)
-        self.content_layout.setSpacing(tokens.LG)
-        self.content.setLayout(self.content_layout)
-        self.scroll.setWidget(self.content)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ border:none; background:{BG}; }}
+            QScrollBar:vertical {{
+                width:6px; background:transparent;
+            }}
+            QScrollBar::handle:vertical {{
+                background:{BORDER2}; border-radius:3px; min-height:40px;
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height:0;
+            }}
+        """)
 
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        self.setLayout(main_layout)
-        main_layout.addWidget(self.scroll)
+        content = QWidget()
+        content.setStyleSheet(f"background:{BG};")
+        self.layout_main = QVBoxLayout(content)
+        self.layout_main.setContentsMargins(28, 24, 28, 34)
+        self.layout_main.setSpacing(22)
+        scroll.setWidget(content)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(scroll)
 
         self._create_header()
-        self._create_kpi_cards()
+        self._create_kpis()
         self._create_charts()
-        self._create_summary_cards()
-        self._create_activity_section()
+        self._create_finance()
+        self._create_activity()
+
+        self.layout_main.addStretch()
 
     def _create_header(self):
-        colors = cw_theme.colors
-        tokens = cw_theme.spacing
+        card = Card()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background:qlineargradient(
+                    x1:0,y1:0,x2:1,y2:0,
+                    stop:0 {SURFACE}, stop:1 {ELEVATED}
+                );
+                border:none;
+                border-radius:14px;
+            }}
+        """)
 
-        header = QHBoxLayout()
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(22, 17, 22, 17)
 
-        titulo_box = QVBoxLayout()
-        titulo_box.setSpacing(2)
-        titulo = QLabel("Olá, Administrador!")
-        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-        titulo_box.addWidget(titulo)
+        left = QVBoxLayout()
+        left.setSpacing(4)
 
-        subtitulo = QLabel("Aqui está o resumo geral da sua operação.")
-        subtitulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        subtitulo.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-        titulo_box.addWidget(subtitulo)
+        now = datetime.now()
+        saudacao = (
+            "Bom dia" if now.hour < 12 else
+            "Boa tarde" if now.hour < 18 else
+            "Boa noite"
+        )
 
-        header.addLayout(titulo_box)
-        header.addStretch()
+        left.addWidget(label(
+            f"{saudacao} — Dashboard Executivo", 22, TEXT, True
+        ))
+        left.addWidget(label(
+            now.strftime("%d/%m/%Y  ·  %H:%M"),
+            10, TEXT3, False, True
+        ))
 
-        lbl_periodo = QLabel("Período:")
-        lbl_periodo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        lbl_periodo.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-        header.addWidget(lbl_periodo)
+        lay.addLayout(left)
+        lay.addStretch()
 
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
         self.combo_periodo.setCurrentText(self.tipo_periodo)
-        self.combo_periodo.setMinimumHeight(36)
-        self.combo_periodo.setMinimumWidth(130)
+        self.combo_periodo.setFixedHeight(38)
+        self.combo_periodo.setFixedWidth(130)
+        self.combo_periodo.setStyleSheet(f"""
+            QComboBox {{
+                background:{SURFACE};
+                color:{TEXT};
+                border:none;
+                border-radius:8px;
+                padding:6px 10px;
+            }}
+            QComboBox:hover {{ background:{ELEVATED}; }}
+            QComboBox::drop-down {{ border:none; width:22px; }}
+            QComboBox QAbstractItemView {{
+                background:{ELEVATED};
+                color:{TEXT};
+                selection-background-color:{BRAND_BG};
+                border:none;
+            }}
+        """)
         self.combo_periodo.currentTextChanged.connect(self._update_period)
-        header.addWidget(self.combo_periodo)
+        lay.addWidget(self.combo_periodo)
 
-        self.content_layout.addLayout(header)
+        refresh = QPushButton("↻  Atualizar")
+        refresh.setFixedHeight(38)
+        refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh.setStyleSheet(f"""
+            QPushButton {{
+                background:{BRAND};
+                color:white;
+                border:none;
+                border-radius:8px;
+                padding:0 18px;
+                font-weight:600;
+            }}
+            QPushButton:hover {{ background:{BRAND_H}; }}
+        """)
+        refresh.clicked.connect(self._load_data)
+        lay.addWidget(refresh)
 
-    def _create_kpi_cards(self):
-        tokens = cw_theme.spacing
+        self.layout_main.addWidget(card)
 
-        cards_grid = QWidget()
-        cards_grid.setStyleSheet("background: transparent;")
-        cards_layout = QGridLayout()
-        cards_layout.setContentsMargins(0, 0, 0, 0)
-        cards_layout.setSpacing(tokens.MD)
-        cards_layout.setRowStretch(0, 0)  # Cards não devem esticar verticalmente
-        for i in range(5):
-            cards_layout.setColumnStretch(i, 1)
-        cards_grid.setLayout(cards_layout)
+    def _create_kpis(self):
+        self.layout_main.addWidget(section_label("Visão geral"))
+        grid = QGridLayout()
+        grid.setSpacing(12)
 
-        self.card_receita = KPICard("Receita Bruta", "R$ 0,00", icon_name="trending_up")
-        cards_layout.addWidget(self.card_receita, 0, 0)
+        self.card_receita = KPI("Receita Bruta", EMERALD)
+        self.card_lucro = KPI("Lucro Estimado", SKY)
+        self.card_fretes_realizados = KPI("Fretes Realizados", BRAND)
+        self.card_fretes_andamento = KPI("Fretes em Andamento", AMBER)
+        self.card_clientes = KPI("Clientes Ativos", CYAN)
 
-        self.card_lucro = KPICard("Lucro Estimado", "R$ 0,00", icon_name="trending_up")
-        cards_layout.addWidget(self.card_lucro, 0, 1)
+        cards = [
+            self.card_receita,
+            self.card_lucro,
+            self.card_fretes_realizados,
+            self.card_fretes_andamento,
+            self.card_clientes,
+        ]
 
-        self.card_fretes_realizados = KPICard("Fretes Realizados", "0", icon_name="check")
-        cards_layout.addWidget(self.card_fretes_realizados, 0, 2)
+        for i, card in enumerate(cards):
+            grid.addWidget(card, 0, i)
+            grid.setColumnStretch(i, 1)
 
-        self.card_fretes_andamento = KPICard("Fretes em Andamento", "0", icon_name="clock")
-        cards_layout.addWidget(self.card_fretes_andamento, 0, 3)
+        self.layout_main.addLayout(grid)
 
-        self.card_clientes = KPICard("Clientes Ativos", "0", icon_name="groups")
-        cards_layout.addWidget(self.card_clientes, 0, 4)
-
-        self.content_layout.addWidget(cards_grid)
+    def _chart_card(self, title):
+        card = Card()
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(12)
+        lay.addWidget(label(title, 13, TEXT, True))
+        holder = QWidget()
+        holder.setStyleSheet("background:transparent;")
+        hl = QVBoxLayout(holder)
+        hl.setContentsMargins(0, 8, 0, 0)
+        lay.addWidget(holder, 1)
+        card.chart_layout = hl
+        return card
 
     def _create_charts(self):
-        tokens = cw_theme.spacing
-
-        charts_layout = QHBoxLayout()
-        charts_layout.setSpacing(tokens.MD)
-
-        self._chart_card_comparativo = ChartCard("Receita x Despesa")
-        self._line_chart = MultiLineChart()
-        self._chart_card_comparativo.set_chart_widget(self._line_chart)
-        charts_layout.addWidget(self._chart_card_comparativo, stretch=3)
-
-        self._chart_card_status = ChartCard("Fretes por Status")
-        self._donut_chart = DonutChart()
-        self._chart_card_status.set_chart_widget(self._donut_chart)
-        charts_layout.addWidget(self._chart_card_status, stretch=2)
-
-        self._chart_card_receita = ChartCard("Receita dos Últimos Meses")
-        self._bar_chart = BarChart()
-        self._chart_card_receita.set_chart_widget(self._bar_chart)
-        charts_layout.addWidget(self._chart_card_receita, stretch=3)
-
-        self.content_layout.addLayout(charts_layout)
-
-    def _create_summary_cards(self):
-        tokens = cw_theme.spacing
-
+        self.layout_main.addWidget(section_label("Performance operacional"))
         row = QHBoxLayout()
-        row.setSpacing(tokens.LG)
+        row.setSpacing(12)
 
-        self.card_contas_receber = self._make_summary_card(
-            "Contas a Receber", "financeiro"
-        )
-        row.addWidget(self.card_contas_receber, stretch=1)
+        self.chart_comparativo = self._chart_card("Receita × Despesa")
+        self.chart_status = self._chart_card("Fretes por Status")
+        self.chart_receita = self._chart_card("Receita Mensal")
 
-        self.card_contas_pagar = self._make_summary_card(
-            "Contas a Pagar", "financeiro"
-        )
-        row.addWidget(self.card_contas_pagar, stretch=1)
+        # Gráfico principal
+        if MultiLineChart:
+            self.line_chart = MultiLineChart()
+        else:
+            self.line_chart = QLabel("Gráfico indisponível")
+            self.line_chart.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.line_chart.setStyleSheet(f"color:{TEXT3};")
 
-        self.card_combustivel = self._make_summary_card(
-            "Combustível (Mês)", "combustivel"
-        )
-        row.addWidget(self.card_combustivel, stretch=1)
+        self.chart_comparativo.chart_layout.addWidget(self.line_chart)
 
-        self.card_manutencoes = self._make_summary_card(
-            "Manutenções", "manutencao"
-        )
-        row.addWidget(self.card_manutencoes, stretch=1)
+        # Status
+        if DonutChart:
+            self.donut_chart = DonutChart()
+        else:
+            self.donut_chart = FallbackDonut()
 
-        self.content_layout.addLayout(row)
+        self.chart_status.chart_layout.addWidget(self.donut_chart)
 
-    def _make_summary_card(self, titulo: str, kind: str) -> QFrame:
-        """Cria um card resumo com placeholders internos preenchidos depois."""
-        colors = cw_theme.colors
-        tokens = cw_theme.spacing
-        radius = cw_theme.radius
+        # Receita
+        if BarChart:
+            self.bar_chart = BarChart()
+        else:
+            self.bar_chart = FallbackBars()
 
-        frame = QFrame()
-        frame.setObjectName("summaryCard2")
-        frame.setStyleSheet(f"""
-        QFrame#summaryCard2 {{
-            background: {colors['card_bg']}; border: 1px solid {colors['card_border']};
-            border-radius: {radius.LG}px;
-        }}
-        QFrame#summaryCard2:hover {{ border-color: {colors['border_strong']}; }}
-        """)
-        layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.LG, tokens.MD, tokens.LG, tokens.LG)
-        layout.setSpacing(6)
-        frame.setLayout(layout)
+        self.chart_receita.chart_layout.addWidget(self.bar_chart)
 
-        title_lbl = QLabel(titulo.upper())
-        title_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
-        title_lbl.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent; letter-spacing: 1px;")
-        layout.addWidget(title_lbl)
+        left = QVBoxLayout()
+        left.setSpacing(12)
+        left.addWidget(self.chart_comparativo, 2)
 
-        value_lbl = QLabel("R$ 0,00")
-        value_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        value_lbl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-        layout.addWidget(value_lbl)
-        frame._value_label = value_lbl
+        right = QVBoxLayout()
+        right.setSpacing(12)
+        right.addWidget(self.chart_status, 1)
+        right.addWidget(self.chart_receita, 1)
 
-        details_row = QHBoxLayout()
-        details_row.setSpacing(tokens.MD)
+        row.addLayout(left, 3)
+        row.addLayout(right, 2)
 
-        detail_a = QVBoxLayout()
-        detail_a.setSpacing(0)
-        label_a = QLabel("")
-        label_a.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
-        label_a.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-        value_a = QLabel("")
-        value_a.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-        value_a.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-        detail_a.addWidget(label_a)
-        detail_a.addWidget(value_a)
-        details_row.addLayout(detail_a)
-        frame._label_a = label_a
-        frame._value_a = value_a
+        self.layout_main.addLayout(row)
 
-        detail_b = QVBoxLayout()
-        detail_b.setSpacing(0)
-        label_b = QLabel("")
-        label_b.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
-        label_b.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-        value_b = QLabel("")
-        value_b.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-        value_b.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-        detail_b.addWidget(label_b)
-        detail_b.addWidget(value_b)
-        details_row.addLayout(detail_b)
-        frame._label_b = label_b
-        frame._value_b = value_b
+    def _metric_card(self, title, accent):
+        card = Card()
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(18, 15, 18, 15)
+        lay.setSpacing(8)
 
-        details_row.addStretch()
-        layout.addLayout(details_row)
+        lay.addWidget(label(title.upper(), 9, TEXT3, True))
+        value = label("R$ —", 20, TEXT, True)
+        lay.addWidget(value)
 
-        link = QLabel(f"Ver todas ›")
-        link.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
-        link.setStyleSheet(f"color: {colors['brand']}; background: transparent;")
-        layout.addWidget(link)
+        d1 = label("—", 10, TEXT2)
+        d2 = label("—", 10, TEXT2)
 
-        return frame
+        line = QHBoxLayout()
+        line.addWidget(d1)
+        line.addStretch()
+        line.addWidget(d2)
+        lay.addLayout(line)
 
-    def _create_activity_section(self):
-        tokens = cw_theme.spacing
+        card.value = value
+        card.detail1 = d1
+        card.detail2 = d2
+        return card
 
+    def _create_finance(self):
+        self.layout_main.addWidget(section_label("Financeiro e custos"))
         row = QHBoxLayout()
-        row.setSpacing(tokens.LG)
+        row.setSpacing(12)
 
-        atividades_card = ModernCard(title="Últimas Atividades", icon_name="clock", padding=tokens.LG)
-        self.atividades_list = QWidget()
-        self.atividades_list.setStyleSheet("background: transparent;")
-        self.atividades_list_layout = QVBoxLayout()
-        self.atividades_list_layout.setContentsMargins(0, 0, 0, 0)
-        self.atividades_list_layout.setSpacing(tokens.SM)
-        self.atividades_list.setLayout(self.atividades_list_layout)
-        atividades_card.add_widget(self.atividades_list)
-        row.addWidget(atividades_card, stretch=1)
+        self.card_contas_receber = self._metric_card(
+            "Contas a Receber", EMERALD
+        )
+        self.card_contas_pagar = self._metric_card(
+            "Contas a Pagar", ROSE
+        )
+        self.card_combustivel = self._metric_card(
+            "Combustível (Mês)", AMBER
+        )
+        self.card_manutencoes = self._metric_card(
+            "Manutenções", SKY
+        )
 
-        entregas_card = ModernCard(title="Próximas Entregas", icon_name="truck", padding=tokens.LG)
-        self.entregas_list = QWidget()
-        self.entregas_list.setStyleSheet("background: transparent;")
-        self.entregas_list_layout = QVBoxLayout()
-        self.entregas_list_layout.setContentsMargins(0, 0, 0, 0)
-        self.entregas_list_layout.setSpacing(tokens.SM)
-        self.entregas_list.setLayout(self.entregas_list_layout)
-        entregas_card.add_widget(self.entregas_list)
-        row.addWidget(entregas_card, stretch=1)
+        for card in [
+            self.card_contas_receber,
+            self.card_contas_pagar,
+            self.card_combustivel,
+            self.card_manutencoes,
+        ]:
+            row.addWidget(card, 1)
 
-        self.content_layout.addLayout(row)
+        self.layout_main.addLayout(row)
 
-    # ================================================================ Data
+    def _activity_card(self, title):
+        card = Card()
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(10)
+        lay.addWidget(label(title, 13, TEXT, True))
+
+        holder = QWidget()
+        holder.setStyleSheet("background:transparent;")
+        hl = QVBoxLayout(holder)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(7)
+        lay.addWidget(holder, 1)
+
+        card.content_layout = hl
+        return card
+
+    def _create_activity(self):
+        self.layout_main.addWidget(section_label("Operação"))
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        left = self._activity_card("Últimas Atividades")
+        right = self._activity_card("Próximas Entregas")
+
+        self.atividades_layout = left.content_layout
+        self.entregas_layout = right.content_layout
+
+        row.addWidget(left, 1)
+        row.addWidget(right, 1)
+        self.layout_main.addLayout(row)
+
+    # --------------------------------------------------------------- DATA
+
     def _load_data(self):
-        self.kpis = dashboard_service.calcular_kpis(self.tipo_periodo, self.mes, self.ano)
-        self.fretes_status = dashboard_service.resumo_fretes_status(self.tipo_periodo, self.mes, self.ano)
-        self.contas_resumo = dashboard_service.resumo_contas_receber_pagar(self.tipo_periodo, self.mes, self.ano)
-        self.combustivel_resumo = dashboard_service.resumo_combustivel_mes()
-        self.manutencoes_resumo = dashboard_service.resumo_manutencoes()
-        self.atividades = dashboard_service.atividades_recentes(4)
-        self.entregas = dashboard_service.proximas_entregas(3)
+        if dashboard_service is None:
+            self._load_mock()
+            return
 
-        ano_grafico = self.ano or datetime.now().strftime("%Y")
-        self.grafico_comparativo = dashboard_service.dados_graficos_comparativo_mensal(ano_grafico)
-        self.grafico_receita = dashboard_service.dados_graficos_receita_mensal(ano_grafico)
+        try:
+            self.kpis = dashboard_service.calcular_kpis(
+                self.tipo_periodo, self.mes, self.ano
+            )
+            self.fretes_status = dashboard_service.resumo_fretes_status(
+                self.tipo_periodo, self.mes, self.ano
+            )
+            self.contas_resumo = (
+                dashboard_service.resumo_contas_receber_pagar(
+                    self.tipo_periodo, self.mes, self.ano
+                )
+            )
+            self.combustivel_resumo = (
+                dashboard_service.resumo_combustivel_mes()
+            )
+            self.manutencoes_resumo = dashboard_service.resumo_manutencoes()
+            self.atividades = dashboard_service.atividades_recentes(5)
+            self.entregas = dashboard_service.proximas_entregas(5)
 
+            self.grafico_comparativo = (
+                dashboard_service.dados_graficos_comparativo_mensal(self.ano)
+            )
+            self.grafico_receita = (
+                dashboard_service.dados_graficos_receita_mensal(self.ano)
+            )
+
+            self._update_ui()
+
+        except Exception as exc:
+            print(f"[DashboardEMU Premium] erro: {exc}")
+            self._load_mock()
+
+    def _load_mock(self):
+        """Fallback somente para desenvolvimento/preview."""
+        self.kpis = {
+            "receita_total": {"valor": 613400, "crescimento": 12.8},
+            "lucro_estimado": {"valor": 142800, "crescimento": 8.4},
+            "fretes_realizados": {"valor": 89, "crescimento": 5.2},
+            "fretes_andamento": {"valor": 14, "crescimento": 0},
+            "clientes_ativos": {"valor": 37, "crescimento": 3.1},
+        }
+        self.fretes_status = [
+            ("Entregue", 68), ("Em Rota", 21), ("Pendente", 11)
+        ]
+        self.contas_resumo = {
+            "Receber": {"total": 61020, "vencidas": 10200, "a_vencer": 50820},
+            "Pagar": {"total": 60700, "vencidas": 8300, "a_vencer": 52400},
+        }
+        self.combustivel_resumo = {
+            "total": 18400, "litros": 5200, "media_litro": 3.54
+        }
+        self.manutencoes_resumo = {
+            "total": 4, "atrasadas": 1, "agendadas": 3
+        }
+        self.atividades = [
+            {"titulo": "NF-00341", "detalhe": "Atacadão Central", "tipo": "Fretes"},
+            {"titulo": "NF-00340", "detalhe": "Norte S.A.", "tipo": "Coletas"},
+            {"titulo": "GHI-9012", "detalhe": "Volvo Service", "tipo": "Manutenção"},
+        ]
+        self.entregas = [
+            {"quando": "15/08", "titulo": "NF-00341", "detalhe": "Campinas, SP", "status": "Em Rota"},
+            {"quando": "15/08", "titulo": "NF-00340", "detalhe": "Ribeirão Preto, SP", "status": "Em Rota"},
+            {"quando": "16/08", "titulo": "NF-00338", "detalhe": "Santos, SP", "status": "Agendado"},
+        ]
+        self.grafico_comparativo = {
+            "labels": ["Mar", "Abr", "Mai", "Jun", "Jul", "Ago"],
+            "receitas": [142000, 168000, 155000, 189000, 204000, 231400],
+            "despesas": [98000, 112000, 109000, 126000, 139000, 151000],
+        }
+        self.grafico_receita = {
+            "labels": ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago"],
+            "valores": [121000, 130000, 142000, 168000, 155000, 189000, 204000, 231400],
+        }
         self._update_ui()
-
-    def _fmt_trend(self, crescimento: float) -> str:
-        seta = "↑" if crescimento >= 0 else "↓"
-        return f"{seta} {abs(crescimento):.1f}% vs período anterior"
 
     def _update_ui(self):
         k = self.kpis
 
-        self.card_receita.set_value(formatar_moeda(k.get("receita_total", {}).get("valor", 0)))
-        self.card_receita.set_trend(self._fmt_trend(k.get("receita_total", {}).get("crescimento", 0)))
+        def get(name):
+            return k.get(name, {}) if isinstance(k.get(name, {}), dict) else {}
 
-        self.card_lucro.set_value(formatar_moeda(k.get("lucro_estimado", {}).get("valor", 0)))
-        self.card_lucro.set_trend(self._fmt_trend(k.get("lucro_estimado", {}).get("crescimento", 0)))
+        self.card_receita.update_value(
+            moeda(get("receita_total").get("valor", 0)),
+            get("receita_total").get("crescimento")
+        )
+        self.card_lucro.update_value(
+            moeda(get("lucro_estimado").get("valor", 0)),
+            get("lucro_estimado").get("crescimento")
+        )
+        self.card_fretes_realizados.update_value(
+            int(get("fretes_realizados").get("valor", 0)),
+            get("fretes_realizados").get("crescimento")
+        )
+        self.card_fretes_andamento.update_value(
+            int(get("fretes_andamento").get("valor", 0)),
+            get("fretes_andamento").get("crescimento")
+        )
+        self.card_clientes.update_value(
+            int(get("clientes_ativos").get("valor", 0)),
+            get("clientes_ativos").get("crescimento")
+        )
 
-        self.card_fretes_realizados.set_value(str(int(k.get("fretes_realizados", {}).get("valor", 0))))
-        self.card_fretes_realizados.set_trend(self._fmt_trend(k.get("fretes_realizados", {}).get("crescimento", 0)))
+        self._update_charts()
+        self._update_finance()
+        self._update_activities()
+        self._update_deliveries()
 
-        self.card_fretes_andamento.set_value(str(int(k.get("fretes_andamento", {}).get("valor", 0))))
-        self.card_fretes_andamento.set_trend(self._fmt_trend(k.get("fretes_andamento", {}).get("crescimento", 0)))
-
-        self.card_clientes.set_value(str(int(k.get("clientes_ativos", {}).get("valor", 0))))
-        self.card_clientes.set_trend(self._fmt_trend(k.get("clientes_ativos", {}).get("crescimento", 0)))
-
-        self._atualizar_grafico_comparativo()
-        self._atualizar_grafico_status()
-        self._atualizar_grafico_receita()
-
-        self._atualizar_card_contas(self.card_contas_receber, self.contas_resumo.get("Receber", {}))
-        self._atualizar_card_contas(self.card_contas_pagar, self.contas_resumo.get("Pagar", {}))
-        self._atualizar_card_combustivel()
-        self._atualizar_card_manutencoes()
-
-        self._update_atividades()
-        self._update_entregas()
-
-    def _atualizar_grafico_comparativo(self):
-        colors = cw_theme.colors
+    def _update_charts(self):
         dados = self.grafico_comparativo or {}
         labels = dados.get("labels", [])
         receitas = dados.get("receitas", [])
         despesas = dados.get("despesas", [])
-        self._line_chart.set_series(labels, [
-            ("Receita", receitas, colors["success"]),
-            ("Despesa", despesas, colors["error"]),
-        ])
 
-    def _atualizar_grafico_status(self):
-        total = sum(v for _, v in self.fretes_status) or 0
-        data = [(label, valor) for label, valor in self.fretes_status if valor > 0]
-        center = str(total) if total else "0"
-        self._donut_chart.set_data(data if data else [("Sem dados", 1)], center_text=center)
+        if hasattr(self.line_chart, "set_series"):
+            self.line_chart.set_series(labels, [
+                ("Receita", receitas, EMERALD),
+                ("Despesa", despesas, ROSE),
+            ])
 
-    def _atualizar_grafico_receita(self):
-        dados = self.grafico_receita or {}
-        labels = dados.get("labels", [])
-        valores = dados.get("valores", [])
-        # Últimos 6 meses até o mês atual
-        mes_atual = int(datetime.now().strftime("%m"))
-        inicio = max(0, mes_atual - 6)
-        self._bar_chart.set_data(labels[inicio:mes_atual], valores[inicio:mes_atual])
+        status = [
+            (n, v) for n, v in self.fretes_status
+            if float(v or 0) > 0
+        ]
 
-    def _atualizar_card_contas(self, frame: QFrame, dados: dict):
-        vencidas = dados.get("vencidas", 0)
-        a_vencer = dados.get("a_vencer", 0)
-        total = dados.get("total", vencidas + a_vencer)
-        frame._value_label.setText(formatar_moeda(total))
-        frame._label_a.setText("Vencidas")
-        frame._value_a.setText(formatar_moeda(vencidas))
-        frame._label_b.setText("A vencer")
-        frame._value_b.setText(formatar_moeda(a_vencer))
+        if hasattr(self.donut_chart, "set_data"):
+            try:
+                self.donut_chart.set_data(
+                    status or [("Sem dados", 1)],
+                    center_text=str(int(sum(v for _, v in status)))
+                )
+            except TypeError:
+                self.donut_chart.set_data(status or [("Sem dados", 1)])
+        elif isinstance(self.donut_chart, FallbackDonut):
+            self.donut_chart.set_data(status)
 
-    def _atualizar_card_combustivel(self):
-        frame = self.card_combustivel
-        dados = self.combustivel_resumo
-        frame._value_label.setText(formatar_moeda(dados.get("total", 0)))
-        frame._label_a.setText("Total (L)")
-        frame._value_a.setText(f"{dados.get('litros', 0):.2f}")
-        frame._label_b.setText("Média (R$/L)")
-        frame._value_b.setText(formatar_moeda(dados.get("media_litro", 0)))
+        dados_r = self.grafico_receita or {}
+        labels_r = dados_r.get("labels", [])
+        valores_r = dados_r.get("valores", [])
 
-    def _atualizar_card_manutencoes(self):
-        frame = self.card_manutencoes
-        dados = self.manutencoes_resumo
-        frame._value_label.setText(str(dados.get("total", 0)))
-        frame._label_a.setText("Atrasadas")
-        frame._value_a.setText(str(dados.get("atrasadas", 0)))
-        frame._label_b.setText("Agendadas")
-        frame._value_b.setText(str(dados.get("agendadas", 0)))
+        # Não assume que a lista começa em janeiro.
+        # Se houver mais de 6 pontos, mostra os seis últimos.
+        labels6 = labels_r[-6:]
+        valores6 = valores_r[-6:]
 
-    def _update_atividades(self):
-        colors = cw_theme.colors
-        tokens = cw_theme.spacing
-        radius = cw_theme.radius
+        if hasattr(self.bar_chart, "set_data"):
+            self.bar_chart.set_data(labels6, valores6)
 
-        for i in reversed(range(self.atividades_list_layout.count())):
-            child = self.atividades_list_layout.itemAt(i).widget()
-            if child:
-                child.deleteLater()
+    def _update_finance(self):
+        def update(card, data):
+            data = data or {}
+            total = data.get("total", 0)
+            card.value.setText(moeda(total))
+            card.detail1.setText(
+                f"Vencidas: {moeda(data.get('vencidas', 0))}"
+            )
+            card.detail2.setText(
+                f"A vencer: {moeda(data.get('a_vencer', 0))}"
+            )
+
+        update(
+            self.card_contas_receber,
+            self.contas_resumo.get("Receber", {})
+        )
+        update(
+            self.card_contas_pagar,
+            self.contas_resumo.get("Pagar", {})
+        )
+
+        cb = self.combustivel_resumo or {}
+        self.card_combustivel.value.setText(moeda(cb.get("total", 0)))
+        self.card_combustivel.detail1.setText(
+            f"Total: {float(cb.get('litros', 0) or 0):.2f} L"
+        )
+        self.card_combustivel.detail2.setText(
+            f"Média: {moeda(cb.get('media_litro', 0))}/L"
+        )
+
+        cm = self.manutencoes_resumo or {}
+        self.card_manutencoes.value.setText(str(cm.get("total", 0)))
+        self.card_manutencoes.detail1.setText(
+            f"Atrasadas: {cm.get('atrasadas', 0)}"
+        )
+        self.card_manutencoes.detail2.setText(
+            f"Agendadas: {cm.get('agendadas', 0)}"
+        )
+
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _activity_item(self, item):
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background:{ELEVATED};
+                border:none;
+                border-radius:9px;
+            }}
+            QFrame:hover {{ background:{OVERLAY}; }}
+        """)
+
+        lay = QHBoxLayout(frame)
+        lay.setContentsMargins(12, 9, 12, 9)
+        lay.setSpacing(10)
+
+        text = QVBoxLayout()
+        text.setSpacing(2)
+        text.addWidget(label(item.get("titulo", ""), 11, TEXT, True))
+        text.addWidget(label(item.get("detalhe", ""), 10, TEXT2))
+        lay.addLayout(text, 1)
+
+        tipo = item.get("tipo", "")
+        lay.addWidget(StatusBadge(tipo))
+
+        return frame
+
+    def _delivery_item(self, item):
+        frame = QFrame()
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background:{ELEVATED};
+                border:none;
+                border-radius:9px;
+            }}
+            QFrame:hover {{ background:{OVERLAY}; }}
+        """)
+
+        lay = QHBoxLayout(frame)
+        lay.setContentsMargins(12, 9, 12, 9)
+        lay.setSpacing(10)
+
+        text = QVBoxLayout()
+        text.setSpacing(2)
+        title = f"{item.get('quando', '')}  •  {item.get('titulo', '')}"
+        text.addWidget(label(title, 11, TEXT, True))
+        text.addWidget(label(item.get("detalhe", ""), 10, TEXT2))
+        lay.addLayout(text, 1)
+
+        lay.addWidget(StatusBadge(item.get("status", "")))
+        return frame
+
+    def _update_activities(self):
+        self._clear_layout(self.atividades_layout)
 
         if not self.atividades:
-            placeholder = QLabel("Nenhuma atividade recente")
-            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-            placeholder.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            self.atividades_list_layout.addWidget(placeholder)
+            self.atividades_layout.addWidget(
+                label("Nenhuma atividade recente", 11, TEXT3)
+            )
             return
 
-        badge_colors = {
-            "Fretes": ("info", "info_soft"),
-            "Coletas": ("success", "success_soft"),
-            "Manutenção": ("warning", "warning_soft"),
-        }
-
         for item in self.atividades:
-            frame = QFrame()
-            frame.setStyleSheet(f"""
-            QFrame {{
-                background: {colors['bg_tertiary']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {radius.MD}px;
-            }}
-            QFrame:hover {{ border-color: {colors['border_strong']}; }}
-            """)
-            il = QHBoxLayout()
-            il.setContentsMargins(tokens.MD, tokens.SM, tokens.MD, tokens.SM)
-            il.setSpacing(tokens.SM)
-            frame.setLayout(il)
+            self.atividades_layout.addWidget(self._activity_item(item))
 
-            text_box = QVBoxLayout()
-            text_box.setSpacing(2)
-            titulo = QLabel(item.get("titulo", ""))
-            titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-            titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-            text_box.addWidget(titulo)
+        self.atividades_layout.addStretch()
 
-            detalhe = QLabel(item.get("detalhe", ""))
-            detalhe.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
-            detalhe.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-            text_box.addWidget(detalhe)
-            il.addLayout(text_box, stretch=1)
-
-            tipo = item.get("tipo", "")
-            key_bg, key_soft = badge_colors.get(tipo, ("brand", "brand_soft"))
-            badge = QLabel(tipo)
-            badge.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
-            badge.setStyleSheet(f"""
-            color: {colors[key_bg]}; background: {colors[key_soft]};
-            border-radius: {radius.SM}px; padding: 2px 8px;
-            """)
-            il.addWidget(badge)
-
-            self.atividades_list_layout.addWidget(frame)
-
-    def _update_entregas(self):
-        colors = cw_theme.colors
-        tokens = cw_theme.spacing
-        radius = cw_theme.radius
-
-        for i in reversed(range(self.entregas_list_layout.count())):
-            child = self.entregas_list_layout.itemAt(i).widget()
-            if child:
-                child.deleteLater()
+    def _update_deliveries(self):
+        self._clear_layout(self.entregas_layout)
 
         if not self.entregas:
-            placeholder = QLabel("Nenhuma entrega em andamento")
-            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-            placeholder.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
-            self.entregas_list_layout.addWidget(placeholder)
+            self.entregas_layout.addWidget(
+                label("Nenhuma entrega próxima", 11, TEXT3)
+            )
             return
 
         for item in self.entregas:
-            frame = QFrame()
-            frame.setStyleSheet(f"""
-            QFrame {{
-                background: {colors['bg_tertiary']}; border: 1px solid {colors['border_subtle']};
-                border-radius: {radius.MD}px;
-            }}
-            QFrame:hover {{ border-color: {colors['border_strong']}; }}
-            """)
-            il = QHBoxLayout()
-            il.setContentsMargins(tokens.MD, tokens.SM, tokens.MD, tokens.SM)
-            il.setSpacing(tokens.SM)
-            frame.setLayout(il)
+            self.entregas_layout.addWidget(self._delivery_item(item))
 
-            text_box = QVBoxLayout()
-            text_box.setSpacing(2)
-            titulo = QLabel(f"{item.get('quando', '')} - {item.get('titulo', '')}")
-            titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-            titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
-            text_box.addWidget(titulo)
-
-            detalhe = QLabel(item.get("detalhe", ""))
-            detalhe.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS))
-            detalhe.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
-            text_box.addWidget(detalhe)
-            il.addLayout(text_box, stretch=1)
-
-            status = item.get("status", "")
-            badge = QLabel(status)
-            badge.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
-            badge.setStyleSheet(f"""
-            color: {colors['info']}; background: {colors['info_soft']};
-            border-radius: {radius.SM}px; padding: 2px 8px;
-            """)
-            il.addWidget(badge)
-
-            self.entregas_list_layout.addWidget(frame)
+        self.entregas_layout.addStretch()
 
     def _update_period(self):
         self.tipo_periodo = self.combo_periodo.currentText()

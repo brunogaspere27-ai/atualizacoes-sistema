@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal, QSize, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QColor, QKeyEvent, QPixmap, QFont
 
-from telas.theme_aurora import aurora_theme_manager as theme_manager
+from ui.theme.cw_theme import cw_theme
 from utils.icons import get_icon, get_pixmap
 
 
@@ -65,8 +65,9 @@ class CommandPalette(QDialog):
         self._build()
 
     def _build(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        typo = cw_theme.typography
 
         # Outer transparent wrapper (for shadow)
         outer = QVBoxLayout()
@@ -82,7 +83,7 @@ class CommandPalette(QDialog):
         QFrame#paletteCard {{
             background: {c['bg_elevated']};
             border: 1px solid {c['border_strong']};
-            border-radius: {t.RADIUS_XL}px;
+            border-radius: {cw_theme.radius.XL}px;
         }}
         """)
         shadow = QGraphicsDropShadowEffect(card)
@@ -117,18 +118,16 @@ class CommandPalette(QDialog):
         self._search = QLineEdit()
         self._search.setPlaceholderText("Buscar ações, telas, clientes...")
         self._search.setFrame(False)
-        self._search.setFont(theme_manager.get_font(t.FONT_SIZE_LG))
+        self._search.setFont(cw_theme.get_font(typo.FONT_SIZE_LG))
         self._search.setStyleSheet(f"""
         QLineEdit {{
             background: transparent; color: {c['text_primary']};
-            border: none; font-size: {t.FONT_SIZE_LG}px;
         }}
         """)
-        self._search.textChanged.connect(self._on_text_changed)
         sl.addWidget(self._search, 1)
 
         hint = QLabel("ESC limpa")
-        hint.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+        hint.setFont(cw_theme.get_font(typo.FONT_SIZE_XS))
         hint.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         sl.addWidget(hint)
 
@@ -172,7 +171,7 @@ class CommandPalette(QDialog):
 
         for key, action in [("↑↓", "navegar"), ("↵", "executar"), ("Ctrl+K", "abrir/fechar")]:
             kw = QLabel(key)
-            kw.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+            kw.setFont(cw_theme.get_font(typo.FONT_SIZE_XS, bold=True))
             kw.setStyleSheet(f"""
             QLabel {{
                 background: {c['bg_overlay']}; color: {c['text_secondary']};
@@ -181,7 +180,7 @@ class CommandPalette(QDialog):
             """)
             fl.addWidget(kw)
             av = QLabel(action)
-            av.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+            av.setFont(cw_theme.get_font(typo.FONT_SIZE_XS))
             av.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
             fl.addWidget(av)
         fl.addStretch()
@@ -207,8 +206,9 @@ class CommandPalette(QDialog):
         self._render_results()
 
     def _render_results(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        typo = cw_theme.typography
 
         # Clear
         while self._results_layout.count():
@@ -219,7 +219,7 @@ class CommandPalette(QDialog):
         if not self._filtered:
             empty = QLabel("Nenhum resultado encontrado")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty.setFont(theme_manager.get_font(t.FONT_SIZE_MD))
+            empty.setFont(cw_theme.get_font(typo.FONT_SIZE_MD))
             empty.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; padding: 24px;")
             self._results_layout.addWidget(empty)
             return
@@ -235,7 +235,7 @@ class CommandPalette(QDialog):
         for cat, cmds in categories.items():
             # Category header
             cat_lbl = QLabel(cat.upper())
-            cat_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+            cat_lbl.setFont(cw_theme.get_font(typo.FONT_SIZE_XS, bold=True))
             cat_lbl.setStyleSheet(f"""
             QLabel {{
                 color: {c['text_tertiary']}; background: transparent;
@@ -257,8 +257,9 @@ class CommandPalette(QDialog):
         self._results_layout.addStretch()
 
     def _make_row(self, cmd: Command, selected: bool) -> QFrame:
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
+        typo = cw_theme.typography
 
         row = QFrame()
         row.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -267,7 +268,7 @@ class CommandPalette(QDialog):
         row.setStyleSheet(f"""
         QFrame {{
             background: {bg};
-            border-radius: {t.RADIUS_MD}px;
+            border-radius: {cw_theme.radius.MD}px;
             border-left: 2px solid {accent};
         }}
         QFrame:hover {{ background: {c['bg_overlay']}; }}
@@ -290,13 +291,13 @@ class CommandPalette(QDialog):
         text_col.setContentsMargins(0, 0, 0, 0)
 
         lbl = QLabel(cmd.label)
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_MD, bold=selected))
+        lbl.setFont(cw_theme.get_font(typo.FONT_SIZE_MD, bold=selected))
         lbl.setStyleSheet(f"color: {c['text_primary'] if selected else c['text_primary']}; background: transparent;")
         text_col.addWidget(lbl)
 
         if cmd.description:
             desc = QLabel(cmd.description)
-            desc.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+            desc.setFont(cw_theme.get_font(typo.FONT_SIZE_XS))
             desc.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
             text_col.addWidget(desc)
 

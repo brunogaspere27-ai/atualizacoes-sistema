@@ -1,200 +1,247 @@
-"""
-Tela de Notas Importadas - CW Transportadora v8
-Migrado de Tkinter/CustomTkinter para PySide6.
-
-Layout dividido em dois painéis:
-  • Esquerda  – lista de manifestos + botões Importar / Apagar
-  • Direita   – tabela de notas do manifesto selecionado + resumo
-A importação roda em thread de fundo e retorna via Signal.
-"""
-
 from __future__ import annotations
 
 import threading
 from datetime import datetime
+from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, QObject, QPropertyAnimation, QEasingCurve, QRectF
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QLabel, QListWidget, QListWidgetItem,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QFileDialog, QMessageBox, QAbstractItemView,
-    QSizePolicy, QScrollArea, QGraphicsDropShadowEffect,
-)
+from PySide6.QtCore import Qt, Signal, QObject
 from PySide6.QtGui import QPainter, QColor, QFont
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QFrame,
+    QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QScrollArea, QComboBox, QLineEdit, QAbstractItemView,
+    QPushButton, QDialog, QInputDialog,
+)
 
 from services.notas_service import notas_service
+from services.viagem_service import viagem_service
 from ui.theme.cw_theme import cw_theme
-from ui.components import CWCard, CWTable, CWBadge, CWButton, ButtonVariant, ButtonSize
 from utils.helpers import formatar_moeda, formatar_peso
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Componente de Card de Manifesto (CRM style)
-# ---------------------------------------------------------------------------
-class ManifestoCard(QFrame):
-    """Card moderno estilo CRM para exibir informações do manifesto."""
+_R = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+_C = Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
 
-    clicked = Signal(int)  # manifesto_id
 
-    def __init__(self, manifesto_data: dict, parent: QWidget = None):
+def _item(text: str, align=_C if False else Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter) -> QTableWidgetItem:
+    c = cw_theme.colors
+    item = QTableWidgetItem(str(text) if text not in (None, "") else "—")
+    item.setTextAlignment(align)
+    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+    item.setForeground(QColor(c['text_primary']))
+    return item
+
+
+class _KpiTile(QFrame):
+    def __init__(self, label: str, accent: str, parent=None):
         super().__init__(parent)
-        self._manifesto_data = manifesto_data
-        self._selected = False
-        self._setup_ui()
-
-    def _setup_ui(self):
+        self._accent = accent
         c = cw_theme.colors
-        t = cw_theme.spacing
-        r = cw_theme.radius
-
-        self.setMinimumHeight(100)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # Base style limpo e moderno - CW Design System
+        self.setMinimumHeight(84)
         self.setStyleSheet(f"""
-        QFrame {{
-            background-color: {c['bg_elevated']};
-            border: 1px solid {c['border_subtle']};
-            border-radius: {r.LG}px;
-        }}
-        QFrame:hover {{
-            border-color: {c['border_default']};
-            background-color: {c['bg_tertiary']};
-        }}
-        QFrame[selected="true"] {{
-            border-color: {c['border_default']};
-            background-color: {c['bg_tertiary']};
-        }}
-        """)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(t.LG, t.LG, t.LG, t.LG)
-        layout.setSpacing(t.SM)
-        self.setLayout(layout)
-
-        # Header: nome + status
-        header = QHBoxLayout()
-        header.setSpacing(t.SM)
-
-        # Nome do manifesto
-        nome = self._manifesto_data.get('nome_arquivo', 'Manifesto')
-        nome_label = QLabel(nome)
-        nome_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
-        nome_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        nome_label.setWordWrap(True)
-        header.addWidget(nome_label, 1)
-
-        # Status badge elegante - usando CWBadge
-        status = self._manifesto_data.get('status', 'Importado')
-        status_variant = {
-            'Importado': BadgeVariant.SUCCESS,
-            'Em uso': BadgeVariant.WARNING,
-            'Concluído': BadgeVariant.INFO,
-        }.get(status, BadgeVariant.DEFAULT)
-
-        status_badge = CWBadge(status, status_variant)
-        header.addWidget(status_badge)
-
-        layout.addLayout(header)
-
-        # Info row: quantidade de notas + data
-        info_row = QHBoxLayout()
-        info_row.setSpacing(t.MD)
-
-        notas_count = self._manifesto_data.get('total_notas', 0)
-        notas_label = QLabel(f"{notas_count} nota(s)")
-        notas_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        notas_label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
-        info_row.addWidget(notas_label)
-
-        data = self._manifesto_data.get('data_importacao', '')
-        if data:
-            data_label = QLabel(f"• {data}")
-            data_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-            data_label.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
-            info_row.addWidget(data_label)
-
-        info_row.addStretch()
-        layout.addLayout(info_row)
-
-        # Footer: peso + frete resumidos
-        footer = QHBoxLayout()
-        footer.setSpacing(t.MD)
-
-        peso = self._manifesto_data.get('peso_total', 0)
-        peso_label = QLabel(formatar_peso(peso))
-        peso_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-        peso_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        footer.addWidget(peso_label)
-
-        frete = self._manifesto_data.get('frete_total', 0)
-        frete_label = QLabel(formatar_moeda(frete))
-        frete_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-        frete_label.setStyleSheet(f"color: {c['success']}; background: transparent;")
-        footer.addWidget(frete_label)
-
-        footer.addStretch()
-        layout.addLayout(footer)
-
-    def mousePressEvent(self, event):
-        self.clicked.emit(self._manifesto_data['id'])
-        super().mousePressEvent(event)
-
-    def set_selected(self, selected: bool):
-        """Define estado selecionado com destaque neutro."""
-        self._selected = selected
-        c = cw_theme.colors
-        r = cw_theme.radius
-
-        if selected:
-            self.setStyleSheet(f"""
             QFrame {{
-                background-color: {c['bg_tertiary']};
-                border: 2px solid {c['border_default']};
-                border-radius: {r.LG}px;
+                background: {c['bg_elevated']};
+                border: 1px solid {c['border_subtle']};
+                border-radius: 12px;
             }}
+        """)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 12, 18, 12)
+        lay.setSpacing(3)
+        label_widget = QLabel(label.upper())
+        label_widget.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        label_widget.setStyleSheet(f"color:{c['text_tertiary']};background:transparent;letter-spacing:1.2px;")
+        lay.addWidget(label_widget)
+        self._value = QLabel("—")
+        self._value.setFont(QFont("Cascadia Code", 20, QFont.Weight.Bold))
+        self._value.setStyleSheet(f"color:{accent};background:transparent;")
+        lay.addWidget(self._value)
+
+    def set_value(self, value: str):
+        self._value.setText(value)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(self._accent))
+        p.drawRoundedRect(0, 18, 3, max(0, self.height() - 36), 2, 2)
+
+
+class _ManifestoCard(QFrame):
+    clicked = Signal(int)
+
+    def __init__(self, data: dict, parent=None):
+        super().__init__(parent)
+        self._data = data
+        self._selected = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(88)
+        self._build()
+        self._update_appearance()
+
+    def _build(self):
+        c = cw_theme.colors
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 12, 14, 12)
+        lay.setSpacing(5)
+
+        top = QHBoxLayout()
+        nome_txt = self._data.get("nome_arquivo", "Manifesto") or f"Manifesto {self._data.get('id', '')}"
+        nome = QLabel(nome_txt)
+        nome.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+        nome.setStyleSheet(f"color:{c['text_primary']};background:transparent;")
+        nome.setWordWrap(True)
+        nome.setMinimumWidth(150)
+        top.addWidget(nome, 1)
+
+        badge = QLabel(f" {self._data.get('total_notas', 0)} ")
+        badge.setFont(QFont("Cascadia Code", 9, QFont.Weight.Bold))
+        badge.setAlignment(_C)
+        badge.setStyleSheet(f"color:{c['sky']};background:{c['sky_soft']};border-radius:9px;padding:1px 7px;")
+        top.addWidget(badge)
+        lay.addLayout(top)
+
+        mid = QHBoxLayout()
+        date = QLabel(self._data.get("data_importacao", "") or "—")
+        date.setFont(QFont("Segoe UI", 9))
+        date.setStyleSheet(f"color:{c['text_tertiary']};background:transparent;")
+        mid.addWidget(date)
+        mid.addStretch()
+        freight = float(self._data.get("frete_total", 0) or 0)
+        if freight:
+            f = QLabel(formatar_moeda(freight))
+            f.setFont(QFont("Cascadia Code", 9, QFont.Weight.Bold))
+            f.setStyleSheet(f"color:{c['emerald']};background:transparent;")
+            mid.addWidget(f)
+        lay.addLayout(mid)
+
+        bottom = QHBoxLayout()
+        weight = float(self._data.get("peso_total", 0) or 0)
+        w = QLabel(formatar_peso(weight))
+        w.setFont(QFont("Cascadia Code", 9, QFont.Weight.Bold))
+        w.setStyleSheet(f"color:{c['text_secondary']};background:transparent;")
+        bottom.addWidget(w)
+        bottom.addStretch()
+        lay.addLayout(bottom)
+
+    def _update_appearance(self):
+        c = cw_theme.colors
+        if self._selected:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['brand_soft']};
+                    border: 1.5px solid {c['brand']};
+                    border-radius: 12px;
+                }}
             """)
         else:
             self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {c['bg_elevated']};
-                border: 1px solid {c['border_subtle']};
-                border-radius: {r.LG}px;
-            }}
-            QFrame:hover {{
-                border-color: {c['border_default']};
-                background-color: {c['bg_tertiary']};
-            }}
+                QFrame {{
+                    background-color: {c['bg_elevated']};
+                    border: 1px solid {c['border_subtle']};
+                    border-radius: 12px;
+                }}
+                QFrame:hover {{
+                    background-color: {c['bg_overlay']};
+                    border-color: {c['border_strong']};
+                }}
             """)
 
+    def set_selected(self, value: bool):
+        self._selected = value
+        self._update_appearance()
+        self.update()
 
-# ---------------------------------------------------------------------------
-# Constantes de coluna da tabela de notas
-# ---------------------------------------------------------------------------
-_COL_CTE       = 0
-_COL_REMETENTE = 1
-_COL_DEST      = 2
-_COL_ORIGEM    = 3
-_COL_DESTINO   = 4
-_COL_FRETE     = 5
-_COL_PESO      = 6
-_COL_STATUS    = 7
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self._data["id"])
+        super().mousePressEvent(event)
 
-_COLUNAS_NOTAS = ["CT-e", "Remetente", "Destinatário", "Origem", "Destino", "Frete", "Peso", "Status"]
+    def refresh_data(self, data: dict):
+        self._data = data
+        self._rebuild_safely()
+
+    def _rebuild_safely(self):
+        while self.layout() and self.layout().count():
+            item = self.layout().takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+        self._build()
+        self._update_appearance()
 
 
-# ---------------------------------------------------------------------------
-# Worker de importação – emite sinal quando concluída
-# ---------------------------------------------------------------------------
+class _DialogVeiculo(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cadastrar Veículo")
+        self.setMinimumWidth(380)
+        self.setModal(True)
+        c = cw_theme.colors
+        self.setStyleSheet(f"background:{c['bg_elevated']};color:{c['text_primary']};")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(12)
+        title = QLabel("Novo Veículo")
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title.setStyleSheet(f"color:{c['text_primary']};background:transparent;")
+        lay.addWidget(title)
+
+        def inp(ph):
+            e = QLineEdit()
+            e.setPlaceholderText(ph)
+            e.setStyleSheet(f"""
+                QLineEdit {{ background:{c['bg_tertiary']};color:{c['text_primary']};border:1px solid {c['border_default']};border-radius:8px;padding:9px 13px;font-size:12px; }}
+                QLineEdit:focus {{ border-color:{c['brand']}; }}
+            """)
+            return e
+
+        self.e_placa = inp("Placa ou nome")
+        self.e_modelo = inp("Modelo")
+        self.e_motorista = inp("Motorista padrão")
+        self.e_capacidade = inp("Capacidade em kg")
+        self.e_media = inp("Média km/L")
+        for w in (self.e_placa, self.e_modelo, self.e_motorista, self.e_capacidade, self.e_media):
+            lay.addWidget(w)
+
+        btn = QPushButton("Salvar Veículo")
+        btn.setFixedHeight(40)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        btn.setStyleSheet(f"QPushButton{{background:{c['emerald']};color:#fff;border:none;border-radius:8px;}}QPushButton:hover{{background:#2da842;}}")
+        btn.clicked.connect(self._salvar)
+        lay.addWidget(btn)
+
+    def _salvar(self):
+        try:
+            placa = self.e_placa.text().strip()
+            modelo = self.e_modelo.text().strip()
+            if not placa or not modelo:
+                QMessageBox.warning(self, "Atenção", "Informe placa/nome e modelo.")
+                return
+            capacidade = float(self.e_capacidade.text().replace(",", ".") or 0)
+            media = float(self.e_media.text().replace(",", ".") or 0)
+            notas_service.cadastrar_caminhao(placa, modelo, self.e_motorista.text().strip(), capacidade, media)
+            self.accept()
+        except ValueError:
+            QMessageBox.warning(self, "Dados inválidos", "Capacidade e média devem ser números.")
+        except Exception as exc:
+            logger.error(f"Erro ao cadastrar veículo: {exc}")
+            QMessageBox.critical(self, "Erro", "Não foi possível cadastrar o veículo.")
+
+
 class _ImportWorker(QObject):
-    """Executa a importação em thread separada e emite sinais thread-safe."""
-
-    concluido = Signal(dict)       # resultado da importação
-    erro      = Signal(str)        # mensagem de erro
+    concluido = Signal(dict)
+    erro = Signal(str)
 
     def __init__(self, caminho: str):
         super().__init__()
@@ -202,400 +249,324 @@ class _ImportWorker(QObject):
 
     def run(self):
         try:
-            resultado = notas_service.importar_manifesto(self._caminho)
-            self.concluido.emit(resultado)
+            self.concluido.emit(notas_service.importar_manifesto(self._caminho))
         except Exception as exc:
-            logger.error(f"Erro ao importar manifesto: {exc}")
+            logger.exception("Erro ao importar manifesto")
             self.erro.emit(str(exc))
 
 
-# ---------------------------------------------------------------------------
-# Tela principal
-# ---------------------------------------------------------------------------
+_COL_SEL, _COL_CTE, _COL_REM, _COL_DEST, _COL_ORIG, _COL_DEST2, _COL_FRETE, _COL_PESO, _COL_STAT = range(9)
+_COLS = ["✓", "CT-e", "Remetente", "Destinatário", "Origem", "Destino", "Frete", "Peso", "Status"]
+_WIDTHS = [38, 155, 230, 230, 120, 130, 115, 105, 115]
+
+
 class TelaNotas(QWidget):
-    """Tela de gerenciamento de manifestos e notas importadas (PySide6)."""
-
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-
-        # Mapeamento item-da-lista → manifesto_id
-        self._manifesto_ids: dict[int, int] = {}   # row → manifesto_id
-        self._manifesto_cards: dict[int, ManifestoCard] = {}  # manifesto_id → card
+        self._manifesto_cards: dict[int, _ManifestoCard] = {}
         self._selected_manifesto_id: Optional[int] = None
-
+        self._notas_ids: dict[int, int] = {}
+        self._notas_marcadas: set[int] = set()
+        self._caminhoes_map: dict[str, int] = {}
+        self._import_thread = None
+        self._worker = None
         self._setup_ui()
+        self._carregar_caminhoes()
         self._carregar_manifestos()
 
-    # ------------------------------------------------------------------
-    # Construção da interface
-    # ------------------------------------------------------------------
-
-    def _setup_ui(self) -> None:
+    def _setup_ui(self):
         c = cw_theme.colors
-        t = cw_theme.spacing
-
-        self.setStyleSheet(f"background-color: {c['bg_primary']};")
-
+        self.setStyleSheet(f"background:{c['bg_primary']};")
         root = QVBoxLayout(self)
-        root.setContentsMargins(t._2XL, t._2XL, t._2XL, t._2XL)
-        root.setSpacing(t.LG)
-
-        # ── Resumo / totais ─────────────────────────────────────────
-        self._lbl_resumo = QLabel("Selecione um manifesto para visualizar as notas.")
-        self._lbl_resumo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
-        self._lbl_resumo.setStyleSheet(
-            f"color: {c['text_secondary']}; background-color: transparent;"
-        )
-        self._lbl_resumo.setWordWrap(True)
-        root.addWidget(self._lbl_resumo)
-
-        # ── Splitter: esquerda=manifestos / direita=notas ────────────
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self._build_header())
+        root.addWidget(self._build_kpi_strip())
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(6)
-        splitter.setStyleSheet(f"""
-        QSplitter::handle {{
-            background-color: {c['border_subtle']};
-        }}
-        """)
+        splitter.setHandleWidth(1)
+        splitter.setStyleSheet(f"QSplitter::handle{{background:{c['border_subtle']};}}")
+        splitter.addWidget(self._build_left())
+        splitter.addWidget(self._build_right())
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([310, 900])
+        root.addWidget(splitter, 1)
 
-        splitter.addWidget(self._criar_painel_manifestos())
-        splitter.addWidget(self._criar_painel_notas())
-        splitter.setStretchFactor(0, 0)   # esquerda – tamanho fixo preferido
-        splitter.setStretchFactor(1, 1)   # direita  – cresce com a janela
-        splitter.setSizes([340, 900])
-
-        root.addWidget(splitter, stretch=1)
-
-    # ── Painel esquerdo – Manifestos (Cards CRM style) ─────────────────────
-
-    def _criar_painel_manifestos(self) -> QWidget:
+    def _build_header(self):
         c = cw_theme.colors
-        t = cw_theme.spacing
+        bar = QFrame()
+        bar.setFixedHeight(60)
+        bar.setStyleSheet(f"QFrame{{background:{c['bg_secondary']};border-bottom:1px solid {c['border_subtle']};}}")
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(22, 0, 22, 0)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        title = QLabel("Notas Fiscais")
+        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setStyleSheet(f"color:{c['text_primary']};background:transparent;")
+        sub = QLabel("Manifestos, notas fiscais e criação de viagens")
+        sub.setFont(QFont("Segoe UI", 9))
+        sub.setStyleSheet(f"color:{c['text_tertiary']};background:transparent;")
+        col.addWidget(title); col.addWidget(sub); lay.addLayout(col); lay.addStretch()
 
-        container = QWidget()
-        container.setMinimumWidth(320)
-        container.setMaximumWidth(400)
-        container.setStyleSheet("background: transparent;")
+        self._combo_periodo = self._mk_combo(["Geral", "Mês", "Ano"])
+        self._combo_periodo.currentTextChanged.connect(self._on_periodo_change)
+        lay.addWidget(self._combo_periodo)
+        self._combo_mes = self._mk_combo([f"{i:02d}" for i in range(1, 13)])
+        self._combo_mes.setCurrentText(datetime.now().strftime("%m"))
+        self._combo_mes.currentTextChanged.connect(lambda _: self._carregar_manifestos())
+        self._combo_mes.hide(); lay.addWidget(self._combo_mes)
+        year = datetime.now().year
+        self._combo_ano = self._mk_combo([str(a) for a in range(year - 5, year + 2)])
+        self._combo_ano.setCurrentText(str(year))
+        self._combo_ano.currentTextChanged.connect(lambda _: self._carregar_manifestos())
+        self._combo_ano.hide(); lay.addWidget(self._combo_ano)
+        return bar
 
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(t.MD)
-
-        # Header com título
-        header = QHBoxLayout()
-        header.setSpacing(t.SM)
-
-        title = QLabel("Manifestos")
-        title.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
-        title.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
-        header.addWidget(title)
-
-        header.addStretch()
-
-        # Botões de ação - usando CWButton
-        self._btn_importar = CWButton("Importar", ButtonVariant.SUCCESS, ButtonSize.SM)
-        self._btn_importar.clicked.connect(self._importar_manifesto)
-        header.addWidget(self._btn_importar)
-
-        self._btn_apagar = CWButton("Apagar", ButtonVariant.DANGER, ButtonSize.SM)
-        self._btn_apagar.clicked.connect(self._apagar_manifesto)
-        header.addWidget(self._btn_apagar)
-
-        layout.addLayout(header)
-
-        # Scroll area para cards
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"""
-        QScrollArea {{ background: transparent; border: none; }}
-        QScrollBar:vertical {{ background: transparent; width: 6px; margin: 4px 1px; }}
-        QScrollBar::handle:vertical {{ background: {c['border_default']}; border-radius: 3px; min-height: 30px; }}
-        QScrollBar::handle:vertical:hover {{ background: {c['border_strong']}; }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ height: 0px; }}
-        """)
-
-        # Container para cards
-        self._cards_container = QWidget()
-        self._cards_container.setStyleSheet("background: transparent;")
-        self._cards_layout = QVBoxLayout()
-        self._cards_layout.setContentsMargins(0, 0, 0, 0)
-        self._cards_layout.setSpacing(t.MD)
-        self._cards_container.setLayout(self._cards_layout)
-
-        scroll.setWidget(self._cards_container)
-        layout.addWidget(scroll, 1)
-
-        return container
-
-    # ── Painel direito – Notas ───────────────────────────────────────────
-
-    def _criar_painel_notas(self) -> QWidget:
+    def _build_kpi_strip(self):
         c = cw_theme.colors
-        t = cw_theme.spacing
+        strip = QFrame(); strip.setFixedHeight(106)
+        strip.setStyleSheet(f"QFrame{{background:{c['bg_secondary']};border-bottom:1px solid {c['border_subtle']};}}")
+        lay = QHBoxLayout(strip); lay.setContentsMargins(18, 11, 18, 11); lay.setSpacing(10)
+        self._kpi_mfst = _KpiTile("Manifestos", c['sky'])
+        self._kpi_nts = _KpiTile("Notas", c['violet'])
+        self._kpi_frt = _KpiTile("Frete Total", c['emerald'])
+        self._kpi_pso = _KpiTile("Peso Total", c['amber'])
+        self._kpi_sel = _KpiTile("Selecionadas", c['brand'])
+        for w in (self._kpi_mfst, self._kpi_nts, self._kpi_frt, self._kpi_pso, self._kpi_sel): lay.addWidget(w, 1)
+        return strip
 
-        card = CWCard(title="Notas do Manifesto Selecionado", parent=self)
+    def _build_left(self):
+        c = cw_theme.colors
+        panel = QWidget(); panel.setMinimumWidth(275); panel.setMaximumWidth(350); panel.setStyleSheet(f"background:{c['bg_secondary']};")
+        lay = QVBoxLayout(panel); lay.setContentsMargins(12, 14, 12, 14); lay.setSpacing(10)
+        tb = QHBoxLayout()
+        title = QLabel("Manifestos"); title.setFont(QFont("Segoe UI", 12, QFont.Weight.DemiBold)); title.setStyleSheet(f"color:{c['text_primary']};background:transparent;")
+        tb.addWidget(title); tb.addStretch()
+        self._btn_importar = self._mk_btn("+ Importar", c['sky']); self._btn_importar.clicked.connect(self._importar_manifesto)
+        self._btn_apagar = self._mk_btn("Apagar", c['error']); self._btn_apagar.clicked.connect(self._apagar_manifesto)
+        tb.addWidget(self._btn_importar); tb.addWidget(self._btn_apagar); lay.addLayout(tb)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.Shape.NoFrame); scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"QScrollArea{{background:transparent;border:none;}}QScrollBar:vertical{{background:transparent;width:5px;}}QScrollBar::handle:vertical{{background:{c['border_default']};border-radius:2px;min-height:28px;}}QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{{height:0;}}")
+        self._cards_container = QWidget(); self._cards_container.setStyleSheet("background:transparent;")
+        self._cards_layout = QVBoxLayout(self._cards_container); self._cards_layout.setContentsMargins(0,0,0,0); self._cards_layout.setSpacing(8); self._cards_layout.addStretch()
+        scroll.setWidget(self._cards_container); lay.addWidget(scroll, 1)
+        return panel
 
-        # Tabela de notas - usando CWTable
-        self._tabela_notas = CWTable(_COLUNAS_NOTAS)
-        self._tabela_notas.setSortingEnabled(True)
-        self._tabela_notas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    def _build_right(self):
+        c = cw_theme.colors
+        panel = QWidget(); panel.setStyleSheet(f"background:{c['bg_primary']};")
+        lay = QVBoxLayout(panel); lay.setContentsMargins(0,0,0,0); lay.setSpacing(0)
+        bar = QFrame(); bar.setFixedHeight(42); bar.setStyleSheet(f"QFrame{{background:{c['bg_secondary']};border-bottom:1px solid {c['border_subtle']};}}")
+        bl = QHBoxLayout(bar); bl.setContentsMargins(20,0,20,0)
+        self._lbl_resumo = QLabel("Selecione um manifesto para visualizar as notas."); self._lbl_resumo.setFont(QFont("Segoe UI",10)); self._lbl_resumo.setStyleSheet(f"color:{c['text_secondary']};background:transparent;")
+        bl.addWidget(self._lbl_resumo); lay.addWidget(bar)
+        self._tabela = QTableWidget(0, len(_COLS)); self._tabela.setHorizontalHeaderLabels(_COLS)
+        self._tabela.verticalHeader().setVisible(False); self._tabela.verticalHeader().setDefaultSectionSize(42)
+        self._tabela.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection); self._tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._tabela.setSortingEnabled(True); self._tabela.setShowGrid(False); self._tabela.setAlternatingRowColors(True)
+        hdr = self._tabela.horizontalHeader(); hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive); hdr.setStretchLastSection(False)
+        for i,w in enumerate(_WIDTHS): self._tabela.setColumnWidth(i,w)
+        self._tabela.cellClicked.connect(self._on_cell_click)
+        self._tabela.setStyleSheet(self._table_style()); lay.addWidget(self._tabela,1)
+        lay.addWidget(self._build_trip_panel())
+        return panel
 
-        # Ajustar larguras das colunas para reduzir truncamento
-        hdr = self._tabela_notas.horizontalHeader()
-        hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        hdr.setStretchLastSection(False)
-        # Larguras iniciais otimizadas
-        col_widths = [140, 250, 220, 120, 120, 100, 100, 100]
-        for i, width in enumerate(col_widths):
-            if i < len(_COLUNAS_NOTAS):
-                self._tabela_notas.setColumnWidth(i, width)
+    def _build_trip_panel(self):
+        c = cw_theme.colors
+        panel = QFrame(); panel.setStyleSheet(f"QFrame{{background:{c['bg_elevated']};border-top:2px solid {c['brand']};}}")
+        lay = QVBoxLayout(panel); lay.setContentsMargins(20,12,20,12); lay.setSpacing(10)
+        tr = QHBoxLayout(); title = QLabel("🚚  Criar Viagem com Notas Selecionadas"); title.setFont(QFont("Segoe UI",12,QFont.Weight.Bold)); title.setStyleSheet(f"color:{c['text_primary']};background:transparent;"); tr.addWidget(title); tr.addStretch()
+        self._lbl_sel = QLabel("0 selecionadas"); self._lbl_sel.setFont(QFont("Cascadia Code",11,QFont.Weight.Bold)); self._lbl_sel.setStyleSheet(f"color:{c['amber']};background:transparent;"); tr.addWidget(self._lbl_sel); lay.addLayout(tr)
+        cr = QHBoxLayout(); cr.setSpacing(10)
+        self._combo_caminhoes = QComboBox(); self._combo_caminhoes.setMinimumWidth(270); self._combo_caminhoes.setStyleSheet(self._combo_style()); cr.addWidget(self._combo_caminhoes)
+        self._entry_motorista = QLineEdit(); self._entry_motorista.setPlaceholderText("Motorista"); self._entry_motorista.setMinimumWidth(170); self._entry_motorista.setStyleSheet(self._input_style()); cr.addWidget(self._entry_motorista)
+        btn_v = self._mk_btn("+ Veículo", c['text_secondary']); btn_v.clicked.connect(self._abrir_novo_veiculo)
+        btn_c = self._mk_btn("✓ Criar Viagem", c['emerald']); btn_c.clicked.connect(self._criar_viagem)
+        btn_a = self._mk_btn("✕ Apagar Viagem", c['error']); btn_a.clicked.connect(self._apagar_viagem)
+        cr.addWidget(btn_v); cr.addWidget(btn_c); cr.addWidget(btn_a); cr.addStretch(); lay.addLayout(cr)
+        return panel
 
-        card.add_widget(self._tabela_notas)
-        return card
+    def _table_style(self):
+        c = cw_theme.colors
+        return f"""QTableWidget{{background:{c['bg_primary']};alternate-background-color:{c['bg_secondary']};border:none;outline:none;gridline-color:transparent;selection-background-color:{c['brand_soft']};selection-color:{c['text_primary']};color:{c['text_primary']};font-size:12px;}}QTableWidget::item{{padding:0 12px;border-bottom:1px solid {c['border_subtle']};color:{c['text_primary']};}}QTableWidget::item:hover{{background:{c['bg_overlay']};}}QHeaderView::section{{background:{c['bg_secondary']};color:{c['text_tertiary']};padding:8px 12px;border:none;border-bottom:2px solid {c['border_default']};font-size:9px;font-weight:700;letter-spacing:.9px;}}QScrollBar:vertical{{background:transparent;width:6px;}}QScrollBar::handle:vertical{{background:{c['border_default']};border-radius:3px;min-height:36px;}}QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{{height:0;}}QScrollBar:horizontal{{background:transparent;height:6px;}}QScrollBar::handle:horizontal{{background:{c['border_default']};border-radius:3px;min-width:36px;}}QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal{{width:0;}}"""
 
-    # ------------------------------------------------------------------
-    # Carregar manifestos (Cards CRM style)
-    # ------------------------------------------------------------------
+    def _mk_combo(self, values):
+        cb = QComboBox(); cb.addItems(values); cb.setStyleSheet(self._combo_style()); return cb
 
-    def _carregar_manifestos(self) -> None:
-        # Limpar cards existentes
-        for card in self._manifesto_cards.values():
-            card.deleteLater()
+    def _combo_style(self):
+        c = cw_theme.colors
+        return f"""QComboBox{{background:{c['bg_tertiary']};color:{c['text_primary']};border:1px solid {c['border_default']};border-radius:8px;padding:6px 12px;font-size:12px;min-height:28px;}}QComboBox:focus{{border-color:{c['brand']};}}QComboBox::drop-down{{border:none;width:22px;}}QComboBox QAbstractItemView{{background:{c['bg_elevated']};color:{c['text_primary']};border:1px solid {c['border_default']};selection-background-color:{c['brand_soft']};selection-color:{c['text_primary']};padding:4px;}}"""
+
+    def _input_style(self):
+        c = cw_theme.colors
+        return f"QLineEdit{{background:{c['bg_tertiary']};color:{c['text_primary']};border:1px solid {c['border_default']};border-radius:8px;padding:7px 12px;font-size:12px;}}QLineEdit:focus{{border-color:{c['brand']};}}"
+
+    def _mk_btn(self, text, color):
+        c = cw_theme.colors
+        btn = QPushButton(text); btn.setFont(QFont("Segoe UI",10,QFont.Weight.Bold)); btn.setFixedHeight(32); btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(f"QPushButton{{background:{color}20;color:{color};border:1px solid {color}50;border-radius:8px;padding:0 14px;}}QPushButton:hover{{background:{color}40;border-color:{color};}}QPushButton:pressed{{background:{color}60;}}QPushButton:disabled{{background:transparent;color:{c['text_disabled']};border-color:{c['border_subtle']};}}")
+        return btn
+
+    def _on_periodo_change(self, value):
+        self._combo_mes.setVisible(value == "Mês")
+        self._combo_ano.setVisible(value in ("Mês", "Ano"))
+        self._carregar_manifestos()
+
+    def _obter_filtro(self):
+        value = self._combo_periodo.currentText()
+        return value, self._combo_mes.currentText() if value == "Mês" else None, self._combo_ano.currentText() if value in ("Mês", "Ano") else None
+
+    def _carregar_caminhoes(self):
+        self._caminhoes_map.clear()
+        try: rows = viagem_service.listar_caminhoes_disponiveis()
+        except Exception as exc:
+            logger.error(f"Erro ao listar caminhões: {exc}"); rows = []
+        self._combo_caminhoes.clear()
+        for cam in rows:
+            try:
+                cam_id, placa, modelo, motorista, cap = cam
+                text = f"{modelo} | {placa} | {float(cap or 0):,.0f} kg"
+                self._caminhoes_map[text] = cam_id
+                self._combo_caminhoes.addItem(text)
+            except Exception:
+                logger.exception("Registro de caminhão inválido")
+        if not rows: self._combo_caminhoes.addItem("Nenhum caminhão cadastrado")
+
+    def _clear_cards(self):
+        while self._cards_layout.count() > 1:
+            item = self._cards_layout.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
         self._manifesto_cards.clear()
-        self._manifesto_ids.clear()
+
+    def _carregar_manifestos(self):
+        self._clear_cards()
         self._selected_manifesto_id = None
-
-        try:
-            manifestos = notas_service.listar_manifestos("Geral", None, None)
+        self._notas_marcadas.clear()
+        self._atualizar_selecao()
+        tipo, mes, ano = self._obter_filtro()
+        try: manifestos = notas_service.listar_manifestos(tipo, mes, ano)
         except Exception as exc:
-            logger.error(f"Erro ao listar manifestos: {exc}")
-            manifestos = []
+            logger.error(f"Erro ao listar manifestos: {exc}"); manifestos = []
+        total_notes = total_freight = total_weight = 0
+        for row in manifestos:
+            mid, nome, data, total_notas, *rest = row
+            freight = float(rest[1] or 0) if len(rest) > 1 else 0
+            weight = float(rest[2] or 0) if len(rest) > 2 else 0
+            total_notes += int(total_notas or 0); total_freight += freight; total_weight += weight
+            data_dict = {"id":mid,"nome_arquivo":nome,"data_importacao":data,"total_notas":int(total_notas or 0),"frete_total":freight,"peso_total":weight}
+            card = _ManifestoCard(data_dict, self._cards_container); card.clicked.connect(self._selecionar_manifesto)
+            self._cards_layout.insertWidget(self._cards_layout.count()-1, card); self._manifesto_cards[mid] = card
+        self._kpi_mfst.set_value(str(len(manifestos))); self._kpi_nts.set_value(str(total_notes)); self._kpi_frt.set_value(formatar_moeda(total_freight)); self._kpi_pso.set_value(formatar_peso(total_weight))
+        if self._manifesto_cards: self._selecionar_manifesto(next(iter(self._manifesto_cards)))
+        else: self._tabela.setRowCount(0); self._lbl_resumo.setText("Nenhum manifesto encontrado.")
 
-        for manifesto in manifestos:
-            manifesto_id, nome_arquivo, data_importacao, total_notas, *_rest = manifesto
-
-            # Criar dados do card
-            manifesto_data = {
-                'id': manifesto_id,
-                'nome_arquivo': nome_arquivo,
-                'data_importacao': data_importacao,
-                'total_notas': total_notas,
-                'status': 'Importado',
-                'peso_total': 0,  # Será calculado depois
-                'frete_total': 0,  # Será calculado depois
-            }
-
-            # Criar card
-            card = ManifestoCard(manifesto_data, parent=self._cards_container)
-            card.clicked.connect(self._ao_selecionar_manifesto)
-            self._cards_layout.addWidget(card)
-            self._manifesto_cards[manifesto_id] = card
-
-        # Selecionar primeiro manifesto se houver
-        if self._manifesto_cards:
-            first_id = list(self._manifesto_cards.keys())[0]
-            self._selecionar_manifesto(first_id)
-        else:
-            self._tabela_notas.setRowCount(0)
-            self._lbl_resumo.setText("Nenhum manifesto encontrado.")
-
-    # ------------------------------------------------------------------
-    # Selecionar manifesto → carregar notas
-    # ------------------------------------------------------------------
-
-    def _ao_selecionar_manifesto(self, manifesto_id: int) -> None:
-        self._selecionar_manifesto(manifesto_id)
-
-    def _selecionar_manifesto(self, manifesto_id: int) -> None:
-        """Seleciona um manifesto e carrega suas notas."""
-        if manifesto_id == self._selected_manifesto_id:
-            return
-
-        # Atualizar seleção visual dos cards
-        for mid, card in self._manifesto_cards.items():
-            card.set_selected(mid == manifesto_id)
-
+    def _selecionar_manifesto(self, manifesto_id):
+        if manifesto_id == self._selected_manifesto_id: return
+        self._notas_marcadas.clear(); self._atualizar_selecao()
+        for mid, card in self._manifesto_cards.items(): card.set_selected(mid == manifesto_id)
         self._selected_manifesto_id = manifesto_id
-
-        # Obter nome do manifesto
         card = self._manifesto_cards.get(manifesto_id)
-        nome_arquivo = card._manifesto_data.get('nome_arquivo', f'Manifesto {manifesto_id}') if card else f'Manifesto {manifesto_id}'
+        self._carregar_notas(manifesto_id, card._data.get("nome_arquivo", "") if card else "")
 
-        self._carregar_notas(manifesto_id, nome_arquivo)
+    def _reload_notas(self):
+        if self._selected_manifesto_id is None: return
+        card = self._manifesto_cards.get(self._selected_manifesto_id)
+        self._carregar_notas(self._selected_manifesto_id, card._data.get("nome_arquivo", "") if card else "")
 
-    def _carregar_notas(self, manifesto_id: int, nome_exibido: str) -> None:
-        self._tabela_notas.setSortingEnabled(False)
-        self._tabela_notas.setRowCount(0)
-
-        try:
-            dados = notas_service.listar_notas_por_manifesto(manifesto_id)
+    def _carregar_notas(self, manifesto_id, nome):
+        self._notas_ids.clear(); self._tabela.setSortingEnabled(False); self._tabela.setRowCount(0)
+        try: dados = notas_service.listar_notas_por_manifesto(manifesto_id)
         except Exception as exc:
-            logger.error(f"Erro ao listar notas do manifesto {manifesto_id}: {exc}")
-            dados = []
-
-        total_frete = 0.0
-        total_peso  = 0.0
-
-        c = cw_theme.colors
-
-        for linha in dados:
-            (
-                _id_nota,
-                chave_nfe,
-                numero_cte,
-                remetente,
-                destinatario,
-                origem,
-                destino,
-                valor_mercadoria,
-                frete,
-                peso,
-                status,
-            ) = linha
-
-            frete = float(frete or 0)
-            peso  = float(peso  or 0)
-            total_frete += frete
-            total_peso  += peso
-
-            cte = numero_cte if numero_cte else (chave_nfe or "")
-
-            row_idx = self._tabela_notas.rowCount()
-            self._tabela_notas.insertRow(row_idx)
-
-            def _item(text: str, align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter) -> QTableWidgetItem:
-                it = QTableWidgetItem(str(text) if text else "-")
-                it.setTextAlignment(align)
-                it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                return it
-
-            _right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-
-            self._tabela_notas.setItem(row_idx, _COL_CTE,       _item(cte))
-            self._tabela_notas.setItem(row_idx, _COL_REMETENTE,  _item(remetente or "-"))
-            self._tabela_notas.setItem(row_idx, _COL_DEST,       _item(destinatario or "-"))
-            self._tabela_notas.setItem(row_idx, _COL_ORIGEM,     _item(origem or "-"))
-            self._tabela_notas.setItem(row_idx, _COL_DESTINO,    _item(destino or "-"))
-            self._tabela_notas.setItem(row_idx, _COL_FRETE,      _item(formatar_moeda(frete),  _right))
-            self._tabela_notas.setItem(row_idx, _COL_PESO,       _item(formatar_peso(peso),    _right))
-
-            # Status com cor
-            status_item = _item(status or "-", Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
-            cor_status = {
-                "Disponível": c.get("success", "#22C55E"),
-                "Em viagem":  c.get("warning", "#F59E0B"),
-                "Entregue":   c.get("info",    "#3B82F6"),
-            }.get(status, c.get("text_tertiary", "#6F7883"))
-            status_item.setForeground(
-                __import__("PySide6.QtGui", fromlist=["QColor"]).QColor(cor_status)
-            )
-            self._tabela_notas.setItem(row_idx, _COL_STATUS, status_item)
-
-        self._tabela_notas.setSortingEnabled(True)
-
-        # Atualizar card do manifesto com totais calculados
-        card = self._manifesto_cards.get(manifesto_id)
+            logger.error(f"Erro ao listar notas: {exc}"); dados = []
+        c = cw_theme.colors; total_freight = total_weight = 0
+        status_colors = {"Disponível":(c['emerald'],c['emerald_soft']),"Em viagem":(c['amber'],c['amber_soft']),"Entregue":(c['sky'],c['sky_soft'])}
+        for line in dados:
+            id_nota, chave, cte_num, remetente, dest, origem, destino, val_merc, freight, weight, status = line
+            freight=float(freight or 0); weight=float(weight or 0); total_freight += freight; total_weight += weight
+            row=self._tabela.rowCount(); self._tabela.insertRow(row); self._notas_ids[row]=id_nota
+            available=status == "Disponível"; marked=id_nota in self._notas_marcadas
+            sel=_item("●" if available and marked else ("○" if available else "—"), _C); sel.setForeground(QColor(c['brand'] if marked and available else c['border_strong'] if available else c['text_disabled']))
+            self._tabela.setItem(row,_COL_SEL,sel); self._tabela.setItem(row,_COL_CTE,_item(cte_num or chave or "")); self._tabela.setItem(row,_COL_REM,_item(remetente)); self._tabela.setItem(row,_COL_DEST,_item(dest)); self._tabela.setItem(row,_COL_ORIG,_item(origem)); self._tabela.setItem(row,_COL_DEST2,_item(destino)); self._tabela.setItem(row,_COL_FRETE,_item(formatar_moeda(freight),_R)); self._tabela.setItem(row,_COL_PESO,_item(formatar_peso(weight),_R))
+            fg,bg=status_colors.get(status,(c['text_tertiary'],c['bg_tertiary'])); st=_item(status or "—",_C); st.setForeground(QColor(fg)); st.setBackground(QColor(bg)); self._tabela.setItem(row,_COL_STAT,st)
+        self._tabela.setSortingEnabled(True)
+        qtd=len(dados); self._lbl_resumo.setText(f"{nome}  ·  {qtd} nota{'s' if qtd != 1 else ''}  ·  Frete {formatar_moeda(total_freight)}  ·  Peso {formatar_peso(total_weight)}" if qtd else f"{nome}  ·  Sem notas")
+        self._kpi_nts.set_value(str(qtd)); self._kpi_frt.set_value(formatar_moeda(total_freight)); self._kpi_pso.set_value(formatar_peso(total_weight))
+        card=self._manifesto_cards.get(manifesto_id)
         if card:
-            card._manifesto_data['peso_total'] = total_peso
-            card._manifesto_data['frete_total'] = total_frete
-            # Recriar o card para atualizar os valores
-            card.deleteLater()
-            new_card = ManifestoCard(card._manifesto_data, parent=self._cards_container)
-            new_card.clicked.connect(self._ao_selecionar_manifesto)
-            new_card.set_selected(True)
-            self._cards_layout.replaceWidget(card, new_card)
-            self._manifesto_cards[manifesto_id] = new_card
+            card._data.update({"frete_total":total_freight,"peso_total":total_weight,"total_notas":qtd})
+            card.set_selected(True)
 
-        qtd = len(dados)
-        resumo = (
-            f"{nome_exibido}   •   "
-            f"Notas: {qtd}   •   "
-            f"Frete Total: {formatar_moeda(total_frete)}   •   "
-            f"Peso Total: {formatar_peso(total_peso)}"
-        )
-        self._lbl_resumo.setText(resumo)
-
-    # ------------------------------------------------------------------
-    # Importar manifesto
-    # ------------------------------------------------------------------
-
-    def _importar_manifesto(self) -> None:
-        caminho, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar Manifesto TXT",
-            "",
-            "Arquivos TXT (*.txt);;Todos os arquivos (*.*)",
-        )
-        if not caminho:
+    def _on_cell_click(self, row, col):
+        id_nota=self._notas_ids.get(row)
+        if id_nota is None: return
+        status_item=self._tabela.item(row,_COL_STAT); status=status_item.text() if status_item else ""
+        if status != "Disponível":
+            QMessageBox.warning(self,"Não disponível",f"Nota com status '{status}' não pode ser selecionada.")
             return
+        c=cw_theme.colors; item=self._tabela.item(row,_COL_SEL)
+        if id_nota in self._notas_marcadas:
+            self._notas_marcadas.remove(id_nota); text="○"; color=c['border_strong']
+        else:
+            self._notas_marcadas.add(id_nota); text="●"; color=c['brand']
+        if item: item.setText(text); item.setForeground(QColor(color))
+        self._atualizar_selecao()
 
-        self._btn_importar.setEnabled(False)
-        self._btn_importar.setText("Importando…")
+    def _atualizar_selecao(self):
+        n=len(self._notas_marcadas); self._lbl_sel.setText(f"{n} selecionada{'s' if n != 1 else ''}"); self._kpi_sel.set_value(str(n))
 
-        self._worker = _ImportWorker(caminho)
-        self._worker.concluido.connect(self._ao_importar_concluido)
-        self._worker.erro.connect(self._ao_importar_erro)
+    def _importar_manifesto(self):
+        path,_=QFileDialog.getOpenFileName(self,"Selecionar Manifesto TXT","","Arquivos TXT (*.txt);;Todos (*.*)")
+        if not path:return
+        self._btn_importar.setEnabled(False); self._btn_importar.setText("Importando…")
+        self._worker=_ImportWorker(path); self._worker.concluido.connect(self._on_import_ok); self._worker.erro.connect(self._on_import_err)
+        self._import_thread=threading.Thread(target=self._worker.run,daemon=True); self._import_thread.start()
 
-        t = threading.Thread(target=self._worker.run, daemon=True)
-        t.start()
+    def _finish_import(self):
+        self._btn_importar.setEnabled(True); self._btn_importar.setText("+ Importar"); self._worker=None; self._import_thread=None
 
-    def _ao_importar_concluido(self, resultado: dict) -> None:
-        self._btn_importar.setEnabled(True)
-        self._btn_importar.setText("Importar")
-
-        QMessageBox.information(
-            self,
-            "Importação Concluída",
-            (
-                f"Arquivo: {resultado.get('arquivo', '-')}\n\n"
-                f"Notas encontradas:  {resultado.get('encontradas', 0)}\n"
-                f"Notas salvas:       {resultado.get('salvas', 0)}\n"
-                f"Notas duplicadas:   {resultado.get('duplicadas', 0)}"
-            ),
-        )
+    def _on_import_ok(self, result):
+        self._finish_import()
+        QMessageBox.information(self,"Importação Concluída",f"Arquivo: {result.get('arquivo','—')}\n\nNotas encontradas: {result.get('encontradas',0)}\nNotas salvas: {result.get('salvas',0)}\nNotas duplicadas: {result.get('duplicadas',0)}")
         self._carregar_manifestos()
 
-    def _ao_importar_erro(self, mensagem: str) -> None:
-        self._btn_importar.setEnabled(True)
-        self._btn_importar.setText("Importar")
+    def _on_import_err(self, msg):
+        self._finish_import(); QMessageBox.critical(self,"Erro ao Importar",msg)
 
-        QMessageBox.critical(self, "Erro ao Importar Manifesto", mensagem)
+    def _apagar_manifesto(self):
+        mid=self._selected_manifesto_id
+        if mid is None: QMessageBox.warning(self,"Atenção","Selecione um manifesto para apagar."); return
+        card=self._manifesto_cards.get(mid); name=card._data.get("nome_arquivo",f"Manifesto {mid}") if card else f"Manifesto {mid}"
+        if QMessageBox.question(self,"Apagar Manifesto",f"Apagar '{name}'?\n\nTodas as notas também serão apagadas.",QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:return
+        try: notas_service.apagar_manifesto(mid)
+        except Exception as exc: QMessageBox.critical(self,"Erro ao Apagar",str(exc)); return
+        self._notas_marcadas.clear(); self._atualizar_selecao(); self._carregar_manifestos()
 
-    # ------------------------------------------------------------------
-    # Apagar manifesto
-    # ------------------------------------------------------------------
-
-    def _apagar_manifesto(self) -> None:
-        if self._selected_manifesto_id is None:
-            QMessageBox.warning(self, "Atenção", "Selecione um manifesto para apagar.")
-            return
-
-        manifesto_id = self._selected_manifesto_id
-        card = self._manifesto_cards.get(manifesto_id)
-        nome_exibido = card._manifesto_data.get('nome_arquivo', f'Manifesto {manifesto_id}') if card else f'Manifesto {manifesto_id}'
-
-        resposta = QMessageBox.question(
-            self,
-            "Apagar Manifesto",
-            (
-                f"Deseja apagar este manifesto?\n\n{nome_exibido}\n\n"
-                "Todas as notas desse manifesto também serão apagadas."
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if resposta != QMessageBox.StandardButton.Yes:
-            return
-
+    def _criar_viagem(self):
+        if not self._notas_marcadas: QMessageBox.warning(self,"Atenção","Selecione pelo menos uma nota."); return
+        cam_txt=self._combo_caminhoes.currentText(); cam_id=self._caminhoes_map.get(cam_txt)
+        if not cam_id: QMessageBox.warning(self,"Atenção","Selecione um caminhão válido."); return
+        driver=self._entry_motorista.text().strip()
+        if not driver: QMessageBox.warning(self,"Atenção","Informe o motorista da viagem."); return
+        ids=list(self._notas_marcadas)
         try:
-            notas_service.apagar_manifesto(manifesto_id)
-        except Exception as exc:
-            QMessageBox.critical(self, "Erro ao Apagar Manifesto", str(exc))
-            return
+            valid,msg,_=viagem_service.validar_capacidade(cam_id,ids)
+            if not valid and QMessageBox.question(self,"Aviso de Capacidade",f"{msg}\n\nDeseja continuar mesmo assim?",QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:return
+            viagem_id=viagem_service.criar_viagem_com_notas(cam_id,ids,driver)
+        except Exception as exc: QMessageBox.critical(self,"Erro ao Criar Viagem",str(exc)); self._reload_notas(); return
+        QMessageBox.information(self,"Viagem Criada",f"Viagem #{viagem_id} criada com sucesso!\n{len(ids)} nota(s) adicionada(s).")
+        self._entry_motorista.clear(); self._notas_marcadas.clear(); self._atualizar_selecao(); self._reload_notas()
 
-        QMessageBox.information(self, "Sucesso", "Manifesto apagado com sucesso!")
-        self._tabela_notas.setRowCount(0)
-        self._lbl_resumo.setText("Selecione um manifesto para visualizar as notas.")
-        self._carregar_manifestos()
+    def _apagar_viagem(self):
+        viagem_id,ok=QInputDialog.getInt(self,"Apagar Viagem","Número da viagem:",1,1,999999)
+        if not ok:return
+        if QMessageBox.question(self,"Confirmar Exclusão",f"Apagar viagem #{viagem_id}?\n\nAs notas voltarão a ficar disponíveis.",QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:return
+        try:
+            total=notas_service.apagar_viagem(viagem_id)
+            QMessageBox.information(self,"Viagem Apagada",f"Viagem #{viagem_id} apagada!\n{total} nota(s) liberada(s).")
+            self._notas_marcadas.clear(); self._atualizar_selecao(); self._reload_notas()
+        except Exception as exc: QMessageBox.critical(self,"Erro ao Apagar Viagem",str(exc))
+
+    def _abrir_novo_veiculo(self):
+        dlg=_DialogVeiculo(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:self._carregar_caminhoes()

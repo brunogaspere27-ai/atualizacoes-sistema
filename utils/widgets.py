@@ -87,8 +87,8 @@ class TrendBadge(QFrame):
         self._build(pct)
 
     def _build(self, pct: float):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         is_up = pct >= 0
         color = c["success"] if is_up else c["error"]
         bg    = c["success_soft"] if is_up else c["error_soft"]
@@ -104,7 +104,7 @@ class TrendBadge(QFrame):
         self.setLayout(hl)
 
         lbl = QLabel(f"{arrow} {sign}{pct:.1f}%")
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
         lbl.setStyleSheet(f"color: {color}; background: transparent;")
         hl.addWidget(lbl)
 
@@ -147,7 +147,7 @@ class MiniProgressBar(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        c = theme_manager.colors
+        c = cw_theme.colors
         r = self.height() // 2
         # Track
         p.setPen(Qt.PenStyle.NoPen)
@@ -179,8 +179,8 @@ class BaseWidget(QFrame):
         super().__init__(parent)
         self._accent = accent
         self._refresh_ms = refresh_ms
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setObjectName("liveWidget")
         self.setStyleSheet(f"""
@@ -221,7 +221,7 @@ class BaseWidget(QFrame):
         hdr.addWidget(ico_wrap)
 
         title_lbl = QLabel(title.upper())
-        title_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        title_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
         title_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 0.8px;")
         hdr.addWidget(title_lbl)
         hdr.addStretch()
@@ -276,20 +276,20 @@ class TruckStatusWidget(BaseWidget):
     """Widget de status da frota com barras de status animadas."""
 
     def __init__(self, parent=None):
-        c = theme_manager.colors
+        c = cw_theme.colors
         super().__init__("Frota", "truck", c["sky"], refresh_ms=20_000, parent=parent)
         self._build_content()
 
     def _build_content(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         # Número grande central
         total_row = QHBoxLayout()
         total_row.setContentsMargins(0, 4, 0, 0)
 
         self._total_lbl = LiveValueLabel(suffix=" veículos")
-        self._total_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        self._total_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_2XL, bold=True))
         self._total_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         total_row.addWidget(self._total_lbl)
         total_row.addStretch()
@@ -307,7 +307,7 @@ class TruckStatusWidget(BaseWidget):
             row.setSpacing(t.SPACING_SM)
 
             lbl = QLabel(label_text)
-            lbl.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+            lbl.setFont(cw_theme.get_font(t.FONT_SIZE_SM))
             lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             lbl.setFixedWidth(90)
             row.addWidget(lbl)
@@ -317,7 +317,7 @@ class TruckStatusWidget(BaseWidget):
             row.addWidget(bar, 1)
 
             count_lbl = QLabel("0")
-            count_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+            count_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
             count_lbl.setStyleSheet(f"color: {color}; background: transparent;")
             count_lbl.setFixedWidth(24)
             count_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -344,16 +344,16 @@ class CashWidget(BaseWidget):
     """Widget financeiro do dia com valor animado e trend vs ontem."""
 
     def __init__(self, parent=None):
-        c = theme_manager.colors
+        c = cw_theme.colors
         super().__init__("Caixa Hoje", "money", c["emerald"], refresh_ms=15_000, parent=parent)
         self._build_content()
 
     def _build_content(self):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self._value_lbl = LiveValueLabel(prefix="R$ ", decimals=2)
-        self._value_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_3XL, bold=True))
+        self._value_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_3XL, bold=True))
         self._value_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         self.add_content(self._value_lbl)
 
@@ -361,7 +361,7 @@ class CashWidget(BaseWidget):
         self._trend_badge = TrendBadge(0.0)
         trend_row.addWidget(self._trend_badge)
         vs_lbl = QLabel("vs. ontem")
-        vs_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+        vs_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_XS))
         vs_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         trend_row.addWidget(vs_lbl)
         trend_row.addStretch()
@@ -389,7 +389,7 @@ class PendingWidget(BaseWidget):
     item_clicked = Signal(str)   # emite a chave do item clicado
 
     def __init__(self, parent=None):
-        c = theme_manager.colors
+        c = cw_theme.colors
         super().__init__("Pendências", "warning", c["amber"], refresh_ms=25_000, parent=parent)
         self._items: List[dict] = []
         self._item_rows: List[QWidget] = []
@@ -402,8 +402,8 @@ class PendingWidget(BaseWidget):
         self._item_rows.clear()
         self._items = items
 
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         for item in items[:5]:
             row = QPushButton()
@@ -427,12 +427,12 @@ class PendingWidget(BaseWidget):
             rl.addWidget(dot)
 
             label_lbl = QLabel(item["label"])
-            label_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+            label_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_SM))
             label_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             rl.addWidget(label_lbl, 1)
 
             count_lbl = QLabel(str(item["count"]))
-            count_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+            count_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_LG, bold=True))
             count_lbl.setStyleSheet(f"color: {color}; background: transparent;")
             rl.addWidget(count_lbl)
 
@@ -455,10 +455,10 @@ class PendingWidget(BaseWidget):
 
             d2 = QLabel(); d2.setFixedSize(8, 8); d2.setStyleSheet(f"background: {color}; border-radius: 4px;")
             rll.addWidget(d2)
-            l2 = QLabel(item["label"]); l2.setFont(theme_manager.get_font(t.FONT_SIZE_SM))
+            l2 = QLabel(item["label"]); l2.setFont(cw_theme.get_font(t.FONT_SIZE_SM))
             l2.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             rll.addWidget(l2, 1)
-            c2 = QLabel(str(item["count"])); c2.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+            c2 = QLabel(str(item["count"])); c2.setFont(cw_theme.get_font(t.FONT_SIZE_LG, bold=True))
             c2.setStyleSheet(f"color: {color}; background: transparent;")
             rll.addWidget(c2)
 
@@ -477,8 +477,8 @@ class TimelineWidget(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setObjectName("timelineCard")
         self.setStyleSheet(f"""
@@ -498,7 +498,7 @@ class TimelineWidget(QFrame):
         # Header
         hdr = QHBoxLayout()
         ttl = QLabel("TIMELINE DO DIA")
-        ttl.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        ttl.setFont(cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
         ttl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 0.8px;")
         hdr.addWidget(ttl)
         hdr.addStretch()
@@ -546,8 +546,8 @@ class _TimelineCanvas(QWidget):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         n = len(self._events)
         w = self.width()
@@ -585,14 +585,14 @@ class _TimelineCanvas(QWidget):
             # Time label (above)
             time_str = ev.get("time", "")
             if time_str:
-                p.setFont(theme_manager.get_font(9, bold=True))
+                p.setFont(cw_theme.get_font(9, bold=True))
                 p.setPen(QColor(c["text_secondary"]))
                 p.drawText(x - 30, cy - r - 22, 60, 18, Qt.AlignmentFlag.AlignCenter, time_str)
 
             # Label (below)
             label = ev.get("label", "")
             if label:
-                p.setFont(theme_manager.get_font(9))
+                p.setFont(cw_theme.get_font(9))
                 p.setPen(QColor(c["text_tertiary"]))
                 p.drawText(x - 40, cy + r + 4, 80, 18, Qt.AlignmentFlag.AlignCenter, label)
 
@@ -610,8 +610,8 @@ class KPITile(QFrame):
                  icon: str = "trending_up", parent=None):
         super().__init__(parent)
         self._accent = accent
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setObjectName("kpiTile")
         self.setStyleSheet(f"""
@@ -640,7 +640,7 @@ class KPITile(QFrame):
         top.addWidget(ico)
         top.addSpacing(6)
         lbl_w = QLabel(label.upper())
-        lbl_w.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl_w.setFont(cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
         lbl_w.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 0.8px;")
         top.addWidget(lbl_w)
         top.addStretch()
@@ -649,7 +649,7 @@ class KPITile(QFrame):
 
         # Value
         self._value_lbl = LiveValueLabel(prefix=prefix, suffix=suffix, decimals=decimals)
-        self._value_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_3XL, bold=True))
+        self._value_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_3XL, bold=True))
         self._value_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         layout.addWidget(self._value_lbl)
 
@@ -658,7 +658,7 @@ class KPITile(QFrame):
         self._trend = TrendBadge(0.0)
         trend_row.addWidget(self._trend)
         self._vs_lbl = QLabel("vs. período anterior")
-        self._vs_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+        self._vs_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_XS))
         self._vs_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         trend_row.addWidget(self._vs_lbl)
         trend_row.addStretch()

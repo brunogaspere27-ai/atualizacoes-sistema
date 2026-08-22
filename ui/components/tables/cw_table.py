@@ -70,9 +70,9 @@ class CWTable(QTableWidget):
         self.setStyleSheet(f"""
             QTableWidget {{
                 background-color: {c['bg_primary']};
-                border: 1px solid {c['border_subtle']};
+                border: none;
                 border-radius: {cw_theme.radius.LG}px;
-                gridline-color: {c['border_subtle']};
+                gridline-color: transparent;
                 font-size: {cw_theme.typography.FONT_SIZE_SM}px;
                 color: {c['text_primary']};
             }}
@@ -91,14 +91,9 @@ class CWTable(QTableWidget):
                 color: {c['text_secondary']};
                 padding: {cw_theme.spacing.SM}px {cw_theme.spacing.MD}px;
                 border: none;
-                border-bottom: 1px solid {c['border_subtle']};
-                border-right: 1px solid {c['border_subtle']};
                 font-weight: 600;
                 font-size: {cw_theme.typography.FONT_SIZE_XS}px;
                 text-transform: uppercase;
-            }}
-            QHeaderView::section:last {{
-                border-right: none;
             }}
             QTableWidget::item:alternate {{
                 background-color: {c['bg_secondary']};

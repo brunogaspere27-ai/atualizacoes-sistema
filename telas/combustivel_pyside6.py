@@ -1,7 +1,7 @@
 """
-Tela Combustível - CW Transportadora - PySide6
+Tela Combustível - CW Transportadora - PySide6 Premium Dark Red
 Controle de abastecimentos, consumo e média km/L.
-Design System CW - Dark Mode Premium
+Design System CW - Premium Dark Industrial
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from services.frota_service import frota_service
 from ui.theme.cw_theme import cw_theme
-from ui.components import KPICard, ModernCard, ModernButton, ButtonStyle, CWButton, ButtonVariant, ButtonSize, CWCard, CWTable
+from ui.components import KPICard, CWCard, CWButton, ButtonVariant, ButtonSize, CWTable
 from utils.helpers import formatar_moeda, formatar_peso, parse_numero
 from utils.logger import get_logger
 

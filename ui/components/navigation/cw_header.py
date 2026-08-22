@@ -118,14 +118,14 @@ class CWHeader(QWidget):
         self._search_input.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {cw_theme.colors['bg_secondary']};
-                border: 1px solid {cw_theme.colors['border_subtle']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 0 {cw_theme.spacing.MD}px;
                 font-size: {cw_theme.typography.FONT_SIZE_SM}px;
                 color: {cw_theme.colors['text_primary']};
             }}
             QLineEdit:focus {{
-                border: 1px solid {cw_theme.colors['border_focus']};
+                background-color: {cw_theme.colors['bg_tertiary']};
             }}
         """)
         
@@ -198,6 +198,6 @@ class CWHeader(QWidget):
         self.setStyleSheet(f"""
             CWHeader {{
                 background-color: {c['bg_primary']};
-                border-bottom: 1px solid {c['border_subtle']};
+                border: none;
             }}
         """)

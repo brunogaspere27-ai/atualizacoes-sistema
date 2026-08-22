@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CW Transportadora - Sistema de Gestão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1" y="3" width="15" height="13"></rect>
+            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+          </svg>
+          CW Transportadora
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Principal</div>
+          <a href="#dashboard" class="nav-item active" data-screen="dashboard">
+            <img src="assets/icons/dashboard.svg" alt="Dashboard" width="20" height="20">
+            Dashboard
+          </a>
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Operacional</div>
+          <a href="#notas" class="nav-item" data-screen="notas">
+            <img src="assets/icons/notas.svg" alt="Notas" width="20" height="20">
+            Notas/Manifestos
+          </a>
+          <a href="#nova-operacao" class="nav-item" data-screen="nova-operacao">
+            <img src="assets/icons/operacao.svg" alt="Nova Operação" width="20" height="20">
+            Nova Operação
+          </a>
+          <a href="#criar-viagem" class="nav-item" data-screen="criar-viagem">
+            <img src="assets/icons/viagem.svg" alt="Criar Viagem" width="20" height="20">
+            Criar Viagem
+          </a>
+          <a href="#viagens" class="nav-item" data-screen="viagens">
+            <img src="assets/icons/viagem.svg" alt="Viagens" width="20" height="20">
+            Histórico de Viagens
+          </a>
+          <a href="#ranking" class="nav-item" data-screen="ranking">
+            <img src="assets/icons/ranking.svg" alt="Ranking" width="20" height="20">
+            Ranking de Clientes
+          </a>
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Frota</div>
+          <a href="#combustivel" class="nav-item" data-screen="combustivel">
+            <img src="assets/icons/combustivel.svg" alt="Combustível" width="20" height="20">
+            Combustível
+          </a>
+          <a href="#manutencao" class="nav-item" data-screen="manutencao">
+            <img src="assets/icons/manutencao.svg" alt="Manutenção" width="20" height="20">
+            Manutenção
+          </a>
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Financeiro</div>
+          <a href="#contas" class="nav-item" data-screen="contas">
+            <img src="assets/icons/contas.svg" alt="Contas" width="20" height="20">
+            Contas
+          </a>
+          <a href="#relatorios" class="nav-item" data-screen="relatorios">
+            <img src="assets/icons/relatorios.svg" alt="Relatórios" width="20" height="20">
+            Relatórios
+          </a>
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Administração</div>
+          <a href="#funcionarios" class="nav-item" data-screen="funcionarios">
+            <img src="assets/icons/funcionarios.svg" alt="Funcionários" width="20" height="20">
+            Funcionários
+          </a>
+          <a href="#usuarios" class="nav-item" data-screen="usuarios">
+            <img src="assets/icons/usuarios.svg" alt="Usuários" width="20" height="20">
+            Usuários
+          </a>
+          <a href="#auditoria" class="nav-item" data-screen="auditoria">
+            <img src="assets/icons/auditoria.svg" alt="Auditoria" width="20" height="20">
+            Auditoria
+          </a>
+          <a href="#versoes" class="nav-item" data-screen="versoes">
+            <img src="assets/icons/versoes.svg" alt="Versões" width="20" height="20">
+            Versões
+          </a>
+          <a href="#configuracoes" class="nav-item" data-screen="configuracoes">
+            <img src="assets/icons/configuracoes.svg" alt="Configurações" width="20" height="20">
+            Configurações
+          </a>
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Perfil</div>
+          <a href="#perfil" class="nav-item" data-screen="perfil">
+            <img src="assets/icons/perfil.svg" alt="Perfil" width="20" height="20">
+            Meu Perfil
+          </a>
+        </div>
+      </nav>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <div class="breadcrumb">
+            <a href="#" class="breadcrumb-item">Home</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item" id="current-page">Dashboard</span>
+          </div>
+        </div>
+        
+        <div class="header-right">
+          <div class="search-bar">
+            <img src="assets/icons/search.svg" alt="Search" width="16" height="16">
+            <input type="text" placeholder="Buscar (Ctrl+K)">
+          </div>
+          
+          <div class="header-actions">
+            <button class="icon-button" title="Notificações">
+              <img src="assets/icons/notification.svg" alt="Notificações" width="20" height="20">
+            </button>
+            <button class="icon-button" title="Dark Mode" id="theme-toggle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="user-menu">
+            <div class="user-avatar">JD</div>
+            <span class="user-name">João Silva</span>
+            <img src="assets/icons/chevron-down.svg" alt="Chevron" width="16" height="16">
+          </div>
+        </div>
+      </header>
+      
+      <!-- Page Content -->
+      <div class="page-content" id="page-content">
+        <!-- Screens will be loaded here -->
+      </div>
+    </main>
+  </div>
+  
+  <script src="js/app-enhanced.js"></script>
+</body>
+</html>

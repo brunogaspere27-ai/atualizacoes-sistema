@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - CW Transportadora</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+      padding: var(--spacing-lg);
+    }
+    
+    .login-card {
+      background: var(--color-card);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-2xl);
+      width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow-xl);
+    }
+    
+    .login-header {
+      text-align: center;
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .login-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      font-size: 24px;
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .login-logo svg {
+      width: 32px;
+      height: 32px;
+    }
+    
+    .login-title {
+      font-size: var(--font-size-h2);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .login-subtitle {
+      font-size: var(--font-size-body);
+      color: var(--color-text-secondary);
+    }
+    
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+    
+    .login-footer {
+      margin-top: var(--spacing-lg);
+      text-align: center;
+    }
+    
+    .login-footer a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-size: var(--font-size-small);
+    }
+    
+    .login-footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .remember-me input {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .remember-me label {
+      font-size: var(--font-size-small);
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1" y="3" width="15" height="13"></rect>
+            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+          </svg>
+          CW Transportadora
+        </div>
+        <h1 class="login-title">Bem-vindo de volta</h1>
+        <p class="login-subtitle">Faça login para acessar o sistema</p>
+      </div>
+      
+      <form class="login-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" placeholder="seu@email.com" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input type="password" class="form-input" placeholder="••••••••" required>
+        </div>
+        
+        <div class="remember-me">
+          <input type="checkbox" id="remember">
+          <label for="remember">Lembrar-me</label>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="margin-top: var(--spacing-sm);">Entrar</button>
+      </form>
+      
+      <div class="login-footer">
+        <a href="#">Esqueceu sua senha?</a>
+      </div>
+      
+      <div style="text-align: center; margin-top: var(--spacing-lg);">
+        <a href="index.html" style="color: var(--color-text-tertiary); text-decoration: none; font-size: var(--font-size-small);">
+          ← Voltar para o sistema
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

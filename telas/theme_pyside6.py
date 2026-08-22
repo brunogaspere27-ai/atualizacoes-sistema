@@ -410,7 +410,7 @@ class ThemeManager:
                 c["chart_5"], c["chart_6"], c["chart_7"], c["chart_8"]]
 
     def get_font(self, size: int = ThemeTokens.FONT_SIZE_MD, bold: bool = False, weight: int = None) -> QFont:
-        font = QFont(self._tokens.FONT_FAMILY_QT, size)
+        font = QFont(self._cw_theme.spacing.FONT_FAMILY_QT, size)
         if weight is not None:
             try:
                 font.setWeight(weight)
@@ -492,7 +492,7 @@ class ThemeManager:
         QSpinBox, QDoubleSpinBox, QDateEdit, QDateTimeEdit, QTimeEdit {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_MD}px;
             padding: 10px 14px;
             selection-background-color: {c['brand_soft']};
@@ -501,17 +501,15 @@ class ThemeManager:
         }}
         QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover,
         QSpinBox:hover, QDoubleSpinBox:hover, QDateEdit:hover, QDateTimeEdit:hover {{
-            border-color: {c['border_strong']};
+            background-color: {c['bg_elevated']};
         }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus,
         QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus, QDateTimeEdit:focus {{
-            border: 1px solid {c['brand']};
-            background-color: {c['bg_secondary']};
+            background-color: {c['bg_elevated']};
         }}
         QLineEdit:disabled, QTextEdit:disabled {{
             background-color: {c['bg_secondary']};
             color: {c['text_disabled']};
-            border-color: {c['border_subtle']};
         }}
         QLineEdit[echoMode="2"] {{
             lineedit-password-character: 8226;
@@ -523,13 +521,13 @@ class ThemeManager:
         QComboBox {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_MD}px;
             padding: 8px 14px;
             min-height: 26px;
         }}
-        QComboBox:hover {{ border-color: {c['border_strong']}; }}
-        QComboBox:focus {{ border: 1px solid {c['brand']}; }}
+        QComboBox:hover {{ background-color: {c['bg_elevated']}; }}
+        QComboBox:focus {{ background-color: {c['bg_elevated']}; }}
         QComboBox::drop-down {{
             border: none;
             width: 32px;
@@ -548,7 +546,7 @@ class ThemeManager:
         QComboBox QAbstractItemView {{
             background-color: {c['bg_elevated']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_MD}px;
             selection-background-color: {c['brand_soft']};
             selection-color: {c['text_primary']};
@@ -601,7 +599,7 @@ class ThemeManager:
             background-color: {c['bg_primary']};
             alternate-background-color: {c['table_row_odd']};
             gridline-color: transparent;
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             selection-background-color: {c['table_row_selected']};
             selection-color: {c['text_primary']};
@@ -611,7 +609,6 @@ class ThemeManager:
         QTableView::item, QTableWidget::item, QTreeView::item, QListView::item {{
             padding: 12px 16px;
             border: none;
-            border-bottom: 1px solid {c['border_subtle']};
         }}
         QTableView::item:hover, QTableWidget::item:hover,
         QTreeView::item:hover, QListView::item:hover {{
@@ -632,15 +629,13 @@ class ThemeManager:
             color: {c['table_header_text']};
             padding: 12px 16px;
             border: none;
-            border-bottom: 1px solid {c['border_default']};
-            border-right: 1px solid {c['border_subtle']};
             font-weight: 600;
             font-size: {t.FONT_SIZE_SM}px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }}
         QHeaderView::section:first {{ border-top-left-radius: {t.RADIUS_LG}px; }}
-        QHeaderView::section:last  {{ border-top-right-radius: {t.RADIUS_LG}px; border-right: none; }}
+        QHeaderView::section:last  {{ border-top-right-radius: {t.RADIUS_LG}px; }}
 
         /* ============================================================
            SCROLLBARS (6px, rounded, transparent track)
@@ -682,7 +677,7 @@ class ThemeManager:
         QMenu {{
             background-color: {c['bg_elevated']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_MD}px;
             padding: 6px;
         }}
@@ -719,7 +714,7 @@ class ThemeManager:
            TABS (underline style)
            ============================================================ */
         QTabWidget::pane {{
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_MD}px;
             background-color: {c['bg_elevated']};
             top: -1px;
@@ -747,7 +742,7 @@ class ThemeManager:
            GROUPBOX / FRAMES
            ============================================================ */
         QGroupBox {{
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             margin-top: 16px;
             padding: 16px;
@@ -813,7 +808,7 @@ class ThemeManager:
         QStatusBar {{
             background-color: {c['bg_secondary']};
             color: {c['text_secondary']};
-            border-top: 1px solid {c['border_subtle']};
+            border: none;
             padding: 4px 12px;
             font-size: {t.FONT_SIZE_SM}px;
         }}
@@ -866,53 +861,53 @@ def setup_theme(settings) -> Dict[str, str]:
     else:
         theme_manager.set_mode(ThemeMode.DARK)
 
-    colors = theme_manager.colors
+    colors = cw_theme.colors
 
     # Aliases para compatibilidade com código existente
     return {
-        "fundo": colors["bg_primary"],
-        "sidebar": colors["sidebar_bg"],
-        "sidebar_card": colors["bg_elevated"],
-        "header": colors["header_bg"],
-        "header_bg": colors["header_bg"],
-        "header_tag": colors["brand"],
-        "header_title": colors["text_primary"],
-        "header_subtitle": colors["text_secondary"],
-        "principal": colors["brand"],
-        "hover": colors["brand_hover"],
-        "texto": colors["text_primary"],
-        "texto_suave": colors["text_secondary"],
-        "card_bg": colors["card_bg"],
-        "card_text": colors["text_primary"],
-        "muted_border": colors["border_subtle"],
-        "surface_alt": colors["bg_tertiary"],
-        "accent": colors["brand"],
-        "divider": colors["border_default"],
+        "fundo": cw_theme.colors["bg_primary"],
+        "sidebar": cw_theme.colors["sidebar_bg"],
+        "sidebar_card": cw_theme.colors["bg_elevated"],
+        "header": cw_theme.colors["header_bg"],
+        "header_bg": cw_theme.colors["header_bg"],
+        "header_tag": cw_theme.colors["brand"],
+        "header_title": cw_theme.colors["text_primary"],
+        "header_subtitle": cw_theme.colors["text_secondary"],
+        "principal": cw_theme.colors["brand"],
+        "hover": cw_theme.colors["brand_hover"],
+        "texto": cw_theme.colors["text_primary"],
+        "texto_suave": cw_theme.colors["text_secondary"],
+        "card_bg": cw_theme.colors["card_bg"],
+        "card_text": cw_theme.colors["text_primary"],
+        "muted_border": cw_theme.colors["border_subtle"],
+        "surface_alt": cw_theme.colors["bg_tertiary"],
+        "accent": cw_theme.colors["brand"],
+        "divider": cw_theme.colors["border_default"],
         "shadow": "#000000",
-        "font_family": theme_manager.tokens.FONT_FAMILY,
+        "font_family": cw_theme.spacing.FONT_FAMILY,
 
         # Cores de acento
-        "brand": colors["brand"],
-        "brand_soft": colors["brand_soft"],
-        "emerald": colors["emerald"],
-        "emerald_soft": colors["emerald_soft"],
-        "sky": colors["sky"],
-        "sky_soft": colors["sky_soft"],
-        "amber": colors["amber"],
-        "amber_soft": colors["amber_soft"],
-        "violet": colors["violet"],
-        "violet_soft": colors["violet_soft"],
-        "cyan": colors["cyan"],
-        "cyan_soft": colors["cyan_soft"],
-        "rose": colors["rose"],
-        "rose_soft": colors["rose_soft"],
-        "success": colors["success"],
-        "warning": colors["warning"],
-        "error": colors["error"],
-        "info": colors["info"],
+        "brand": cw_theme.colors["brand"],
+        "brand_soft": cw_theme.colors["brand_soft"],
+        "emerald": cw_theme.colors["emerald"],
+        "emerald_soft": cw_theme.colors["emerald_soft"],
+        "sky": cw_theme.colors["sky"],
+        "sky_soft": cw_theme.colors["sky_soft"],
+        "amber": cw_theme.colors["amber"],
+        "amber_soft": cw_theme.colors["amber_soft"],
+        "violet": cw_theme.colors["violet"],
+        "violet_soft": cw_theme.colors["violet_soft"],
+        "cyan": cw_theme.colors["cyan"],
+        "cyan_soft": cw_theme.colors["cyan_soft"],
+        "rose": cw_theme.colors["rose"],
+        "rose_soft": cw_theme.colors["rose_soft"],
+        "success": cw_theme.colors["success"],
+        "warning": cw_theme.colors["warning"],
+        "error": cw_theme.colors["error"],
+        "info": cw_theme.colors["info"],
 
         # Charts
-        "chart_bg": colors["chart_bg"],
-        "chart_grid": colors["chart_grid"],
-        "chart_text": colors["chart_text"],
+        "chart_bg": cw_theme.colors["chart_bg"],
+        "chart_grid": cw_theme.colors["chart_grid"],
+        "chart_text": cw_theme.colors["chart_text"],
     }

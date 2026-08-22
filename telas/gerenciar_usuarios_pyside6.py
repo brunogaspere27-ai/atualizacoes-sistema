@@ -25,6 +25,7 @@ from services.auditoria_service import (
 )
 from ui.theme.cw_theme import cw_theme
 from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
+from utils.components import ModernCard, ModernButton, ButtonStyle, ModernTable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -42,8 +43,8 @@ class TelaGerenciarUsuarios(QWidget):
         self._carregar_usuarios()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -53,19 +54,19 @@ class TelaGerenciarUsuarios(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_primary']}; border: none; }}")
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL)
+        cl.setSpacing(cw_theme.spacing.SPACING_XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
         # Barra de botões
-        barra = ModernCard(padding=tokens.SPACING_LG)
+        barra = ModernCard(padding=cw_theme.spacing.SPACING_LG)
         br = QHBoxLayout()
         btn_novo = ModernButton("+ Novo Usuário", ButtonStyle.PRIMARY)
         btn_novo.clicked.connect(lambda: self._abrir_modal_criar())
@@ -78,7 +79,7 @@ class TelaGerenciarUsuarios(QWidget):
         cl.addWidget(barra)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = ModernCard(padding=cw_theme.spacing.SPACING_XL)
         colunas = [
             ("ID", 50), ("Nome Completo", 220), ("Usuário", 130), ("Nível", 110),
             ("Status", 90), ("Último Login", 150), ("Criado em", 150),
@@ -235,31 +236,31 @@ class _ModalCriarEditarUsuario(QDialog):
         self._setup_ui()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        layout.setSpacing(cw_theme.spacing.SPACING_MD)
         self.setLayout(layout)
 
         titulo = QLabel("Editar Usuário" if self._editando else "Criar Novo Usuário")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']};")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']};")
         layout.addWidget(titulo)
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; }}")
         fl = QFormLayout()
-        fl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        fl.setSpacing(tokens.SPACING_SM)
+        fl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        fl.setSpacing(cw_theme.spacing.SPACING_SM)
         frame.setLayout(fl)
 
         input_style = f"""
-            QLineEdit {{ background-color: {colors['bg_primary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: 8px 12px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QLineEdit:focus {{ border: 1.5px solid {colors['violet']}; }}
+            QLineEdit {{ background-color: {cw_theme.colors['bg_primary']}; color: {cw_theme.colors['text_primary']};
+                border: 1.5px solid {cw_theme.colors['border_subtle']}; border-radius: {cw_theme.radius.MD}px;
+                padding: 8px 12px; font-size: {cw_theme.typography.FONT_SIZE_MD}px; }}
+            QLineEdit:focus {{ border: 1.5px solid {cw_theme.colors['info']}; }}
         """
 
         self.entry_nome = QLineEdit()
@@ -289,8 +290,8 @@ class _ModalCriarEditarUsuario(QDialog):
         fl.addRow(self._lbl("Nível de acesso"), self.combo_nivel)
 
         self.label_erro = QLabel("")
-        self.label_erro.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        self.label_erro.setStyleSheet(f"color: {colors['rose']}; background: transparent;")
+        self.label_erro.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        self.label_erro.setStyleSheet(f"color: {cw_theme.colors['primary']}; background: transparent;")
         self.label_erro.setWordWrap(True)
         fl.addRow(self.label_erro)
 
@@ -347,9 +348,9 @@ class _ModalCriarEditarUsuario(QDialog):
             self.label_erro.setText("Erro inesperado.")
 
     def _lbl(self, texto) -> QLabel:
-        colors = theme_manager.colors
+        colors = cw_theme.colors
         lbl = QLabel(texto)
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; font-weight: 600; background: transparent;")
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; font-weight: 600; background: transparent;")
         return lbl
 
 
@@ -364,35 +365,35 @@ class _ModalPermissoes(QDialog):
         self._setup_ui()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        layout.setSpacing(cw_theme.spacing.SPACING_MD)
         self.setLayout(layout)
 
         titulo = QLabel("Configurar Permissões")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']};")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']};")
         layout.addWidget(titulo)
 
         sub = QLabel("Marque as ações permitidas para cada módulo.")
-        sub.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        sub.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        sub.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        sub.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         layout.addWidget(sub)
 
         # Scroll
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_LG}px; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.LG}px; }}")
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_secondary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_secondary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_MD, tokens.SPACING_MD, tokens.SPACING_MD)
-        cl.setSpacing(tokens.SPACING_SM)
+        cl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_MD)
+        cl.setSpacing(cw_theme.spacing.SPACING_SM)
         content.setLayout(cl)
         scroll.setWidget(content)
 
@@ -400,21 +401,21 @@ class _ModalPermissoes(QDialog):
 
         # Header
         header = QFrame()
-        header.setStyleSheet(f"QFrame {{ background-color: {colors['bg_tertiary']}; border-radius: {tokens.RADIUS_MD}px; }}")
+        header.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_tertiary']}; border-radius: {cw_theme.radius.MD}px; }}")
         hl = QHBoxLayout()
-        hl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+        hl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
         header.setLayout(hl)
 
         lbl_mod = QLabel("Módulo")
-        lbl_mod.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl_mod.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl_mod.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_mod.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         lbl_mod.setMinimumWidth(140)
         hl.addWidget(lbl_mod)
 
         for acao in _ACOES_PERMISSAO:
             lbl = QLabel(acao.capitalize())
-            lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+            lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setMinimumWidth(75)
             hl.addWidget(lbl)
@@ -426,14 +427,14 @@ class _ModalPermissoes(QDialog):
                 continue
 
             row = QFrame()
-            row.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; }}")
+            row.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_primary']}; border-radius: {cw_theme.radius.MD}px; }}")
             rl = QHBoxLayout()
-            rl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+            rl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
             row.setLayout(rl)
 
             lbl_nome = QLabel(nome_modulo)
-            lbl_nome.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD))
-            lbl_nome.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+            lbl_nome.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+            lbl_nome.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
             lbl_nome.setMinimumWidth(140)
             rl.addWidget(lbl_nome)
 
@@ -444,8 +445,8 @@ class _ModalPermissoes(QDialog):
                 cb = QCheckBox()
                 cb.setChecked(perm_modulo.get(acao, False))
                 cb.setStyleSheet(f"""
-                    QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 4px; border: 2px solid {colors['border_subtle']}; }}
-                    QCheckBox::indicator:checked {{ background-color: {colors['emerald']}; border: 2px solid {colors['emerald']}; }}
+                    QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 4px; border: 2px solid {cw_theme.colors['border_subtle']}; }}
+                    QCheckBox::indicator:checked {{ background-color: {cw_theme.colors['success']}; border: 2px solid {cw_theme.colors['success']}; }}
                 """)
                 self._checkboxes[modulo][acao] = cb
                 rl.addWidget(cb)

@@ -554,7 +554,7 @@ class SaaSTable(QTableWidget):
             background-color: {c['card_bg']};
             border: 1px solid {c['card_border']};
             border-radius: {t.RADIUS_XL}px;
-            gridline-color: {c['border_subtle']};
+            gridline-color: transparent;
             selection-background-color: {c['cw_soft']};
             selection-color: {c['cw']};
         }}

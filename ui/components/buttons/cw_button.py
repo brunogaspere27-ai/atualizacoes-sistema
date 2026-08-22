@@ -126,7 +126,7 @@ class CWButton(QPushButton):
             QPushButton {{
                 background-color: {cw_theme.colors['bg_secondary']};
                 color: {cw_theme.colors['text_primary']};
-                border: 1px solid {cw_theme.colors['border_default']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 0px 16px;
                 font-weight: 500;
@@ -209,26 +209,24 @@ class CWButton(QPushButton):
         """
     
     def _get_ghost_style(self) -> str:
-        """Estilo GHOST: Transparente com borda"""
+        """Estilo GHOST: Transparente sem borda"""
         return f"""
             QPushButton {{
                 background-color: transparent;
                 color: {cw_theme.colors['text_primary']};
-                border: 1px solid {cw_theme.colors['border_default']};
+                border: none;
                 border-radius: {cw_theme.radius.MD}px;
                 padding: 0px 16px;
                 font-weight: 500;
             }}
             QPushButton:hover {{
                 background-color: {cw_theme.colors['bg_secondary']};
-                border: 1px solid {cw_theme.colors['border_strong']};
             }}
             QPushButton:pressed {{
                 background-color: {cw_theme.colors['bg_tertiary']};
             }}
             QPushButton:disabled {{
                 color: {cw_theme.colors['text_disabled']};
-                border: 1px solid {cw_theme.colors['border_subtle']};
             }}
         """
     

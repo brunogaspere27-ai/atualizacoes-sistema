@@ -710,8 +710,8 @@ class AuroraThemeManager:
                 c["chart_5"], c["chart_6"], c["chart_7"], c["chart_8"]]
 
     def get_font(self, size: int = None, bold: bool = False, weight: int = None) -> QFont:
-        size = size or self._tokens.FONT_SIZE_MD
-        font = QFont(self._tokens.FONT_FAMILY_QT, size)
+        size = size or self._cw_theme.spacing.FONT_SIZE_MD
+        font = QFont(self._cw_theme.spacing.FONT_FAMILY_QT, size)
         if weight is not None:
             try:
                 font.setWeight(weight)
@@ -784,7 +784,7 @@ class AuroraThemeManager:
         QSpinBox, QDoubleSpinBox, QDateEdit, QDateTimeEdit, QTimeEdit {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 12px 16px;
             selection-background-color: {c['aurora_soft']};
@@ -792,29 +792,27 @@ class AuroraThemeManager:
             font-size: {t.FONT_SIZE_MD}px;
         }}
         QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover {{
-            border-color: {c['border_strong']};
+            background-color: {c['bg_elevated']};
         }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-            border: 1px solid {c['aurora']};
-            background-color: {c['bg_surface']};
+            background-color: {c['bg_elevated']};
         }}
         QLineEdit:disabled, QTextEdit:disabled {{
             background-color: {c['bg_secondary']};
             color: {c['text_disabled']};
-            border-color: {c['border_subtle']};
         }}
 
         /* COMBOBOX */
         QComboBox {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 10px 16px;
             min-height: 28px;
         }}
-        QComboBox:hover {{ border-color: {c['border_strong']}; }}
-        QComboBox:focus {{ border: 1px solid {c['aurora']}; }}
+        QComboBox:hover {{ background-color: {c['bg_elevated']}; }}
+        QComboBox:focus {{ background-color: {c['bg_elevated']}; }}
         QComboBox::drop-down {{ border: none; width: 32px; subcontrol-position: center right; }}
         QComboBox::down-arrow {{
             image: none;
@@ -826,7 +824,7 @@ class AuroraThemeManager:
         QComboBox QAbstractItemView {{
             background-color: {c['bg_elevated']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             selection-background-color: {c['aurora_soft']};
             selection-color: {c['text_primary']};
@@ -871,7 +869,7 @@ class AuroraThemeManager:
             background-color: {c['bg_primary']};
             alternate-background-color: {c['table_row_odd']};
             gridline-color: transparent;
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_XL}px;
             selection-background-color: {c['table_row_selected']};
             selection-color: {c['text_primary']};
@@ -880,7 +878,6 @@ class AuroraThemeManager:
         QTableView::item, QTableWidget::item {{
             padding: 14px 18px;
             border: none;
-            border-bottom: 1px solid {c['border_subtle']};
         }}
         QTableView::item:hover, QTableWidget::item:hover {{
             background-color: {c['table_row_hover']};
@@ -896,15 +893,13 @@ class AuroraThemeManager:
             color: {c['table_header_text']};
             padding: 14px 18px;
             border: none;
-            border-bottom: 1px solid {c['border_default']};
-            border-right: 1px solid {c['border_subtle']};
             font-weight: 600;
             font-size: {t.FONT_SIZE_SM}px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
         }}
         QHeaderView::section:first {{ border-top-left-radius: {t.RADIUS_XL}px; }}
-        QHeaderView::section:last {{ border-top-right-radius: {t.RADIUS_XL}px; border-right: none; }}
+        QHeaderView::section:last {{ border-top-right-radius: {t.RADIUS_XL}px; }}
 
         /* SCROLLBARS */
         QScrollBar:vertical {{ background: transparent; width: 6px; margin: 4px 2px; }}
@@ -930,7 +925,7 @@ class AuroraThemeManager:
         QMenu {{
             background-color: {c['bg_elevated']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_XL}px;
             padding: 8px;
         }}
@@ -944,7 +939,7 @@ class AuroraThemeManager:
 
         /* TABS */
         QTabWidget::pane {{
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_XL}px;
             background: {c['bg_elevated']};
             top: -1px;
@@ -962,7 +957,7 @@ class AuroraThemeManager:
 
         /* GROUPBOX */
         QGroupBox {{
-            border: 1px solid {c['border_subtle']};
+            border: none;
             border-radius: {t.RADIUS_XL}px;
             margin-top: 20px; padding: 20px;
             background: {c['bg_elevated']};
@@ -1034,53 +1029,53 @@ def setup_aurora_theme(settings) -> Dict[str, str]:
     else:
         aurora_theme_manager.set_mode(ThemeMode.DARK)
 
-    colors = aurora_theme_manager.colors
+    colors = aurora_cw_theme.colors
     return {
-        "fundo": colors["bg_primary"],
-        "sidebar": colors["sidebar_bg"],
-        "sidebar_card": colors["bg_elevated"],
-        "header": colors["header_bg"],
-        "header_bg": colors["header_bg"],
-        "header_tag": colors["aurora"],
-        "header_title": colors["text_primary"],
-        "header_subtitle": colors["text_secondary"],
-        "principal": colors["aurora"],
-        "hover": colors["aurora_hover"],
-        "texto": colors["text_primary"],
-        "texto_suave": colors["text_secondary"],
-        "card_bg": colors["card_bg"],
-        "card_text": colors["text_primary"],
-        "muted_border": colors["border_subtle"],
-        "surface_alt": colors["bg_tertiary"],
-        "accent": colors["aurora"],
-        "divider": colors["border_default"],
-        "shadow": colors["aurora_glow"],
-        "font_family": aurora_theme_manager.tokens.FONT_FAMILY,
-        "aurora": colors["aurora"],
-        "aurora_soft": colors["aurora_soft"],
-        "ocean": colors["ocean"],
-        "ocean_soft": colors["ocean_soft"],
-        "sunset": colors["sunset"],
-        "sunset_soft": colors["sunset_soft"],
-        "forest": colors["forest"],
-        "forest_soft": colors["forest_soft"],
-        "cosmos": colors["cosmos"],
-        "cosmos_soft": colors["cosmos_soft"],
-        "ember": colors["ember"],
-        "ember_soft": colors["ember_soft"],
-        "crimson": colors["crimson"],
-        "crimson_soft": colors["crimson_soft"],
-        "neon": colors["neon"],
-        "neon_soft": colors["neon_soft"],
-        "success": colors["success"],
-        "success_soft": colors["success_soft"],
-        "warning": colors["warning"],
-        "warning_soft": colors["warning_soft"],
-        "error": colors["error"],
-        "error_soft": colors["error_soft"],
-        "info": colors["info"],
-        "info_soft": colors["info_soft"],
-        "chart_bg": colors["chart_bg"],
-        "chart_grid": colors["chart_grid"],
-        "chart_text": colors["chart_text"],
+        "fundo": cw_theme.colors["bg_primary"],
+        "sidebar": cw_theme.colors["sidebar_bg"],
+        "sidebar_card": cw_theme.colors["bg_elevated"],
+        "header": cw_theme.colors["header_bg"],
+        "header_bg": cw_theme.colors["header_bg"],
+        "header_tag": cw_theme.colors["aurora"],
+        "header_title": cw_theme.colors["text_primary"],
+        "header_subtitle": cw_theme.colors["text_secondary"],
+        "principal": cw_theme.colors["aurora"],
+        "hover": cw_theme.colors["aurora_hover"],
+        "texto": cw_theme.colors["text_primary"],
+        "texto_suave": cw_theme.colors["text_secondary"],
+        "card_bg": cw_theme.colors["card_bg"],
+        "card_text": cw_theme.colors["text_primary"],
+        "muted_border": cw_theme.colors["border_subtle"],
+        "surface_alt": cw_theme.colors["bg_tertiary"],
+        "accent": cw_theme.colors["aurora"],
+        "divider": cw_theme.colors["border_default"],
+        "shadow": cw_theme.colors["aurora_glow"],
+        "font_family": aurora_cw_theme.spacing.FONT_FAMILY,
+        "aurora": cw_theme.colors["aurora"],
+        "aurora_soft": cw_theme.colors["aurora_soft"],
+        "ocean": cw_theme.colors["ocean"],
+        "ocean_soft": cw_theme.colors["ocean_soft"],
+        "sunset": cw_theme.colors["sunset"],
+        "sunset_soft": cw_theme.colors["sunset_soft"],
+        "forest": cw_theme.colors["forest"],
+        "forest_soft": cw_theme.colors["forest_soft"],
+        "cosmos": cw_theme.colors["cosmos"],
+        "cosmos_soft": cw_theme.colors["cosmos_soft"],
+        "ember": cw_theme.colors["ember"],
+        "ember_soft": cw_theme.colors["ember_soft"],
+        "crimson": cw_theme.colors["crimson"],
+        "crimson_soft": cw_theme.colors["crimson_soft"],
+        "neon": cw_theme.colors["neon"],
+        "neon_soft": cw_theme.colors["neon_soft"],
+        "success": cw_theme.colors["success"],
+        "success_soft": cw_theme.colors["success_soft"],
+        "warning": cw_theme.colors["warning"],
+        "warning_soft": cw_theme.colors["warning_soft"],
+        "error": cw_theme.colors["error"],
+        "error_soft": cw_theme.colors["error_soft"],
+        "info": cw_theme.colors["info"],
+        "info_soft": cw_theme.colors["info_soft"],
+        "chart_bg": cw_theme.colors["chart_bg"],
+        "chart_grid": cw_theme.colors["chart_grid"],
+        "chart_text": cw_theme.colors["chart_text"],
     }

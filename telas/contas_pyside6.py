@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt, QTimer
 from services.financeiro_service import financeiro_service
 from ui.theme.cw_theme import cw_theme
 from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
+from utils.components import ModernCard, ModernInput, ModernButton, ButtonStyle, ModernTable
 from utils.helpers import formatar_moeda, parse_numero
 from utils.logger import get_logger
 
@@ -35,8 +36,8 @@ class TelaContas(QWidget):
         self._carregar_contas()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -46,25 +47,25 @@ class TelaContas(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_primary']}; border: none; }}")
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL)
+        cl.setSpacing(cw_theme.spacing.SPACING_XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
         # Filtros
-        filtros = ModernCard(padding=tokens.SPACING_LG)
+        filtros = ModernCard(padding=cw_theme.spacing.SPACING_LG)
         fr = QHBoxLayout()
-        fr.setSpacing(tokens.SPACING_MD)
+        fr.setSpacing(cw_theme.spacing.SPACING_MD)
 
         self.combo_periodo = QComboBox()
         self.combo_periodo.addItems(["Geral", "Mês", "Ano"])
-        self.combo_periodo.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
+        self.combo_periodo.setMinimumHeight(cw_theme.spacing.SPACING_XL * 2 + cw_theme.spacing.SPACING_SM)
         self.combo_periodo.setMinimumWidth(110)
         self.combo_periodo.currentTextChanged.connect(lambda: self._carregar_contas())
         fr.addWidget(self.combo_periodo)
@@ -72,7 +73,7 @@ class TelaContas(QWidget):
         self.combo_mes = QComboBox()
         self.combo_mes.addItems([f"{i:02d}" for i in range(1, 13)])
         self.combo_mes.setCurrentIndex(datetime.now().month - 1)
-        self.combo_mes.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
+        self.combo_mes.setMinimumHeight(cw_theme.spacing.SPACING_XL * 2 + cw_theme.spacing.SPACING_SM)
         self.combo_mes.setMinimumWidth(80)
         self.combo_mes.currentTextChanged.connect(lambda: self._carregar_contas())
         fr.addWidget(self.combo_mes)
@@ -84,7 +85,7 @@ class TelaContas(QWidget):
 
         self.combo_tipo = QComboBox()
         self.combo_tipo.addItems(["Todos", "Pagar", "Receber"])
-        self.combo_tipo.setMinimumHeight(tokens.SPACING_XL * 2 + tokens.SPACING_SM)
+        self.combo_tipo.setMinimumHeight(cw_theme.spacing.SPACING_XL * 2 + cw_theme.spacing.SPACING_SM)
         self.combo_tipo.setMinimumWidth(110)
         self.combo_tipo.currentTextChanged.connect(lambda: self._carregar_contas())
         fr.addWidget(self.combo_tipo)
@@ -105,30 +106,30 @@ class TelaContas(QWidget):
 
         # Resumo
         resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
+        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; border: none; }}")
         rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_LG)
+        rl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD)
+        rl.setSpacing(cw_theme.spacing.SPACING_LG)
         resumo_frame.setLayout(rl)
 
         self._resumo = {}
         for titulo, chave, cor in [
-            ("A receber", "receber", colors["emerald"]),
-            ("A pagar", "pagar", colors["rose"]),
-            ("Pago/Recebido", "pago", colors["sky"]),
-            ("Saldo previsto", "saldo", colors["text_primary"]),
+            ("A receber", "receber", cw_theme.colors["success"]),
+            ("A pagar", "pagar", cw_theme.colors["rose"]),
+            ("Pago/Recebido", "pago", cw_theme.colors["sky"]),
+            ("Saldo previsto", "saldo", cw_theme.colors["text_primary"]),
         ]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_primary']}; border-radius: {cw_theme.radius.MD}px; border: none; }}")
             cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+            cardl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
             card.setLayout(cardl)
             t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+            t.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            t.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
             cardl.addWidget(t)
             v = QLabel("R$ 0,00")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+            v.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
             v.setStyleSheet(f"color: {cor}; background: transparent;")
             cardl.addWidget(v)
             self._resumo[chave] = v
@@ -136,7 +137,7 @@ class TelaContas(QWidget):
         cl.addWidget(resumo_frame)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = ModernCard(padding=cw_theme.spacing.SPACING_XL)
         colunas = [
             ("ID", 45), ("Tipo", 70), ("Descrição", 220), ("Cliente/Forn.", 190),
             ("Categoria", 110), ("Valor", 110), ("Vencimento", 110),
@@ -251,31 +252,31 @@ class TelaContas(QWidget):
         dlg.setWindowTitle("Conta")
         dlg.resize(560, 680)
 
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        layout.setSpacing(tokens.SPACING_MD)
+        layout.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        layout.setSpacing(cw_theme.spacing.SPACING_MD)
         dlg.setLayout(layout)
 
         titulo = QLabel("Cadastro de Conta")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']};")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']};")
         layout.addWidget(titulo)
 
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; }}")
+        frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; }}")
         fl = QFormLayout()
-        fl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL, tokens.SPACING_XL)
-        fl.setSpacing(tokens.SPACING_SM)
+        fl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_XL)
+        fl.setSpacing(cw_theme.spacing.SPACING_SM)
         frame.setLayout(fl)
 
         input_style = f"""
-            QLineEdit {{ background-color: {colors['bg_primary']}; color: {colors['text_primary']};
-                border: 1.5px solid {colors['border_subtle']}; border-radius: {tokens.RADIUS_MD}px;
-                padding: 8px 12px; font-size: {tokens.FONT_SIZE_MD}px; }}
-            QLineEdit:focus {{ border: 1.5px solid {colors['sky']}; }}
+            QLineEdit {{ background-color: {cw_theme.colors['bg_primary']}; color: {cw_theme.colors['text_primary']};
+                border: 1.5px solid {cw_theme.colors['border_subtle']}; border-radius: {cw_theme.radius.MD}px;
+                padding: 8px 12px; font-size: {cw_theme.typography.FONT_SIZE_MD}px; }}
+            QLineEdit:focus {{ border: 1.5px solid {cw_theme.colors['info']}; }}
         """
         combo_style = input_style.replace("QLineEdit", "QComboBox")
 
@@ -427,7 +428,7 @@ class TelaContas(QWidget):
         self._carregar_contas()
 
     def _lbl(self, texto) -> QLabel:
-        colors = theme_manager.colors
+        colors = cw_theme.colors
         lbl = QLabel(texto)
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; font-weight: 600; background: transparent;")
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; font-weight: 600; background: transparent;")
         return lbl

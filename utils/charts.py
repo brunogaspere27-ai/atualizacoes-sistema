@@ -35,8 +35,8 @@ class ChartCard(QFrame):
 
     def __init__(self, title: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         self.setObjectName("chartCard")
         self.setStyleSheet(f"""
@@ -67,7 +67,7 @@ class ChartCard(QFrame):
         # Header elegante
         hdr = QHBoxLayout()
         title_lbl = QLabel(title)
-        title_lbl.setFont(theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+        title_lbl.setFont(cw_theme.get_font(t.FONT_SIZE_LG, bold=True))
         title_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         hdr.addWidget(title_lbl)
         hdr.addStretch()
@@ -79,7 +79,7 @@ class ChartCard(QFrame):
             btn = QPushButton(p)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setMinimumHeight(26)
-            btn.setFont(theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+            btn.setFont(cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
             self._style_period_btn(btn, p == self._active_period)
             btn.clicked.connect(lambda _, b=btn, period=p: self._set_period(period))
             hdr.addWidget(btn)
@@ -90,8 +90,8 @@ class ChartCard(QFrame):
         self._layout.addLayout(self._chart_area)
 
     def _style_period_btn(self, btn: QPushButton, active: bool):
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
         if active:
             btn.setStyleSheet(f"""
             QPushButton {{
@@ -137,7 +137,7 @@ class LineChart(QWidget):
             return
 
         self.setMinimumHeight(280)
-        c = theme_manager.colors
+        c = cw_theme.colors
 
         # pyqtgraph config
         pg.setConfigOptions(antialias=True, background=c['chart_bg'], foreground=c['chart_text'])
@@ -163,7 +163,7 @@ class LineChart(QWidget):
     def set_data(self, x: list, y: list, color: str = None, fill: bool = True):
         if not HAS_PYQTGRAPH:
             return
-        c = theme_manager.colors
+        c = cw_theme.colors
         line_color = color or c['chart_1']
 
         self._plot.clear()
@@ -205,7 +205,7 @@ class BarChart(QWidget):
         if not HAS_PYQTGRAPH:
             return
         self.setMinimumHeight(250)
-        c = theme_manager.colors
+        c = cw_theme.colors
         pg.setConfigOptions(antialias=True, background=c['chart_bg'], foreground=c['chart_text'])
 
         self._plot = pg.PlotWidget()
@@ -225,7 +225,7 @@ class BarChart(QWidget):
     def set_data(self, labels: list, values: list, color: str = None):
         if not HAS_PYQTGRAPH:
             return
-        c = theme_manager.colors
+        c = cw_theme.colors
         bar_color = color or c['chart_1']
 
         self._plot.clear()
@@ -256,7 +256,7 @@ class DonutChart(QWidget):
     def set_data(self, data: List[Tuple[str, float]], center_text: str = ""):
         """data: [(label, value), ...]"""
         colors = theme_manager.get_chart_colors()
-        self._data = [(label, value, colors[i % len(colors)]) for i, (label, value) in enumerate(data)]
+        self._data = [(label, value, cw_theme.colors[i % len(colors)]) for i, (label, value) in enumerate(data)]
         self._center_text = center_text
         self._anim_progress = 0.0
         self._timer.start(16)
@@ -299,15 +299,15 @@ class DonutChart(QWidget):
             start_angle += span + gap
 
         # Inner circle (donut hole)
-        c = theme_manager.colors
+        c = cw_theme.colors
         p.setBrush(QColor(c['card_bg']))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawEllipse(int(cx - inner_r), int(cy - inner_r), int(inner_r * 2), int(inner_r * 2))
 
         # Center text
         if self._center_text:
-            t = theme_manager.tokens
-            p.setFont(theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+            t = cw_theme.spacing
+            p.setFont(cw_theme.get_font(t.FONT_SIZE_2XL, bold=True))
             p.setPen(QColor(c['text_primary']))
             p.drawText(
                 int(cx - outer_r), int(cy - inner_r), int(outer_r * 2), int(inner_r * 2),
@@ -348,8 +348,8 @@ class GaugeChart(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        c = theme_manager.colors
-        t = theme_manager.tokens
+        c = cw_theme.colors
+        t = cw_theme.spacing
 
         w, h = self.width(), self.height()
         size = min(w, h * 1.8)
@@ -378,14 +378,14 @@ class GaugeChart(QWidget):
 
         # Value text
         pct_text = f"{int(self._anim_value * 100)}%"
-        p.setFont(theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        p.setFont(cw_theme.get_font(t.FONT_SIZE_2XL, bold=True))
         p.setPen(QColor(c['text_primary']))
         p.drawText(int(cx - r), int(cy - r), int(r * 2), int(r * 2),
                    Qt.AlignmentFlag.AlignCenter, pct_text)
 
         # Label
         if self._label:
-            p.setFont(theme_manager.get_font(t.FONT_SIZE_XS))
+            p.setFont(cw_theme.get_font(t.FONT_SIZE_XS))
             p.setPen(QColor(c['text_secondary']))
             p.drawText(int(cx - r), int(cy + 4), int(r * 2), 24,
                        Qt.AlignmentFlag.AlignCenter, self._label)
@@ -412,7 +412,7 @@ class SparklineChart(QWidget):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        c = theme_manager.colors
+        c = cw_theme.colors
         color = QColor(self._color or c['chart_1'])
 
         w, h = self.width(), self.height()
@@ -465,7 +465,7 @@ class MultiLineChart(QWidget):
             return
 
         self.setMinimumHeight(260)
-        c = theme_manager.colors
+        c = cw_theme.colors
         pg.setConfigOptions(antialias=True, background=c['chart_bg'], foreground=c['chart_text'])
 
         self._plot = pg.PlotWidget()
@@ -496,8 +496,8 @@ class MultiLineChart(QWidget):
         self.setLayout(layout)
 
     def _add_legend_item(self, label: str, color: str):
-        t = theme_manager.tokens
-        c = theme_manager.colors
+        t = cw_theme.spacing
+        c = cw_theme.colors
         item = QWidget()
         item.setStyleSheet("background: transparent;")
         il = QHBoxLayout()
@@ -511,7 +511,7 @@ class MultiLineChart(QWidget):
         il.addWidget(dot)
 
         lbl = QLabel(label)
-        lbl.setFont(theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        lbl.setFont(cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         il.addWidget(lbl)
 

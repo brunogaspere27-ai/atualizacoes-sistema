@@ -19,6 +19,7 @@ from PySide6.QtGui import QColor
 from services.historico_service import historico_service
 from ui.theme.cw_theme import cw_theme
 from ui.components import CWButton, ButtonVariant, ButtonSize, CWCard, CWInput, CWTable
+from utils.components import ModernCard, ModernButton, ButtonStyle, ModernTable
 from utils.helpers import formatar_moeda
 
 
@@ -32,8 +33,8 @@ class TelaHistorico(QWidget):
         self._carregar_viagens()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -44,43 +45,43 @@ class TelaHistorico(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_primary']}; border: none; }}")
         root.addWidget(scroll)
 
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
         cl = QVBoxLayout()
-        cl.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        cl.setSpacing(tokens.SPACING_XL)
+        cl.setContentsMargins(cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL)
+        cl.setSpacing(cw_theme.spacing.SPACING_XL)
         content.setLayout(cl)
         scroll.setWidget(content)
 
         # Cards de resumo
         resumo_frame = QFrame()
-        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; border: 1px solid {colors['border_subtle']}; }}")
+        resumo_frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; border: none; }}")
         rl = QHBoxLayout()
-        rl.setContentsMargins(tokens.SPACING_XL, tokens.SPACING_MD, tokens.SPACING_XL, tokens.SPACING_MD)
-        rl.setSpacing(tokens.SPACING_LG)
+        rl.setContentsMargins(cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_XL, cw_theme.spacing.SPACING_MD)
+        rl.setSpacing(cw_theme.spacing.SPACING_LG)
         resumo_frame.setLayout(rl)
 
         self._resumo = {}
         for titulo, chave, cor in [
-            ("VIAGENS", "total", colors["text_primary"]),
-            ("NOTAS", "notas", colors["text_primary"]),
-            ("FRETE TOTAL", "frete", colors["emerald"]),
-            ("PESO TOTAL", "peso", colors["rose"]),
+            ("VIAGENS", "total", cw_theme.colors["text_primary"]),
+            ("NOTAS", "notas", cw_theme.colors["text_primary"]),
+            ("FRETE TOTAL", "frete", cw_theme.colors["success"]),
+            ("PESO TOTAL", "peso", cw_theme.colors["rose"]),
         ]:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; border: none; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_primary']}; border-radius: {cw_theme.radius.MD}px; border: none; }}")
             cardl = QVBoxLayout()
-            cardl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+            cardl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
             card.setLayout(cardl)
             t = QLabel(titulo)
-            t.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-            t.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+            t.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+            t.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
             cardl.addWidget(t)
             v = QLabel("0")
-            v.setFont(theme_manager.get_font(tokens.FONT_SIZE_XL, bold=True))
+            v.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
             v.setStyleSheet(f"color: {cor}; background: transparent;")
             cardl.addWidget(v)
             self._resumo[chave] = v
@@ -88,12 +89,12 @@ class TelaHistorico(QWidget):
         cl.addWidget(resumo_frame)
 
         # Tabela
-        card = ModernCard(padding=tokens.SPACING_XL)
+        card = ModernCard(padding=cw_theme.spacing.SPACING_XL)
 
         row = QHBoxLayout()
         titulo_tbl = QLabel("Lista de Viagens Criadas")
-        titulo_tbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG, bold=True))
-        titulo_tbl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        titulo_tbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG, bold=True))
+        titulo_tbl.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
         row.addWidget(titulo_tbl)
         row.addStretch()
         btn_atualizar = ModernButton("🔄 Atualizar", ButtonStyle.SECONDARY)
@@ -215,12 +216,12 @@ class TelaHistorico(QWidget):
         layout = QVBoxLayout()
         dlg.setLayout(layout)
 
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         titulo = QLabel(f"DETALHES DA VIAGEM #{vid}")
-        titulo.setFont(theme_manager.get_font(tokens.FONT_SIZE_2XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['rose']}; background: transparent;")
+        titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+        titulo.setStyleSheet(f"color: {cw_theme.colors['primary']}; background: transparent;")
         layout.addWidget(titulo)
 
         if detalhes:
@@ -230,9 +231,9 @@ class TelaHistorico(QWidget):
             uso = (peso_tb / capacidade * 100) if capacidade > 0 else 0
 
             info_frame = QFrame()
-            info_frame.setStyleSheet(f"QFrame {{ background-color: {colors['bg_secondary']}; border-radius: {tokens.RADIUS_XL}px; }}")
+            info_frame.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_secondary']}; border-radius: {cw_theme.radius.XL}px; }}")
             il = QHBoxLayout()
-            il.setContentsMargins(tokens.SPACING_LG, tokens.SPACING_MD, tokens.SPACING_LG, tokens.SPACING_MD)
+            il.setContentsMargins(cw_theme.spacing.SPACING_LG, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_LG, cw_theme.spacing.SPACING_MD)
             info_frame.setLayout(il)
 
             for t, v in [
@@ -244,17 +245,17 @@ class TelaHistorico(QWidget):
                 ("CAPACIDADE", f"{uso:.1f}% usada"),
             ]:
                 f = QFrame()
-                f.setStyleSheet(f"QFrame {{ background-color: {colors['bg_primary']}; border-radius: {tokens.RADIUS_MD}px; }}")
+                f.setStyleSheet(f"QFrame {{ background-color: {cw_theme.colors['bg_primary']}; border-radius: {cw_theme.radius.MD}px; }}")
                 fl = QVBoxLayout()
-                fl.setContentsMargins(tokens.SPACING_MD, tokens.SPACING_SM, tokens.SPACING_MD, tokens.SPACING_SM)
+                fl.setContentsMargins(cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM, cw_theme.spacing.SPACING_MD, cw_theme.spacing.SPACING_SM)
                 f.setLayout(fl)
                 tl = QLabel(t)
-                tl.setFont(theme_manager.get_font(tokens.FONT_SIZE_XS, bold=True))
-                tl.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+                tl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XS, bold=True))
+                tl.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
                 fl.addWidget(tl)
                 vl = QLabel(v)
-                vl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-                vl.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+                vl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+                vl.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
                 fl.addWidget(vl)
                 il.addWidget(f)
 
@@ -287,8 +288,8 @@ class TelaHistorico(QWidget):
 
         # Resumo
         resumo_lbl = QLabel(f"Notas: {len(notas)}  |  Peso: {total_peso:,.2f} kg  |  Frete: R$ {total_frete:,.2f}")
-        resumo_lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
-        resumo_lbl.setStyleSheet(f"color: {colors['text_primary']}; background: {colors['bg_secondary']}; padding: 12px; border-radius: {tokens.RADIUS_MD}px;")
+        resumo_lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
+        resumo_lbl.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: {cw_theme.colors['bg_secondary']}; padding: 12px; border-radius: {cw_theme.radius.MD}px;")
         layout.addWidget(resumo_lbl)
 
         dlg.exec()

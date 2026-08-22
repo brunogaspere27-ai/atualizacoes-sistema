@@ -43,17 +43,30 @@ from utils.preparar_distribuicao import preparar_base_para_distribuicao
 from utils.env_check import verificar_configuracao_env
 
 # Importar novos componentes CW
-from ui.theme.cw_theme import cw_theme
-from ui.components import CWSidebar, CWHeader, CWButton, ButtonVariant, ButtonSize
-from utils.command_palette import command_registry
-from services.search_service import search_service
+try:
+    from ui.theme.cw_theme import cw_theme
+except Exception:
+    cw_theme = None
+try:
+    from ui.components import CWSidebar, CWHeader, CWButton, ButtonVariant, ButtonSize
+except Exception:
+    CWSidebar = CWHeader = CWButton = None
+    ButtonVariant = ButtonSize = None
+try:
+    from utils.command_palette import command_registry
+except Exception:
+    command_registry = None
+try:
+    from services.search_service import search_service
+except Exception:
+    search_service = None
 
 # Importar telas Aurora
 from telas.login_aurora import LoginAurora
 from telas.dashboard_cw import DashboardCW
 from telas.operacoes_pyside6 import TelaOperacoes
 from telas.notas_pyside6 import TelaNotas
-from telas.ranking_pyside6 import TelaRankingClientes
+from telas.ranking_clientes import TelaRankingClientes
 from telas.historico_versoes_pyside6 import TelaHistoricoVersoes
 
 logger = get_logger(__name__)
@@ -105,7 +118,10 @@ class App(QMainWindow):
         _log_step("App.__init__: settings.reload() ok")
 
         # Configurar tema CW
-        self.cores = cw_theme.colors
+        if cw_theme is not None:
+            self.cores = cw_theme.colors
+        else:
+            self.cores = {}
         _log_step("App.__init__: tema CW aplicado")
 
         # Estado da aplicação
@@ -179,11 +195,24 @@ class App(QMainWindow):
         self.resize(1600, 950)
 
         # Aplicar stylesheet do tema CW
-        self.setStyleSheet(f"""
-        QMainWindow {{
-            background-color: {cw_theme.colors['bg_primary']};
-        }}
-        """)
+        if cw_theme is not None:
+            self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {cw_theme.colors['bg_primary']};
+            }}
+            QWidget {{
+                border: none;
+                outline: none;
+            }}
+            """)
+        else:
+            self.setStyleSheet("""
+            QMainWindow { background-color: #07090c; }
+            QWidget {
+                border: none;
+                outline: none;
+            }
+            """)
 
         # Ícone da aplicação
         logo_path = str(settings.resource_path("assets/logo_cw.jpg"))
@@ -219,11 +248,14 @@ class App(QMainWindow):
         # Right panel: topbar + content
         self.right_panel = QWidget()
         self.right_panel.setObjectName("rightPanel")
-        self.right_panel.setStyleSheet(f"""
-        QWidget#rightPanel {{
-            background-color: {cw_theme.colors['bg_primary']};
-        }}
-        """)
+        if cw_theme is not None:
+            self.right_panel.setStyleSheet(f"""
+            QWidget#rightPanel {{
+                background-color: {cw_theme.colors['bg_primary']};
+            }}
+            """)
+        else:
+            self.right_panel.setStyleSheet("QWidget#rightPanel { background-color: #07090c; }")
         self.right_layout = QVBoxLayout()
         self.right_layout.setContentsMargins(0, 0, 0, 0)
         self.right_layout.setSpacing(0)
@@ -235,11 +267,14 @@ class App(QMainWindow):
         # Área de conteúdo
         self.content_area = QWidget()
         self.content_area.setObjectName("contentArea")
-        self.content_area.setStyleSheet(f"""
-        QWidget#contentArea {{
-            background-color: {cw_theme.colors['bg_primary']};
-        }}
-        """)
+        if cw_theme is not None:
+            self.content_area.setStyleSheet(f"""
+            QWidget#contentArea {{
+                background-color: {cw_theme.colors['bg_primary']};
+            }}
+            """)
+        else:
+            self.content_area.setStyleSheet("QWidget#contentArea { background-color: #07090c; }")
         self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
@@ -365,7 +400,8 @@ class App(QMainWindow):
         if self.login_widget is not None:
             return
 
-        self.login_widget = LoginAurora()
+        from telas.login_pyside6 import TelaLogin
+        self.login_widget = TelaLogin()
         self.login_widget.login_sucesso.connect(self._on_login_success)
 
         # Configurar para ocupar toda a janela
@@ -633,24 +669,34 @@ class App(QMainWindow):
 
             # Criar placeholder simples com tema CW
             placeholder = QWidget()
-            placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
             pl = QVBoxLayout()
-            pl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
-            pl.setSpacing(cw_theme.spacing.LG)
-            placeholder.setLayout(pl)
-
+            if cw_theme is not None:
+                placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
+                pl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
+                pl.setSpacing(cw_theme.spacing.LG)
+                title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
+                title_label.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
+                subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+                subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
+            else:
+                placeholder.setStyleSheet("background-color: #07090c;")
+                pl.setContentsMargins(40, 40, 40, 40)
+                pl.setSpacing(16)
+                title_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+                title_label.setStyleSheet("color: #FFFFFF; background: transparent;")
+                subtitle_label.setFont(QFont("Segoe UI", 14))
+                subtitle_label.setStyleSheet("color: #A0AEC0; background: transparent;")
+            
             title_label = QLabel(titulo)
-            title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_2XL, bold=True))
-            title_label.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
             title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pl.addWidget(title_label)
 
             subtitle_label = QLabel(subtitulo)
-            subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
-            subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
             subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             subtitle_label.setWordWrap(True)
             pl.addWidget(subtitle_label)
+            
+            placeholder.setLayout(pl)
 
             self.telas[tela] = placeholder
             self.stacked_widget.addWidget(placeholder)
@@ -664,11 +710,22 @@ class App(QMainWindow):
                 self.telas["dashboard"] = DashboardCW()
             except Exception as erro:
                 logger.error(f"Falha ao carregar dashboard CW: {erro}")
-                from ui.components import CWCard
-                from PySide6.QtWidgets import QLabel
-                placeholder = CWCard(title="Erro")
+                from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+                placeholder = QWidget()
+                if cw_theme is not None:
+                    placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
+                else:
+                    placeholder.setStyleSheet("background-color: #07090c;")
+                pl = QVBoxLayout()
+                pl.setContentsMargins(40, 40, 40, 40)
                 error_label = QLabel(f"Não foi possível carregar o dashboard.\n{erro}")
-                placeholder.add_widget(error_label)
+                if cw_theme is not None:
+                    error_label.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
+                else:
+                    error_label.setStyleSheet("color: #FFFFFF; background: transparent;")
+                error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                pl.addWidget(error_label)
+                placeholder.setLayout(pl)
                 self.telas["dashboard"] = placeholder
             self.stacked_widget.addWidget(self.telas["dashboard"])
 
@@ -688,24 +745,38 @@ class App(QMainWindow):
                 logger.error(f"Falha ao carregar tela '{chave}': {erro}")
                 # Criar placeholder de erro com tema CW
                 error_placeholder = QWidget()
-                error_placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
                 epl = QVBoxLayout()
-                epl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
-                epl.setSpacing(cw_theme.spacing.LG)
-                error_placeholder.setLayout(epl)
-
+                if cw_theme is not None:
+                    error_placeholder.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
+                    epl.setContentsMargins(cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL, cw_theme.spacing._3XL)
+                    epl.setSpacing(cw_theme.spacing.LG)
+                else:
+                    error_placeholder.setStyleSheet("background-color: #07090c;")
+                    epl.setContentsMargins(40, 40, 40, 40)
+                    epl.setSpacing(16)
+                
                 title_label = QLabel(f"Erro ao carregar {chave}")
-                title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-                title_label.setStyleSheet(f"color: {cw_theme.colors['error']}; background: transparent;")
+                if cw_theme is not None:
+                    title_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
+                    title_label.setStyleSheet(f"color: {cw_theme.colors['error']}; background: transparent;")
+                else:
+                    title_label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+                    title_label.setStyleSheet("color: #EF4444; background: transparent;")
                 title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 epl.addWidget(title_label)
 
                 subtitle_label = QLabel(f"Não foi possível carregar esta tela.\n{erro}")
-                subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
-                subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
+                if cw_theme is not None:
+                    subtitle_label.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+                    subtitle_label.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
+                else:
+                    subtitle_label.setFont(QFont("Segoe UI", 14))
+                    subtitle_label.setStyleSheet("color: #A0AEC0; background: transparent;")
                 subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 subtitle_label.setWordWrap(True)
                 epl.addWidget(subtitle_label)
+                
+                error_placeholder.setLayout(epl)
 
                 self.telas[chave] = error_placeholder
             self.stacked_widget.addWidget(self.telas[chave])

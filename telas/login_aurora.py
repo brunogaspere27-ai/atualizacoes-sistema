@@ -54,8 +54,8 @@ class LoginAurora(QWidget):
         self._animate_entry()
 
     def _setup_ui(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         # Configurar size policy para expandir e preencher toda a janela
         self.setSizePolicy(
@@ -140,8 +140,8 @@ class _PremiumLoginCard(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._password_visible = False
 
         # Card flutuante com glassmorphism moderno
@@ -191,14 +191,14 @@ class _PremiumLoginCard(QFrame):
 
         # Nome da empresa
         company_lbl = QLabel("CW TRANSPORTADORA")
-        company_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        company_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_2XL, bold=True))
         company_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent; letter-spacing: 2px;")
         company_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(company_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Subtítulo
         subtitle_lbl = QLabel("Sistema de Gestão Logística")
-        subtitle_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD))
+        subtitle_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD))
         subtitle_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent; letter-spacing: 1px;")
         subtitle_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle_lbl, 0, Qt.AlignmentFlag.AlignCenter)
@@ -207,7 +207,7 @@ class _PremiumLoginCard(QFrame):
 
         # Campo Usuário
         username_lbl = QLabel("Usuário")
-        username_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        username_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         username_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         username_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(username_lbl, 0, Qt.AlignmentFlag.AlignCenter)
@@ -243,7 +243,7 @@ class _PremiumLoginCard(QFrame):
 
         # Campo Senha
         password_lbl = QLabel("Senha")
-        password_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        password_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         password_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         password_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(password_lbl, 0, Qt.AlignmentFlag.AlignCenter)

@@ -63,7 +63,7 @@ class CWSidebar(QWidget):
         logo_container.setStyleSheet(f"""
             QFrame {{
                 background-color: {c['sidebar_bg']};
-                border-bottom: 1px solid {c['sidebar_border']};
+                border: none;
             }}
         """)
         logo_layout = QHBoxLayout()
@@ -363,6 +363,6 @@ class CWSidebar(QWidget):
         self.setStyleSheet(f"""
             CWSidebar {{
                 background-color: {c['sidebar_bg']};
-                border-right: 1px solid {c['sidebar_border']};
+                border: none;
             }}
         """)

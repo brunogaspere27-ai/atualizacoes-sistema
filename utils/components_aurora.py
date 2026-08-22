@@ -69,8 +69,8 @@ class AuroraButton(QPushButton):
         self._apply(icon_name)
 
     def _apply(self, icon_name=None):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         sizes = {
             ButtonSize.SM: (36, 14, 18, t.FONT_SIZE_SM),
             ButtonSize.MD: (44, 18, 24, t.FONT_SIZE_MD),
@@ -80,7 +80,7 @@ class AuroraButton(QPushButton):
         h, px, py, fs = sizes[self._size]
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(h)
-        self.setFont(aurora_theme_manager.get_font(fs, bold=True))
+        self.setFont(aurora_cw_theme.get_font(fs, bold=True))
 
         if icon_name:
             self.setIcon(get_icon(icon_name, QSize(24, 24)))
@@ -187,8 +187,8 @@ class AuroraCard(QFrame):
         super().__init__(parent)
         self._variant = variant
         self._accent = accent_color
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         pad = padding or t.SPACING_XL
 
         self.setObjectName("auroraCard")
@@ -258,7 +258,7 @@ class AuroraCard(QFrame):
                 ico.setPixmap(get_pixmap(icon_name, QSize(28, 28), accent))
                 hdr.addWidget(ico)
             lbl = QLabel(title)
-            lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_LG, bold=True))
+            lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_LG, bold=True))
             lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
             hdr.addWidget(lbl)
             hdr.addStretch()
@@ -287,8 +287,8 @@ class AuroraSidebar(QFrame):
         self._setup()
 
     def _setup(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self.setFixedWidth(self.EXPANDED_W)
         self.setObjectName("auroraSidebar")
         self.setStyleSheet(f"""
@@ -383,8 +383,8 @@ class AuroraSidebar(QFrame):
     def add_user_card(self, name: str, role: str, avatar_letter: str = "U",
                       usuario_id: int = None, status: str = "online"):
         from utils.avatar import AvatarWidget, avatar_bus
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         sep = QFrame()
         sep.setMinimumHeight(1)
@@ -431,14 +431,14 @@ class AuroraSidebar(QFrame):
         info.setContentsMargins(0, 0, 0, 0)
         info.setSpacing(4)
         self._user_name_label = QLabel(name)
-        self._user_name_label.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD, bold=True))
+        self._user_name_label.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD, bold=True))
         self._user_name_label.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         info.addWidget(self._user_name_label)
 
         status_text = {"online": "Online", "ausente": "Ausente",
                        "ocupado": "Ocupado", "offline": "Offline"}
         self._user_role_label = QLabel(f"{status_text.get(status, 'Online')}  ·  {role}")
-        self._user_role_label.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        self._user_role_label.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
         self._user_role_label.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         info.addWidget(self._user_role_label)
         hl.addLayout(info)
@@ -450,12 +450,12 @@ class AuroraSidebar(QFrame):
         QTimer.singleShot(50, lambda: self._sidebar_status_dot.move(34, 34) if self._sidebar_status_dot else None)
 
     def add_section(self, title: str):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         if self._scroll_layout.count() > 0:
             self._scroll_layout.addSpacing(20)
         lbl = QLabel(title.upper())
-        lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+        lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
         lbl.setObjectName("sectionLabel")
         lbl.setStyleSheet(f"""
         QLabel {{
@@ -471,8 +471,8 @@ class AuroraSidebar(QFrame):
     def add_menu_item(self, name: str, label: str, icon_name: str,
                       accent_color: AccentColor = AccentColor.AURORA,
                       badge: str = "", shortcut: str = ""):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         accent = aurora_theme_manager.get_accent(accent_color)
 
         row = QFrame()
@@ -523,7 +523,7 @@ class AuroraSidebar(QFrame):
         # Keyboard hint elegante
         if shortcut:
             hint = QLabel(shortcut)
-            hint.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_XS))
+            hint.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_XS))
             hint.setStyleSheet(f"""
                 color: {c['text_tertiary']};
                 background: {c['bg_tertiary']};
@@ -541,7 +541,7 @@ class AuroraSidebar(QFrame):
             badge_lbl = QLabel(str(badge))
             badge_lbl.setFixedSize(24, 20)
             badge_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            badge_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_XS, bold=True))
+            badge_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_XS, bold=True))
             badge_lbl.setStyleSheet(f"""
             QLabel {{
                 background: {accent}20;
@@ -575,8 +575,8 @@ class AuroraSidebar(QFrame):
         self.navigation_requested.emit(name)
 
     def _update_active(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         for item in self._menu_items:
             btn = item["button"]
             ind = item["indicator"]
@@ -672,8 +672,8 @@ class AuroraTopBar(QFrame):
         super().__init__(parent)
         self._usuario_id = None
         self._usuario_nome = ""
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self.setMinimumHeight(56)  # Linear usa 56px para mais compact
         self.setObjectName("auroraTopBar")
         self.setStyleSheet(f"""
@@ -690,7 +690,7 @@ class AuroraTopBar(QFrame):
 
         # Breadcrumb elegante estilo Linear
         self._breadcrumb = QLabel("")
-        self._breadcrumb.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        self._breadcrumb.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
         self._breadcrumb.setStyleSheet(f"""
             color: {c['text_tertiary']};
             background: transparent;
@@ -963,7 +963,7 @@ class AuroraTopBar(QFrame):
         colors = {"online": "#10B981", "ausente": "#F59E0B",
                   "ocupado": "#EF4444", "offline": "#6B7280"}
         cor = colors.get(status, "#10B981")
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         self._status_dot.setStyleSheet(
             f"background: {cor}; border-radius: 6px; border: 2px solid {c['header_bg']};"
         )
@@ -980,8 +980,8 @@ class AuroraKPICard(QFrame):
                  icon_name: str = None, accent_color: AccentColor = AccentColor.AURORA,
                  parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._accent = accent_color
         self._sparkline_data = []
 
@@ -1052,7 +1052,7 @@ class AuroraKPICard(QFrame):
             self._icon_base_color = accent
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(aurora_theme_manager.get_font(14, bold=True))
+        title_lbl.setFont(aurora_cw_theme.get_font(14, bold=True))
         title_lbl.setStyleSheet(f"""
             color: {c['text_secondary']};
             background: transparent;
@@ -1111,7 +1111,7 @@ class AuroraKPICard(QFrame):
             change_ico.setStyleSheet("background: transparent;")
 
             change_lbl = QLabel(change)
-            change_lbl.setFont(aurora_theme_manager.get_font(13, bold=True))
+            change_lbl.setFont(aurora_cw_theme.get_font(13, bold=True))
             change_lbl.setStyleSheet(f"color: {change_color}; background: transparent;")
 
             badge_layout.addWidget(change_ico)
@@ -1134,7 +1134,7 @@ class AuroraKPICard(QFrame):
         self._value_label.setText(value)
 
     def set_change(self, change: str):
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         is_positive = change.startswith('+')
         change_color = c['forest'] if is_positive else c['crimson']
         change_icon = "trending_up" if is_positive else "trending_down"
@@ -1161,7 +1161,7 @@ class AuroraKPICard(QFrame):
             change_ico = QLabel()
             change_ico.setFixedSize(18, 18)
             change_lbl = QLabel()
-            change_lbl.setFont(aurora_theme_manager.get_font(13, bold=True))
+            change_lbl.setFont(aurora_cw_theme.get_font(13, bold=True))
             
             badge_layout.addWidget(change_ico)
             badge_layout.addWidget(change_lbl)
@@ -1253,7 +1253,7 @@ class _PremiumSparkline(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         accent = aurora_theme_manager.get_accent(self._accent_color)
         soft = aurora_theme_manager.get_color(self._accent_color.value + '_soft')
         
@@ -1320,8 +1320,8 @@ class _PremiumSparkline(QWidget):
 class AuroraTable(QTableWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         self.setStyleSheet(f"""
         QTableWidget {{
@@ -1407,8 +1407,8 @@ class AuroraTable(QTableWidget):
 class AuroraProgressBar(QProgressBar):
     def __init__(self, accent_color: AccentColor = AccentColor.AURORA, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         self._accent = accent_color
 
         start = aurora_theme_manager.get_color(accent_color.value + '_start')
@@ -1435,7 +1435,7 @@ class AuroraProgressBar(QProgressBar):
 class SeparatorLine(QFrame):
     def __init__(self, orientation: str = "horizontal", parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         if orientation == "horizontal":
             self.setMinimumHeight(1)
             self.setStyleSheet(f"background: {c['border_subtle']}; border: none;")
@@ -1449,8 +1449,8 @@ class PlaceholderScreen(QFrame):
     def __init__(self, title: str, subtitle: str = "", icon_name: str = "sparkles",
                  accent: AccentColor = AccentColor.AURORA, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         accent_color = aurora_theme_manager.get_accent(accent)
 
         self.setStyleSheet(f"""
@@ -1488,7 +1488,7 @@ class PlaceholderScreen(QFrame):
 
         # Title
         title_lbl = QLabel(title)
-        title_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_2XL, bold=True))
+        title_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_2XL, bold=True))
         title_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -1503,7 +1503,7 @@ class PlaceholderScreen(QFrame):
         # Subtitle
         if subtitle:
             sub_lbl = QLabel(subtitle)
-            sub_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD))
+            sub_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD))
             sub_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             sub_lbl.setWordWrap(True)

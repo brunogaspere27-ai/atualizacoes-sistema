@@ -39,8 +39,8 @@ def _growth_text(value: float) -> str:
 class _TopClienteRow(QFrame):
     def __init__(self, posicao: int, cliente: dict, max_frete: float, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         nome = cliente.get("cliente", "Cliente não informado")
         frete = float(cliente.get("frete", 0) or 0)
@@ -68,7 +68,7 @@ class _TopClienteRow(QFrame):
         rank = QLabel(f"{posicao:02d}")
         rank.setFixedSize(38, 38)
         rank.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        rank.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        rank.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         rank.setStyleSheet(f"""
         QLabel {{
             background: {c['aurora_soft']};
@@ -83,7 +83,7 @@ class _TopClienteRow(QFrame):
         avatar = QLabel(initials[:2])
         avatar.setFixedSize(40, 40)
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        avatar.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         avatar.setStyleSheet(f"""
         QLabel {{
             background: {c['ember_soft']};
@@ -97,10 +97,10 @@ class _TopClienteRow(QFrame):
         info_col = QVBoxLayout()
         info_col.setSpacing(6)
         title = QLabel(nome)
-        title.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD, bold=True))
+        title.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD, bold=True))
         title.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         subtitle = QLabel(f"{notas} notas  •  {formatar_peso(peso)}  •  frete médio {percentual:.1f}%")
-        subtitle.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        subtitle.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
         subtitle.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         bar = AuroraProgressBar(AccentColor.AURORA)
         bar.setValue(progresso)
@@ -117,7 +117,7 @@ class _TopClienteRow(QFrame):
         amount.setFont(QFont(t.FONT_FAMILY_QT, t.FONT_SIZE_XL, QFont.Weight.Bold))
         amount.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         share = QLabel(f"{progresso}% do líder")
-        share.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        share.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         share.setStyleSheet(f"color: {c['aurora']}; background: transparent;")
         value_col.addWidget(amount)
         value_col.addWidget(share)
@@ -127,8 +127,8 @@ class _TopClienteRow(QFrame):
 class _InsightRow(QFrame):
     def __init__(self, titulo: str, detalhe: str, tag: str, accent: str, parent=None):
         super().__init__(parent)
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         self.setStyleSheet(f"""
         QFrame {{
@@ -143,7 +143,7 @@ class _InsightRow(QFrame):
 
         head = QHBoxLayout()
         title = QLabel(titulo)
-        title.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        title.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         title.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         badge = QLabel(tag)
         badge.setStyleSheet(f"""
@@ -163,7 +163,7 @@ class _InsightRow(QFrame):
 
         detail_lbl = QLabel(detalhe)
         detail_lbl.setWordWrap(True)
-        detail_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        detail_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
         detail_lbl.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         layout.addWidget(detail_lbl)
 
@@ -188,8 +188,8 @@ class DashboardAurora(QWidget):
         self._auto_refresh.start()
 
     def _setup_ui(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -223,8 +223,8 @@ class DashboardAurora(QWidget):
         self._build_footer()
 
     def _build_header(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         usuario = auth_service.usuario_atual or {}
 
         card = AuroraCard(variant=CardVariant.GLASS, accent_color=AccentColor.AURORA)
@@ -262,7 +262,7 @@ class DashboardAurora(QWidget):
         titulo.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
         subtitulo = QLabel("O dashboard executivo concentra receita, operação e ranking com a mesma linguagem visual do restante do sistema.")
         subtitulo.setWordWrap(True)
-        subtitulo.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD))
+        subtitulo.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD))
         subtitulo.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         texto.addWidget(titulo)
         texto.addWidget(subtitulo)
@@ -271,7 +271,7 @@ class DashboardAurora(QWidget):
         status_col = QVBoxLayout()
         status_col.setSpacing(10)
         self._header_timestamp = QLabel()
-        self._header_timestamp.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        self._header_timestamp.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         self._header_timestamp.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
 
         self._context_chip = QLabel("")
@@ -297,15 +297,15 @@ class DashboardAurora(QWidget):
         self.content_layout.addWidget(card)
 
     def _build_period_selector(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         row = QHBoxLayout()
         row.setSpacing(t.SPACING_MD)
         self._period_buttons = []
 
         label = QLabel("Período")
-        label.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        label.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         label.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         row.addWidget(label)
 
@@ -340,7 +340,7 @@ class DashboardAurora(QWidget):
         self.content_layout.addWidget(wrapper)
 
     def _build_charts(self):
-        t = aurora_theme_manager.tokens
+        t = aurora_cw_theme.spacing
 
         row = QHBoxLayout()
         row.setSpacing(t.SPACING_XL)
@@ -387,7 +387,7 @@ class DashboardAurora(QWidget):
         self.content_layout.addLayout(row)
 
     def _build_bottom_area(self):
-        t = aurora_theme_manager.tokens
+        t = aurora_cw_theme.spacing
 
         row = QHBoxLayout()
         row.setSpacing(t.SPACING_XL)
@@ -419,10 +419,10 @@ class DashboardAurora(QWidget):
         self.content_layout.addLayout(row)
 
     def _build_footer(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
         footer = QLabel("© 2026 CW Transportadora")
-        footer.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+        footer.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
         footer.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.content_layout.addWidget(footer)
@@ -444,7 +444,7 @@ class DashboardAurora(QWidget):
         self._load_data()
 
     def _update_period_buttons(self):
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         for btn, periodo in self._period_buttons:
             active = periodo == self.tipo_periodo
             btn.setStyleSheet(f"""
@@ -547,7 +547,7 @@ class DashboardAurora(QWidget):
         self._clear_layout(self._clientes_layout)
         if not self.ranking_clientes:
             vazio = QLabel("Nenhum cliente encontrado para o período selecionado.")
-            vazio.setStyleSheet(f"color: {aurora_theme_manager.colors['text_tertiary']}; background: transparent;")
+            vazio.setStyleSheet(f"color: {aurora_cw_theme.cw_theme.colors['text_tertiary']}; background: transparent;")
             self._clientes_layout.addWidget(vazio)
             return
 
@@ -556,7 +556,7 @@ class DashboardAurora(QWidget):
             self._clientes_layout.addWidget(_TopClienteRow(pos, cliente, max_frete))
 
     def _render_insights(self):
-        c = aurora_theme_manager.colors
+        c = aurora_cw_theme.colors
         self._clear_layout(self._insights_layout)
 
         contas = dashboard_service.resumo_contas_receber_pagar(*self._current_context()[:3])
@@ -612,5 +612,5 @@ class DashboardAurora(QWidget):
         self._clear_layout(self._insights_layout)
         erro = QLabel(f"Não foi possível carregar o dashboard agora.\n{error_message}")
         erro.setWordWrap(True)
-        erro.setStyleSheet(f"color: {aurora_theme_manager.colors['crimson']}; background: transparent;")
+        erro.setStyleSheet(f"color: {aurora_cw_theme.cw_theme.colors['crimson']}; background: transparent;")
         self._clientes_layout.addWidget(erro)

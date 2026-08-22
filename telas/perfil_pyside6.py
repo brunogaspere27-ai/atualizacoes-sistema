@@ -62,8 +62,8 @@ class TelaPerfil(QWidget):
         self._carregar_dados()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         # Scroll area
         scroll = QScrollArea()
@@ -76,9 +76,9 @@ class TelaPerfil(QWidget):
             background: transparent; width: 8px; margin: 4px 2px;
         }}
         QScrollBar::handle:vertical {{
-            background: {colors['border_default']}; border-radius: 4px; min-height: 40px;
+            background: {cw_theme.colors['border_default']}; border-radius: 4px; min-height: 40px;
         }}
-        QScrollBar::handle:vertical:hover {{ background: {colors['border_strong']}; }}
+        QScrollBar::handle:vertical:hover {{ background: {cw_theme.colors['border_strong']}; }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
         QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
             background: none; height: 0px;
@@ -86,10 +86,10 @@ class TelaPerfil(QWidget):
         """)
 
         content = QWidget()
-        content.setStyleSheet(f"background: {colors['bg_primary']};")
+        content.setStyleSheet(f"background: {cw_theme.colors['bg_primary']};")
         self._layout = QVBoxLayout()
-        self._layout.setContentsMargins(tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL, tokens.SPACING_2XL)
-        self._layout.setSpacing(tokens.SPACING_XL)
+        self._layout.setContentsMargins(cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL, cw_theme.spacing.SPACING_2XL)
+        self._layout.setSpacing(cw_theme.spacing.SPACING_XL)
         content.setLayout(self._layout)
         scroll.setWidget(content)
 
@@ -110,15 +110,15 @@ class TelaPerfil(QWidget):
         self._build_info_section()
 
     def _build_avatar_section(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
-        card = ModernCard("Foto de Perfil", icon_name="user_circle", padding=tokens.SPACING_XL)
+        card = ModernCard("Foto de Perfil", icon_name="user_circle", padding=cw_theme.spacing.SPACING_XL)
         layout = card.layout()
 
         # Avatar + botões
         row = QHBoxLayout()
-        row.setSpacing(tokens.SPACING_XL)
+        row.setSpacing(cw_theme.spacing.SPACING_XL)
 
         # Avatar circular (96px)
         self._avatar_label = QLabel()
@@ -126,8 +126,8 @@ class TelaPerfil(QWidget):
         self._avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._avatar_label.setStyleSheet(f"""
         QLabel {{
-            background: {colors['bg_tertiary']};
-            border: 2px solid {colors['border_default']};
+            background: {cw_theme.colors['bg_tertiary']};
+            border: 2px solid {cw_theme.colors['border_default']};
             border-radius: 48px;
         }}
         """)
@@ -135,7 +135,7 @@ class TelaPerfil(QWidget):
 
         # Botões
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(tokens.SPACING_SM)
+        btn_col.setSpacing(cw_theme.spacing.SPACING_SM)
 
         btn_trocar = ModernButton("Trocar Foto", ButtonStyle.PRIMARY, "camera", parent=self)
         btn_trocar.clicked.connect(self._trocar_foto)
@@ -157,33 +157,33 @@ class TelaPerfil(QWidget):
         self._layout.addWidget(card)
 
     def _build_nome_section(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
-        card = ModernCard("Nome Completo", icon_name="user_circle", padding=tokens.SPACING_XL)
+        card = ModernCard("Nome Completo", icon_name="user_circle", padding=cw_theme.spacing.SPACING_XL)
         layout = card.layout()
 
         # Label
         lbl = QLabel("Seu nome completo é usado em todo o sistema")
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        lbl.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         layout.addWidget(lbl)
 
         # Input
         self._entry_nome = QLineEdit()
         self._entry_nome.setPlaceholderText("Digite seu nome completo")
         self._entry_nome.setMinimumHeight(44)
-        self._entry_nome.setFont(theme_manager.get_font(tokens.FONT_SIZE_LG))
+        self._entry_nome.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_LG))
         self._entry_nome.setStyleSheet(f"""
         QLineEdit {{
-            background: {colors['bg_tertiary']};
-            color: {colors['text_primary']};
-            border: 1px solid {colors['border_default']};
-            border-radius: {tokens.RADIUS_MD}px;
+            background: {cw_theme.colors['bg_tertiary']};
+            color: {cw_theme.colors['text_primary']};
+            border: 1px solid {cw_theme.colors['border_default']};
+            border-radius: {cw_theme.radius.MD}px;
             padding: 10px 16px;
         }}
-        QLineEdit:hover {{ border-color: {colors['border_strong']}; }}
-        QLineEdit:focus {{ border: 1px solid {colors['brand']}; background: {colors['bg_secondary']}; }}
+        QLineEdit:hover {{ border-color: {cw_theme.colors['border_strong']}; }}
+        QLineEdit:focus {{ border: 1px solid {cw_theme.colors['brand']}; background: {cw_theme.colors['bg_secondary']}; }}
         """)
         layout.addWidget(self._entry_nome)
 
@@ -195,21 +195,21 @@ class TelaPerfil(QWidget):
         self._layout.addWidget(card)
 
     def _build_senha_section(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
-        card = ModernCard("Alterar Senha", icon_name="lock", padding=tokens.SPACING_XL)
+        card = ModernCard("Alterar Senha", icon_name="lock", padding=cw_theme.spacing.SPACING_XL)
         layout = card.layout()
 
         lbl = QLabel("Use uma senha forte com pelo menos 8 caracteres")
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM))
-        lbl.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         layout.addWidget(lbl)
 
         # Senha atual
         lbl_atual = QLabel("Senha Atual")
-        lbl_atual.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl_atual.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl_atual.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_atual.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         layout.addWidget(lbl_atual)
 
         self._entry_senha_atual = QLineEdit()
@@ -218,21 +218,21 @@ class TelaPerfil(QWidget):
         self._entry_senha_atual.setMinimumHeight(44)
         self._entry_senha_atual.setStyleSheet(f"""
         QLineEdit {{
-            background: {colors['bg_tertiary']};
-            color: {colors['text_primary']};
-            border: 1px solid {colors['border_default']};
-            border-radius: {tokens.RADIUS_MD}px;
+            background: {cw_theme.colors['bg_tertiary']};
+            color: {cw_theme.colors['text_primary']};
+            border: 1px solid {cw_theme.colors['border_default']};
+            border-radius: {cw_theme.radius.MD}px;
             padding: 10px 16px;
         }}
-        QLineEdit:hover {{ border-color: {colors['border_strong']}; }}
-        QLineEdit:focus {{ border: 1px solid {colors['brand']}; background: {colors['bg_secondary']}; }}
+        QLineEdit:hover {{ border-color: {cw_theme.colors['border_strong']}; }}
+        QLineEdit:focus {{ border: 1px solid {cw_theme.colors['brand']}; background: {cw_theme.colors['bg_secondary']}; }}
         """)
         layout.addWidget(self._entry_senha_atual)
 
         # Nova senha
         lbl_nova = QLabel("Nova Senha")
-        lbl_nova.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl_nova.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl_nova.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_nova.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         layout.addWidget(lbl_nova)
 
         self._entry_senha_nova = QLineEdit()
@@ -241,21 +241,21 @@ class TelaPerfil(QWidget):
         self._entry_senha_nova.setMinimumHeight(44)
         self._entry_senha_nova.setStyleSheet(f"""
         QLineEdit {{
-            background: {colors['bg_tertiary']};
-            color: {colors['text_primary']};
-            border: 1px solid {colors['border_default']};
-            border-radius: {tokens.RADIUS_MD}px;
+            background: {cw_theme.colors['bg_tertiary']};
+            color: {cw_theme.colors['text_primary']};
+            border: 1px solid {cw_theme.colors['border_default']};
+            border-radius: {cw_theme.radius.MD}px;
             padding: 10px 16px;
         }}
-        QLineEdit:hover {{ border-color: {colors['border_strong']}; }}
-        QLineEdit:focus {{ border: 1px solid {colors['brand']}; background: {colors['bg_secondary']}; }}
+        QLineEdit:hover {{ border-color: {cw_theme.colors['border_strong']}; }}
+        QLineEdit:focus {{ border: 1px solid {cw_theme.colors['brand']}; background: {cw_theme.colors['bg_secondary']}; }}
         """)
         layout.addWidget(self._entry_senha_nova)
 
         # Confirmar senha
         lbl_conf = QLabel("Confirmar Nova Senha")
-        lbl_conf.setFont(theme_manager.get_font(tokens.FONT_SIZE_SM, bold=True))
-        lbl_conf.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl_conf.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
+        lbl_conf.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         layout.addWidget(lbl_conf)
 
         self._entry_senha_conf = QLineEdit()
@@ -264,14 +264,14 @@ class TelaPerfil(QWidget):
         self._entry_senha_conf.setMinimumHeight(44)
         self._entry_senha_conf.setStyleSheet(f"""
         QLineEdit {{
-            background: {colors['bg_tertiary']};
-            color: {colors['text_primary']};
-            border: 1px solid {colors['border_default']};
-            border-radius: {tokens.RADIUS_MD}px;
+            background: {cw_theme.colors['bg_tertiary']};
+            color: {cw_theme.colors['text_primary']};
+            border: 1px solid {cw_theme.colors['border_default']};
+            border-radius: {cw_theme.radius.MD}px;
             padding: 10px 16px;
         }}
-        QLineEdit:hover {{ border-color: {colors['border_strong']}; }}
-        QLineEdit:focus {{ border: 1px solid {colors['brand']}; background: {colors['bg_secondary']}; }}
+        QLineEdit:hover {{ border-color: {cw_theme.colors['border_strong']}; }}
+        QLineEdit:focus {{ border: 1px solid {cw_theme.colors['brand']}; background: {cw_theme.colors['bg_secondary']}; }}
         """)
         layout.addWidget(self._entry_senha_conf)
 
@@ -283,10 +283,10 @@ class TelaPerfil(QWidget):
         self._layout.addWidget(card)
 
     def _build_info_section(self):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
-        card = ModernCard("Informações da Conta", icon_name="info", padding=tokens.SPACING_XL)
+        card = ModernCard("Informações da Conta", icon_name="info", padding=cw_theme.spacing.SPACING_XL)
         layout = card.layout()
 
         # Usuário
@@ -305,24 +305,24 @@ class TelaPerfil(QWidget):
         self._layout.addStretch()
 
     def _create_info_row(self, label: str, value: str) -> QWidget:
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
 
         row = QWidget()
         row.setStyleSheet("background: transparent;")
         hl = QHBoxLayout()
-        hl.setContentsMargins(0, tokens.SPACING_SM, 0, tokens.SPACING_SM)
+        hl.setContentsMargins(0, cw_theme.spacing.SPACING_SM, 0, cw_theme.spacing.SPACING_SM)
         row.setLayout(hl)
 
         lbl = QLabel(label)
-        lbl.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD))
-        lbl.setStyleSheet(f"color: {colors['text_secondary']}; background: transparent;")
+        lbl.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD))
+        lbl.setStyleSheet(f"color: {cw_theme.colors['text_secondary']}; background: transparent;")
         lbl.setFixedWidth(150)
         hl.addWidget(lbl)
 
         val = QLabel(value)
-        val.setFont(theme_manager.get_font(tokens.FONT_SIZE_MD, bold=True))
-        val.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        val.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True))
+        val.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
         hl.addWidget(val)
         hl.addStretch()
 
@@ -365,18 +365,18 @@ class TelaPerfil(QWidget):
             self._info_widgets["Membro Desde"].setText(criado)
 
     def _set_avatar_initials(self, nome: str):
-        colors = theme_manager.colors
-        tokens = theme_manager.tokens
+        colors = cw_theme.colors
+        tokens = cw_theme.spacing
         initials = perfil_service.get_initials(nome)
         color = perfil_service.get_avatar_color(nome)
 
         self._avatar_label.setText(initials)
-        self._avatar_label.setFont(theme_manager.get_font(32, bold=True))
+        self._avatar_label.setFont(cw_theme.get_font(32, bold=True))
         self._avatar_label.setStyleSheet(f"""
         QLabel {{
             background: {color};
             color: #FFF;
-            border: 2px solid {colors['border_default']};
+            border: 2px solid {cw_theme.colors['border_default']};
             border-radius: 48px;
         }}
         """)

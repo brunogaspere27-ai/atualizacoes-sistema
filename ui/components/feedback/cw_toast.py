@@ -105,26 +105,22 @@ class CWToast(QWidget):
             ToastType.SUCCESS: {
                 'icon': '✓',
                 'bg': c['success_soft'],
-                'text': c['success'],
-                'border': c['success']
+                'text': c['success']
             },
             ToastType.ERROR: {
                 'icon': '✕',
                 'bg': c['error_soft'],
-                'text': c['error'],
-                'border': c['error']
+                'text': c['error']
             },
             ToastType.WARNING: {
                 'icon': '⚠',
                 'bg': c['warning_soft'],
-                'text': c['warning'],
-                'border': c['warning']
+                'text': c['warning']
             },
             ToastType.INFO: {
                 'icon': 'ℹ',
                 'bg': c['info_soft'],
-                'text': c['info'],
-                'border': c['info']
+                'text': c['info']
             }
         }
         
@@ -163,7 +159,7 @@ class CWToast(QWidget):
         self.setStyleSheet(f"""
             CWToast {{
                 background-color: {config['bg']};
-                border: 1px solid {config['border']};
+                border: none;
                 border-radius: {r.LG}px;
             }}
         """)

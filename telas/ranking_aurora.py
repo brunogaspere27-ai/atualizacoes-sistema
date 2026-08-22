@@ -78,8 +78,8 @@ class RankingAurora(QWidget):
         self.carregar_ranking()
 
     def _setup_ui(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
@@ -136,8 +136,8 @@ class RankingAurora(QWidget):
         content_layout.addWidget(table_card)
 
     def _create_header(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         header = QFrame()
         header.setStyleSheet("background: transparent;")
@@ -162,15 +162,15 @@ class RankingAurora(QWidget):
         return header
 
     def _create_filters(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         filter_row = QHBoxLayout()
         filter_row.setSpacing(t.SPACING_MD)
 
         # Período
         periodo_lbl = QLabel("Período:")
-        periodo_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        periodo_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         periodo_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         filter_row.addWidget(periodo_lbl)
 
@@ -203,8 +203,8 @@ class RankingAurora(QWidget):
         return filter_row
 
     def _create_kpis(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         kpi_row = QHBoxLayout()
         kpi_row.setSpacing(t.SPACING_LG)

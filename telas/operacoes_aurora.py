@@ -45,8 +45,8 @@ class OperacoesAurora(QWidget):
         self._carregar_historico()
 
     def _setup_ui(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -91,8 +91,8 @@ class OperacoesAurora(QWidget):
         content_layout.addWidget(self._build_historico())
 
     def _create_header(self):
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         header = QFrame()
         header.setStyleSheet("background: transparent;")
@@ -109,15 +109,15 @@ class OperacoesAurora(QWidget):
         hl.addStretch()
 
         subtitle = QLabel("Transferência SP → Cascavel")
-        subtitle.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD))
+        subtitle.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD))
         subtitle.setStyleSheet(f"color: {c['text_tertiary']}; background: transparent;")
         hl.addWidget(subtitle)
 
         return header
 
     def _build_form(self) -> AuroraCard:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         card = AuroraCard(
             "Dados da Transferência",
@@ -149,7 +149,7 @@ class OperacoesAurora(QWidget):
             col = (idx % 2) * 2
 
             lbl = QLabel(label)
-            lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+            lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
             lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             grid.addWidget(lbl, row, col)
 
@@ -186,8 +186,8 @@ class OperacoesAurora(QWidget):
         return card
 
     def _build_resumo(self) -> AuroraCard:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         card = AuroraCard(
             "Resumo",
@@ -214,14 +214,14 @@ class OperacoesAurora(QWidget):
             row.setSpacing(t.SPACING_SM)
 
             lbl = QLabel(label)
-            lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM))
+            lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM))
             lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
             row.addWidget(lbl)
 
             row.addStretch()
 
             val_lbl = QLabel(default)
-            val_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_MD, bold=True))
+            val_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_MD, bold=True))
             val_lbl.setStyleSheet(f"color: {c['text_primary']}; background: transparent;")
             row.addWidget(val_lbl)
 
@@ -236,7 +236,7 @@ class OperacoesAurora(QWidget):
         margem_row.setSpacing(t.SPACING_SM)
 
         margem_lbl = QLabel("Margem")
-        margem_lbl.setFont(aurora_theme_manager.get_font(t.FONT_SIZE_SM, bold=True))
+        margem_lbl.setFont(aurora_cw_theme.get_font(t.FONT_SIZE_SM, bold=True))
         margem_lbl.setStyleSheet(f"color: {c['text_secondary']}; background: transparent;")
         margem_row.addWidget(margem_lbl)
 
@@ -254,8 +254,8 @@ class OperacoesAurora(QWidget):
         return card
 
     def _build_historico(self) -> AuroraCard:
-        c = aurora_theme_manager.colors
-        t = aurora_theme_manager.tokens
+        c = aurora_cw_theme.colors
+        t = aurora_cw_theme.spacing
 
         card = AuroraCard(
             "Histórico de Transferências",
@@ -301,7 +301,7 @@ class OperacoesAurora(QWidget):
             self._margem_lbl.setText(f"{margem:.1f}%")
 
             # Colorir margem
-            c = aurora_theme_manager.colors
+            c = aurora_cw_theme.colors
             if margem >= 20:
                 self._margem_lbl.setStyleSheet(f"color: {c['forest']}; background: transparent;")
             elif margem >= 10:

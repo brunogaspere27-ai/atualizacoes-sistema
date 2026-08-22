@@ -95,18 +95,18 @@ class TelaRankingClientes(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: {colors['bg_primary']}; border: none; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: {cw_theme.colors['bg_primary']}; border: none; }}")
         root_layout.addWidget(scroll)
 
         # Container interno
         content = QWidget()
-        content.setStyleSheet(f"background-color: {colors['bg_primary']};")
+        content.setStyleSheet(f"background-color: {cw_theme.colors['bg_primary']};")
         self._content_layout = QVBoxLayout(content)
         self._content_layout.setContentsMargins(
-            tokens._2XL, tokens._2XL,
-            tokens._2XL, tokens._2XL,
+            cw_theme.spacing._2XL, cw_theme.spacing._2XL,
+            cw_theme.spacing._2XL, cw_theme.spacing._2XL,
         )
-        self._content_layout.setSpacing(tokens.LG)
+        self._content_layout.setSpacing(cw_theme.spacing.LG)
         scroll.setWidget(content)
 
         self._criar_filtros()
@@ -121,15 +121,15 @@ class TelaRankingClientes(QWidget):
         frame = QFrame()
         frame.setStyleSheet(f"""
         QFrame {{
-            background-color: {colors['card_bg']};
-            border: 1px solid {colors['card_border']};
+            background-color: {cw_theme.colors['card_bg']};
+            border: 1px solid {cw_theme.colors['card_border']};
             border-radius: {radius.LG}px;
         }}
         """)
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(tokens.LG, tokens.MD, tokens.LG, tokens.MD)
-        layout.setSpacing(tokens.MD)
+        layout.setContentsMargins(cw_theme.spacing.LG, cw_theme.spacing.MD, cw_theme.spacing.LG, cw_theme.spacing.MD)
+        layout.setSpacing(cw_theme.spacing.MD)
 
         # Combo período
         self.combo_periodo = QComboBox()
@@ -159,7 +159,7 @@ class TelaRankingClientes(QWidget):
 
         titulo = QLabel("Ranking de clientes por frete")
         titulo.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        titulo.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        titulo.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
         layout.insertWidget(0, titulo)
 
         # Botão Atualizar
@@ -181,7 +181,7 @@ class TelaRankingClientes(QWidget):
         cards_widget.setStyleSheet("background: transparent;")
         grid = QGridLayout(cards_widget)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(tokens.MD)
+        grid.setSpacing(cw_theme.spacing.MD)
         for col in range(4):
             grid.setColumnStretch(col, 1)
 
@@ -215,27 +215,27 @@ class TelaRankingClientes(QWidget):
         container = QFrame()
         container.setStyleSheet(f"""
         QFrame {{
-            background-color: {colors['card_bg']};
-            border: 1px solid {colors['card_border']};
+            background-color: {cw_theme.colors['card_bg']};
+            border: 1px solid {cw_theme.colors['card_border']};
             border-radius: {radius.LG}px;
         }}
         """)
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(tokens.LG, tokens.LG, tokens.LG, tokens.LG)
-        container_layout.setSpacing(tokens.MD)
+        container_layout.setContentsMargins(cw_theme.spacing.LG, cw_theme.spacing.LG, cw_theme.spacing.LG, cw_theme.spacing.LG)
+        container_layout.setSpacing(cw_theme.spacing.MD)
 
         # Cabeçalho do container da tabela
         topo = QHBoxLayout()
         self.lbl_titulo_tabela = QLabel("Ranking de Clientes")
         self.lbl_titulo_tabela.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_XL, bold=True))
-        self.lbl_titulo_tabela.setStyleSheet(f"color: {colors['text_primary']}; background: transparent;")
+        self.lbl_titulo_tabela.setStyleSheet(f"color: {cw_theme.colors['text_primary']}; background: transparent;")
         topo.addWidget(self.lbl_titulo_tabela)
 
         topo.addStretch()
 
         lbl_ordem = QLabel("Mais área útil, mais posições e leitura por impacto")
         lbl_ordem.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM))
-        lbl_ordem.setStyleSheet(f"color: {colors['text_tertiary']}; background: transparent;")
+        lbl_ordem.setStyleSheet(f"color: {cw_theme.colors['text_tertiary']}; background: transparent;")
         topo.addWidget(lbl_ordem)
         container_layout.addLayout(topo)
 
@@ -297,7 +297,7 @@ class TelaRankingClientes(QWidget):
         item = QTableWidgetItem("Carregando…")
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         colors = cw_theme.colors
-        item.setForeground(QBrush(QColor(colors["text_tertiary"])))
+        item.setForeground(QBrush(QColor(cw_theme.colors["text_tertiary"])))
         self.tabela.setItem(0, 0, item)
         self.tabela.setSpan(0, 0, 1, self.tabela.columnCount())
 
@@ -359,15 +359,15 @@ class TelaRankingClientes(QWidget):
             self.tabela.setRowCount(1)
             item = QTableWidgetItem("Nenhum cliente encontrado para este período.")
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item.setForeground(QBrush(QColor(colors["text_tertiary"])))
+            item.setForeground(QBrush(QColor(cw_theme.colors["text_tertiary"])))
             self.tabela.setItem(0, 0, item)
             self.tabela.setSpan(0, 0, 1, self.tabela.columnCount())
             return
 
         fonte_normal = cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD)
         fonte_bold = cw_theme.get_font(cw_theme.typography.FONT_SIZE_MD, bold=True)
-        cor_frete = QColor(colors["success"])
-        cor_padrao = QColor(colors["text_primary"])
+        cor_frete = QColor(cw_theme.colors["success"])
+        cor_padrao = QColor(cw_theme.colors["text_primary"])
         maior_frete = max((float(item.get("frete", 0) or 0) for item in self.dados), default=0) or 1
 
         self.tabela.setRowCount(len(self.dados))
@@ -408,7 +408,7 @@ class TelaRankingClientes(QWidget):
 
             destaque = QLabel(f"{impacto}% do líder")
             destaque.setFont(cw_theme.get_font(cw_theme.typography.FONT_SIZE_SM, bold=True))
-            destaque.setStyleSheet(f"color: {colors['brand']}; background: transparent;")
+            destaque.setStyleSheet(f"color: {cw_theme.colors['brand']}; background: transparent;")
             impacto_layout.addWidget(destaque)
 
             # Simple progress bar using QFrame
@@ -419,13 +419,13 @@ class TelaRankingClientes(QWidget):
             barra.setTextVisible(False)
             barra.setStyleSheet(f"""
                 QProgressBar {{
-                    background-color: {colors['bg_tertiary']};
+                    background-color: {cw_theme.colors['bg_tertiary']};
                     border: none;
                     border-radius: 4px;
                     height: 8px;
                 }}
                 QProgressBar::chunk {{
-                    background-color: {colors['brand']};
+                    background-color: {cw_theme.colors['brand']};
                     border-radius: 4px;
                 }}
             """)

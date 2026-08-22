@@ -211,7 +211,7 @@ class SaaSTheme:
         QPushButton {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 10px 20px;
             font-size: {t.FONT_SIZE_MD}px;
@@ -220,7 +220,6 @@ class SaaSTheme:
 
         QPushButton:hover {{
             background-color: {c['bg_hover']};
-            border-color: {c['border_strong']};
         }}
 
         QPushButton:pressed {{
@@ -230,42 +229,38 @@ class SaaSTheme:
         QPushButton:disabled {{
             background-color: {c['bg_tertiary']};
             color: {c['text_disabled']};
-            border-color: {c['border_subtle']};
         }}
 
         /* Primary Button (CW Red) */
         QPushButton[class="primary"] {{
             background-color: {c['cw']};
             color: #FFFFFF;
-            border: 1px solid {c['cw']};
+            border: none;
         }}
 
         QPushButton[class="primary"]:hover {{
             background-color: {c['cw_hover']};
-            border-color: {c['cw_hover']};
         }}
 
         QPushButton[class="primary"]:pressed {{
             background-color: {c['cw_active']};
-            border-color: {c['cw_active']};
         }}
 
         /* LineEdit */
         QLineEdit {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 10px 16px;
             font-size: {t.FONT_SIZE_MD}px;
         }}
 
         QLineEdit:hover {{
-            border-color: {c['border_strong']};
+            background-color: {c['bg_hover']};
         }}
 
         QLineEdit:focus {{
-            border-color: {c['cw']};
             background-color: {c['bg_surface']};
         }}
 
@@ -278,7 +273,7 @@ class SaaSTheme:
         QComboBox {{
             background-color: {c['bg_tertiary']};
             color: {c['text_primary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 10px 16px;
             font-size: {t.FONT_SIZE_MD}px;
@@ -286,11 +281,11 @@ class SaaSTheme:
         }}
 
         QComboBox:hover {{
-            border-color: {c['border_strong']};
+            background-color: {c['bg_hover']};
         }}
 
         QComboBox:focus {{
-            border-color: {c['cw']};
+            background-color: {c['bg_surface']};
         }}
 
         QComboBox::drop-down {{
@@ -307,7 +302,7 @@ class SaaSTheme:
 
         QComboBox QAbstractItemView {{
             background-color: {c['bg_surface']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             selection-background-color: {c['cw_soft']};
             selection-color: {c['cw']};
@@ -339,16 +334,16 @@ class SaaSTheme:
         /* Table */
         QTableWidget {{
             background-color: {c['bg_surface']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_XL}px;
-            gridline-color: {c['border_subtle']};
+            gridline-color: transparent;
             selection-background-color: {c['cw_soft']};
             selection-color: {c['cw']};
         }}
 
         QTableWidget::item {{
             padding: 12px 16px;
-            border-bottom: 1px solid {c['border_subtle']};
+            border: none;
         }}
 
         QTableWidget::item:hover {{
@@ -363,7 +358,6 @@ class SaaSTheme:
             background-color: {c['bg_tertiary']};
             color: {c['text_secondary']};
             border: none;
-            border-bottom: 1px solid {c['border_default']};
             padding: 12px 16px;
             font-size: {t.FONT_SIZE_SM}px;
             font-weight: 600;
@@ -383,7 +377,7 @@ class SaaSTheme:
         /* Menu */
         QMenu {{
             background-color: {c['bg_surface']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_LG}px;
             padding: 4px;
         }}
@@ -429,7 +423,7 @@ class SaaSTheme:
         /* ProgressBar */
         QProgressBar {{
             background-color: {c['bg_tertiary']};
-            border: 1px solid {c['border_default']};
+            border: none;
             border-radius: {t.RADIUS_FULL}px;
             height: 8px;
             text-align: center;

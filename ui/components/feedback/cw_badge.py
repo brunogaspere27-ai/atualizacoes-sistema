@@ -52,28 +52,23 @@ class CWBadge(QLabel):
         variant_config = {
             BadgeVariant.DEFAULT: {
                 'bg': c['bg_tertiary'],
-                'text': c['text_secondary'],
-                'border': c['border_default']
+                'text': c['text_secondary']
             },
             BadgeVariant.SUCCESS: {
                 'bg': c['success_soft'],
-                'text': c['success'],
-                'border': c['success']
+                'text': c['success']
             },
             BadgeVariant.WARNING: {
                 'bg': c['warning_soft'],
-                'text': c['warning'],
-                'border': c['warning']
+                'text': c['warning']
             },
             BadgeVariant.ERROR: {
                 'bg': c['error_soft'],
-                'text': c['error'],
-                'border': c['error']
+                'text': c['error']
             },
             BadgeVariant.INFO: {
                 'bg': c['info_soft'],
-                'text': c['info'],
-                'border': c['info']
+                'text': c['info']
             }
         }
         
@@ -83,7 +78,7 @@ class CWBadge(QLabel):
             QLabel {{
                 background-color: {config['bg']};
                 color: {config['text']};
-                border: 1px solid {config['border']};
+                border: none;
                 border-radius: {r.SM}px;
                 padding: {t.XS}px {t.SM}px;
                 font-size: {cw_theme.typography.FONT_SIZE_XS}px;

@@ -85,12 +85,6 @@ class CWChartWidget(QWidget):
         if max_value == 0:
             max_value = 1
         
-        # Draw grid lines
-        painter.setPen(QPen(QColor(c['border_subtle']), 1))
-        for i in range(5):
-            y = y_start + (height / 4) * i
-            painter.drawLine(x_start, int(y), x_start + int(width), int(y))
-        
         # Draw line
         painter.setPen(QPen(QColor(c['primary']), 2))
         points = []
@@ -141,12 +135,6 @@ class CWChartWidget(QWidget):
         max_value = max(values) if values else 1
         if max_value == 0:
             max_value = 1
-        
-        # Draw grid lines
-        painter.setPen(QPen(QColor(c['border_subtle']), 1))
-        for i in range(5):
-            y = y_start + (height / 4) * i
-            painter.drawLine(x_start, int(y), x_start + int(width), int(y))
         
         # Draw bars
         bar_width = (width / len(values)) * 0.6
@@ -199,7 +187,7 @@ class CWChartWidget(QWidget):
             
             span_angle = (value / total) * 360 * 16  # Qt usa 1/16 de grau
             
-            painter.setBrush(QBrush(QColor(colors[i % len(colors)])))
+            painter.setBrush(QBrush(QColor(cw_theme.colors[i % len(colors)])))
             painter.setPen(Qt.PenStyle.NoPen)
             
             painter.drawPie(
@@ -225,7 +213,7 @@ class CWChartWidget(QWidget):
         legend_y = 20
         
         for i, (label, value) in enumerate(zip(labels, values)):
-            color = colors[i % len(colors)]
+            color = cw_theme.colors[i % len(colors)]
             
             painter.setBrush(QBrush(QColor(color)))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -292,7 +280,7 @@ class CWChartCard(QWidget):
         self.setStyleSheet(f"""
             CWChartCard {{
                 background-color: {c['bg_elevated']};
-                border: 1px solid {c['border_subtle']};
+                border: none;
                 border-radius: {r.LG}px;
             }}
         """)
